@@ -24,6 +24,7 @@ FILES = {
     "main_prompt": 'system_prompt_main.txt',
     "img_prompt_instr": 'system_prompt_imgprompt.txt',
     "visual_prompt": 'system_prompt_visual.txt',
+    "architect_prompt": 'system_prompt_architect.txt',
     "conversations_dir": 'conversations'
 }
 
@@ -456,7 +457,68 @@ def new_chat():
     get_active_chat_path()
     return jsonify({"success": True})
 
+@app.route('/architect_chat', methods=['POST'])
+def architect_chat():
+    """Stream response from the Architect persona."""
+    hist = request.json.get('history', [])
+    user_msg = request.json.get('message')
+
+    # Prepend system prompt if empty
+    if not hist:
+        hist = [{"role": "system", "content": read_text(FILES["architect_prompt"])}]
+
+    hist.append({"role": "user", "content": user_msg})
+
+    def generate():
+        m_set = read_json(FILES["mistral_settings"], {})
+        headers = {"Authorization": f"Bearer {MISTRAL_API_KEY}"}
+        payload = {
+            "model": m_set.get("model", "mistral-large-latest"),
+            "temperature": 0.9,
+            "messages": hist,
+            "stream": True, "safe_prompt": False
+        }
+
+        try:
+            with requests.post(MISTRAL_URL, headers=headers, json=payload, stream=True) as r:
+                for line in r.iter_lines():
+                    if line:
+                        decoded = line.decode('utf-8')
+                        if "[DONE]" in decoded: break
+                        try:
+                            chunk = json.loads(decoded[6:])
+                            if len(chunk['choices'])>0:
+                                c = chunk['choices'][0]['delta'].get('content', '')
+                                yield f"data: {json.dumps({'content': c})}\n\n"
+                        except: pass
+        except Exception as e:
+            yield f"data: {json.dumps({'error': str(e)})}\n\n"
+
+    return Response(stream_with_context(generate()), mimetype='text/event-stream')
+
+@app.route('/create_scenario_chat', methods=['POST'])
+def create_scenario_chat():
+    """Create a new chat file with the Architect's prompt as the first user message."""
+    prompt = request.json.get('prompt')
+    if not prompt: return jsonify({"error": "No prompt provided"}), 400
+
+    ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    fn = f"Scenario_{ts}.json"
+
+    chat_data = {
+        "messages": [
+            {"role": "system", "content": read_text(FILES["main_prompt"])},
+            {"role": "user", "content": prompt},
+            {"role": "assistant", "content": "Understood. I'm ready to begin the scenario."} 
+        ],
+        "summaries": [],
+        "visual_memory": ""
+    }
+
+    write_json(os.path.join(FILES["conversations_dir"], fn), chat_data)
+    write_json(FILES["active_meta"], {"filename": fn})
+    return jsonify({"success": True, "filename": fn})
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
-
 # Last Updated: 2026-02-17 13:00:00

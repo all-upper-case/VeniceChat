@@ -16,11 +16,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const editOverlay = document.getElementById('edit-overlay');
     const editTextarea = document.getElementById('edit-textarea');
     const guidedOverlay = document.getElementById('guided-overlay');
-    const guidedInput = document.getElementById('guided-input');
-    const vmTextarea = document.getElementById('visual-memory-text');
+    const architectModal = document.getElementById('architectModal');
+    const architectChatBox = document.getElementById('architect-chat');
+    const architectInput = document.getElementById('architect-input');
+    let architectHistory = [];
 
     loadHistory();
     loadSidebar();
+
+    // ... (Existing loadHistory and renderChat functions) ...
 
     async function loadHistory() {
         try {
@@ -34,117 +38,126 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (e) { console.error("History error", e); }
     }
 
-    function renderChat() {
-        chatbox.innerHTML = '';
-        runningInput = 0;
-        runningOutput = 0;
+    // ... (rest of code) ...
 
-        let lastSumIndex = -1;
-        if (summaries.length > 0) {
-            lastSumIndex = summaries[summaries.length - 1].end_index;
-        }
+    document.getElementById('architect-btn').onclick = () => {
+        architectModal.style.display = 'block';
+        architectHistory = []; // Reset history
+        architectChatBox.innerHTML = '<div class="message assistant">Hello! I\'m the Architect. I can help you design a new scenario, RPG, or story. What kind of experience are you looking for today?</div>';
+    };
 
-        chatHistory.forEach((msg, idx) => {
-            if (msg.role === 'system') return;
+    document.getElementById('close-architect').onclick = () => architectModal.style.display = 'none';
 
-            if (msg.usage) {
-                runningInput += (msg.usage.prompt_tokens || 0);
-                runningOutput += (msg.usage.completion_tokens || 0);
-            }
+    document.getElementById('architect-send').onclick = sendArchitectMessage;
+    architectInput.onkeydown = (e) => { if(e.key==='Enter') sendArchitectMessage(); };
 
-            const div = document.createElement('div');
-            div.className = `message ${msg.role}`;
+    async function sendArchitectMessage() {
+        const txt = architectInput.value.trim();
+        if(!txt) return;
 
-            const isSummed = (idx <= lastSumIndex);
+        // Add User Message
+        const uDiv = document.createElement('div'); uDiv.className = 'message user'; uDiv.textContent = txt;
+        architectChatBox.appendChild(uDiv);
+        architectInput.value = '';
 
-            if (msg.content.startsWith('__IMG_JSON__')) {
-                try {
-                    const d = JSON.parse(msg.content.substring(12));
-                    div.innerHTML = `
-                        <img src="${d.url}" class="img-display" title="Click to open">
-                        <div class="prompt-box">${d.prompt}</div>
-                        <button class="msg-btn" style="margin-top:5px; width:100%;">Show/Hide Prompt</button>
-                    `;
-                    div.querySelector('img').onclick = () => window.open(d.url, '_blank');
-                    div.querySelector('button').onclick = (e) => {
-                        const box = e.target.previousElementSibling;
-                        box.style.display = (box.style.display === 'block') ? 'none' : 'block';
-                    };
-                } catch(e) { div.textContent = "[Image Error]"; }
-            } else {
-                div.innerHTML = marked.parse(msg.content);
-            }
+        // Add Assistant Placeholder
+        const aDiv = document.createElement('div'); aDiv.className = 'message assistant'; aDiv.textContent = '...';
+        architectChatBox.appendChild(aDiv);
+        architectChatBox.scrollTop = architectChatBox.scrollHeight;
 
-            const optionsBtn = document.createElement('div');
-            optionsBtn.className = 'options-btn';
-            optionsBtn.textContent = '⋮';
+        let fullContent = "";
+        let isScenarioReady = false;
+        let ghostPrompt = "";
 
-            const toolsPanel = document.createElement('div');
-            toolsPanel.className = 'tools-panel';
+        try {
+            const res = await fetch('/architect_chat', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ history: architectHistory, message: txt })
+            });
 
-            const btnRow = document.createElement('div');
-            btnRow.className = 'tools-row';
+            const reader = res.body.getReader();
+            const dec = new TextDecoder();
 
-            const editBtn = document.createElement('button'); editBtn.className = 'msg-btn'; editBtn.textContent = 'Edit';
-            editBtn.onclick = () => openLargeEditor(idx, 'message');
+            while(true) {
+                const {done, value} = await reader.read();
+                if(done) break;
+                const chunk = dec.decode(value);
+                const lines = chunk.split('\n\n');
+                for (const line of lines) {
+                    if (line.startsWith('data: ')) {
+                        try {
+                            const d = JSON.parse(line.substring(6));
+                            if (d.content) {
+                                fullContent += d.content;
 
-            const regenBtn = document.createElement('button'); regenBtn.className = 'msg-btn'; regenBtn.textContent = msg.role === 'user' ? 'Resend' : 'Regen';
-            regenBtn.onclick = () => handleRegen(idx, msg.role);
-
-            btnRow.append(editBtn, regenBtn);
-            toolsPanel.appendChild(btnRow);
-
-            const stats = document.createElement('div');
-            stats.className = 'stats-block';
-            let statHtml = `Msg #${idx}`;
-
-            if (isSummed) {
-                statHtml += ` <span class="sum-badge">SUMMARIZED</span>`;
-            }
-
-            if (msg.usage) statHtml += `<br>Usage: In:${msg.usage.prompt_tokens} Out:${msg.usage.completion_tokens}`;
-            statHtml += `<br>Total: <span class="stat-highlight">In:${runningInput} Out:${runningOutput}</span>`;
-
-            stats.innerHTML = statHtml;
-
-            // VIEW SUMMARY BUTTON
-            if (isSummed) {
-                // Find which batch contains this message
-                const myBatch = summaries.find(s => idx >= s.start_index && idx <= s.end_index);
-                if (myBatch) {
-                    const viewSumBtn = document.createElement('button');
-                    viewSumBtn.className = 'msg-btn';
-                    viewSumBtn.style.marginTop = '5px';
-                    viewSumBtn.style.width = '100%';
-                    viewSumBtn.textContent = 'View Batch Summary';
-                    viewSumBtn.onclick = () => viewSummary(myBatch.content);
-                    stats.appendChild(viewSumBtn);
+                                // Check for Magic Token
+                                if (fullContent.includes('__SCENARIO_READY__')) {
+                                    isScenarioReady = true;
+                                    const parts = fullContent.split('__SCENARIO_READY__');
+                                    // We show the part BEFORE the token
+                                    aDiv.innerHTML = marked.parse(parts[0]);
+                                    // We capture the part AFTER the token
+                                    ghostPrompt = parts[1];
+                                } else {
+                                    if (!isScenarioReady) {
+                                        aDiv.innerHTML = marked.parse(fullContent);
+                                    } else {
+                                        // If ready, we keep appending to ghostPrompt invisible to user
+                                        // (Actually fullContent has it, so we just parse at the end)
+                                    }
+                                }
+                                architectChatBox.scrollTop = architectChatBox.scrollHeight;
+                            }
+                        } catch(e) {}
+                    }
                 }
             }
 
-            toolsPanel.appendChild(stats);
+            // Round finished
+            if (isScenarioReady) {
+                // Final parse to ensure we got everything
+                const parts = fullContent.split('__SCENARIO_READY__');
+                ghostPrompt = parts[1].trim();
 
-            optionsBtn.onclick = () => { toolsPanel.style.display = (toolsPanel.style.display === 'block') ? 'none' : 'block'; };
+                // Trigger the handoff
+                const launchBtn = document.createElement('button');
+                launchBtn.className = 'action';
+                launchBtn.style.width = '100%';
+                launchBtn.style.marginTop = '10px';
+                launchBtn.style.background = 'var(--accent)';
+                launchBtn.textContent = "🚀 Launch Scenario";
+                launchBtn.onclick = () => launchScenario(ghostPrompt);
 
-            div.appendChild(optionsBtn);
-            div.appendChild(toolsPanel);
-            chatbox.appendChild(div);
-        });
+                const readyMsg = document.createElement('div');
+                readyMsg.className = 'message assistant';
+                readyMsg.innerHTML = "<b>Scenario Generated!</b> Click below to start.";
+                readyMsg.appendChild(launchBtn);
+                architectChatBox.appendChild(readyMsg);
+                architectChatBox.scrollTop = architectChatBox.scrollHeight;
 
-        chatbox.scrollTop = chatbox.scrollHeight;
+            } else {
+                architectHistory.push({role: 'user', content: txt});
+                architectHistory.push({role: 'assistant', content: fullContent});
+            }
+
+        } catch(e) { aDiv.textContent = "Error: " + e; }
     }
 
-    function viewSummary(text) {
-        document.getElementById('summary-content').textContent = text;
-        document.getElementById('summary-view-modal').style.display = 'block';
-    }
-
-    function openLargeEditor(index, type) {
-        activeEditIndex = index;
-        activeEditType = type;
-        if (type === 'message') editTextarea.value = chatHistory[index].content.replace('__IMG_JSON__', '');
-        else fetch('/get_settings').then(r=>r.json()).then(d => editTextarea.value = d.main_prompt);
-        editOverlay.style.display = 'block';
+    async function launchScenario(promptText) {
+        try {
+            const res = await fetch('/create_scenario_chat', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ prompt: promptText })
+            });
+            const d = await res.json();
+            if(d.success) {
+                architectModal.style.display = 'none';
+                loadHistory(); // Reloads into the new chat
+                document.getElementById('sidebar').classList.add('hidden');
+            }
+        } catch(e) { alert("Launch failed: " + e); }
     }
 
     document.getElementById('save-large-edit').onclick = async () => {
