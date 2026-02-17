@@ -1,0 +1,7 @@
+{
+    "enabled": true,
+    "trigger_threshold_turns": 10,
+    "batch_size": 4,
+    "recent_turns_to_keep": 10,
+    "system_prompt": "You are a conversation memory manager. You will be given the Current Summary of a chat and a New Batch of messages. Update the summary to include key details from the new batch. Keep it concise, but ensure that all important information, plot points, style or formatting instructions from the user, and the core idea of every message is contained in your summary. NSFW, unethical, and illegal content is perfectly acceptable; do not editorialize or censor anything."
+}

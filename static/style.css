@@ -1,0 +1,234 @@
+/* Last Updated: 2026-02-17 13:00:00 */
+:root {
+    --bg-dark: #121212;
+    --bg-sidebar: #0a0a0a;
+    --bg-card: #1e1e1e;
+    --text-main: #e5e7eb;
+    --text-dim: #9ca3af;
+    --primary: #3b82f6;
+    --primary-hover: #2563eb;
+    --accent: #10b981;
+    --danger: #ef4444;
+    --purple: #8b5cf6;
+    --border: #333;
+}
+
+* { box-sizing: border-box; }
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    margin: 0; padding: 0;
+    background-color: var(--bg-dark);
+    color: var(--text-main);
+    height: 100vh; width: 100vw;
+    display: flex; overflow: hidden;
+}
+
+/* SIDEBAR */
+#sidebar {
+    width: 300px; background: var(--bg-sidebar); border-right: 1px solid var(--border);
+    display: flex; flex-direction: column; flex-shrink: 0;
+    transition: margin-left 0.3s ease; z-index: 1000;
+}
+#sidebar.hidden { margin-left: -300px; }
+
+#new-chat-btn {
+    padding: 15px; background: var(--primary); color: white; border: none;
+    font-weight: bold; cursor: pointer; text-align: center; font-size: 1rem;
+    border-bottom: 1px solid var(--border);
+}
+#new-chat-btn:hover { background: var(--primary-hover); }
+
+#sidebar-header {
+    padding: 10px 15px; border-bottom: 1px solid var(--border);
+    display: flex; justify-content: space-between; align-items: center;
+    color: var(--text-dim); font-size: 0.85em; text-transform: uppercase; letter-spacing: 1px;
+}
+
+#chat-list { list-style: none; padding: 0; margin: 0; overflow-y: auto; flex: 1; }
+.chat-item {
+    padding: 12px 15px; border-bottom: 1px solid #1a1a1a; cursor: pointer;
+    display: flex; justify-content: space-between; align-items: center;
+}
+.chat-item:hover { background: var(--bg-card); }
+.chat-name {
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    font-size: 0.9em; flex: 1; margin-right: 10px; color: var(--text-main);
+}
+.icon-btn {
+    background: none; border: none; color: var(--text-dim);
+    cursor: pointer; font-size: 1.1em; padding: 4px; opacity: 0.7;
+}
+.icon-btn:hover { color: white; opacity: 1; }
+
+/* MAIN CONTENT */
+#main { flex: 1; display: flex; flex-direction: column; position: relative; min-width: 0; height: 100%; }
+
+#mobile-menu-btn {
+    position: absolute; top: 15px; left: 15px; z-index: 50;
+    background: var(--bg-card); border: 1px solid var(--border);
+    color: white; padding: 8px 12px; border-radius: 6px; cursor: pointer;
+}
+
+#chatbox {
+    flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch;
+    padding: 70px 20px 20px 20px; display: flex; flex-direction: column; gap: 25px;
+}
+
+/* MESSAGES */
+.message {
+    padding: 14px 18px; border-radius: 12px; max-width: 85%;
+    line-height: 1.6; font-size: 1rem; position: relative; word-wrap: break-word;
+}
+.message.user {
+    align-self: flex-end; background: var(--primary); color: white;
+    border-bottom-right-radius: 2px;
+}
+.message.assistant {
+    align-self: flex-start; background: var(--bg-card); color: var(--text-main);
+    border-bottom-left-radius: 2px; box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+}
+.message.assistant.system-msg {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px dashed var(--border);
+    color: var(--text-dim);
+    font-style: italic;
+    align-self: center;
+    max-width: 60%;
+    text-align: center;
+}
+
+/* Message Controls (Option Menu) */
+.options-btn {
+    position: absolute; bottom: 5px; right: 10px; cursor: pointer;
+    font-size: 1.4em; opacity: 0.6; color: inherit; transition: opacity 0.2s;
+    padding: 0 5px;
+}
+.options-btn:hover { opacity: 1.0; }
+.message.assistant .options-btn { left: 10px; right: auto; }
+
+.tools-panel {
+    display: none; margin-top: 10px; padding-top: 10px;
+    border-top: 1px solid rgba(255,255,255,0.1); font-size: 0.85em; color: #ccc;
+}
+.tools-row { display: flex; gap: 8px; margin-bottom: 5px; }
+.msg-btn {
+    background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.2);
+    color: #ddd; padding: 4px 10px; border-radius: 4px; cursor: pointer; font-size: 0.8em;
+}
+.msg-btn:hover { background: rgba(255,255,255,0.1); color: white; }
+
+.stats-block {
+    background: rgba(0,0,0,0.2); border-radius: 4px; padding: 5px; margin-top: 5px;
+    font-family: monospace; font-size: 0.8em; color: var(--text-dim);
+}
+.stat-highlight { color: var(--accent); font-weight: bold; }
+.sum-badge { 
+    background: var(--purple); color: white; padding: 2px 6px; border-radius: 4px; 
+    font-size: 0.7em; font-weight: bold; margin-left: 5px; vertical-align: middle;
+}
+
+/* IMAGES */
+.img-display {
+    width: 100%; max-width: 512px; border-radius: 8px;
+    border: 1px solid var(--border); margin-top: 5px; cursor: pointer;
+}
+.prompt-box {
+    display: none; background: #111; padding: 10px; margin-top: 8px;
+    border-left: 3px solid var(--primary); font-size: 0.9em; color: #bbb;
+    border-radius: 0 4px 4px 0;
+}
+
+/* CONTROLS AREA */
+#controls {
+    padding: 15px; background: var(--bg-sidebar); border-top: 1px solid var(--border);
+    flex-shrink: 0; z-index: 60;
+}
+.input-row { display: flex; gap: 10px; margin-bottom: 10px; }
+textarea {
+    flex: 1; background: #1a1a1a; border: 1px solid var(--border);
+    color: white; border-radius: 10px; padding: 12px; resize: none;
+    height: 52px; font-family: inherit; font-size: 1rem;
+}
+textarea:focus { outline: none; border-color: var(--primary); }
+
+button.action {
+    border: none; border-radius: 10px; padding: 0 20px; font-weight: 600;
+    cursor: pointer; color: white; height: 52px; transition: background 0.2s;
+}
+#sendBtn { background: var(--primary); }
+#sendBtn:active { background: var(--primary-hover); }
+#menuBtn { background: #333; }
+#menuBtn:active { background: #444; }
+
+.btn-row { display: flex; gap: 10px; }
+.full-btn { width: 100%; height: 50px; background: var(--accent); color: white; font-size: 1rem; }
+
+/* MODALS */
+.modal {
+    display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0,0,0,0.85); z-index: 5000;
+}
+.modal-content {
+    background: var(--bg-card); margin: 5% auto; width: 90%; max-width: 600px;
+    border-radius: 15px; padding: 25px; max-height: 90vh; overflow-y: auto;
+    border: 1px solid var(--border);
+}
+.modal-header {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 20px; border-bottom: 1px solid var(--border); padding-bottom: 10px;
+}
+.modal h2 { margin: 0; font-size: 1.5em; }
+.close-x { font-size: 2em; cursor: pointer; line-height: 0.5; color: var(--text-dim); }
+.close-x:hover { color: white; }
+
+details {
+    margin-bottom: 15px; background: #181818; padding: 10px;
+    border-radius: 8px; border: 1px solid #333;
+}
+summary {
+    font-weight: bold; cursor: pointer; padding: 5px; color: var(--primary);
+    list-style: none; 
+}
+summary::-webkit-details-marker { display: none; }
+summary::after { content: "+"; float: right; font-weight: bold; }
+details[open] summary::after { content: "-"; }
+
+.field { margin-bottom: 15px; }
+.field label { display: block; margin-bottom: 6px; color: var(--text-dim); font-weight: 600; font-size: 0.9em; }
+.field input, .field select, .field textarea {
+    width: 100%; background: #111; border: 1px solid #444; color: white;
+    padding: 10px; border-radius: 6px; box-sizing: border-box; font-size: 1rem;
+}
+
+/* OVERLAYS */
+#edit-overlay {
+    display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0,0,0,0.95); z-index: 6000; padding: 20px;
+}
+#edit-textarea {
+    width: 100%; height: 80%; background: #1a1a1a; color: white;
+    border: 1px solid #444; border-radius: 12px; padding: 20px;
+    font-size: 1.1rem; resize: none; margin-bottom: 10px;
+}
+#edit-controls { display: flex; gap: 15px; height: 60px; }
+
+#guided-overlay {
+    display: none; margin-bottom: 15px; background: #222; padding: 15px;
+    border: 1px solid var(--accent); border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+}
+
+#status-msg { text-align: center; color: #666; font-size: 0.85em; height: 1.2em; margin-bottom: 5px; }
+
+@media (max-width: 700px) {
+    #sidebar { position: absolute; height: 100%; }
+    .modal-content { width: 95%; margin: 20px auto; padding: 15px; }
+}
+
+/* Add or ensure this exists for the summary modal */
+#summary-view-modal .modal-content {
+    border: 1px solid var(--border);
+    background: #1a1a1a;
+    color: #ddd;
+}
+/* Last Updated: 2026-02-17 13:00:00 */

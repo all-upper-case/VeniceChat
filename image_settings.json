@@ -1,0 +1,7 @@
+{
+    "width": 864,
+    "height": 1152,
+    "guided_mode": true,
+    "num_inference_steps": 8,
+    "enable_safety_checker": false
+}

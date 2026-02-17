@@ -1,0 +1,133 @@
+<!-- Last Updated: 2026-02-17 13:00:00 -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Mistral & Z-Image</title>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css', v='12.0') }}">
+</head>
+<body>
+
+    <div id="sidebar" class="hidden">
+        <button id="new-chat-btn">+ New Chat</button>
+        <div id="sidebar-header">
+            <span>Recent Chats</span>
+            <button id="close-sidebar" class="icon-btn">✕</button>
+        </div>
+        <ul id="chat-list"></ul>
+    </div>
+
+    <div id="main">
+        <button id="mobile-menu-btn">☰</button>
+        <div id="chatbox"></div>
+        <div id="status-msg"></div>
+
+        <div id="guided-overlay">
+            <label>Visual Guidance:</label>
+            <textarea id="guided-input" placeholder="Add instructions..."></textarea>
+            <div style="display:flex; gap:12px; margin-top:10px;">
+                <button id="guided-submit" class="action" style="flex:1; background:var(--accent);">Generate</button>
+                <button id="guided-cancel" class="action" style="flex:1; background:#444;">Cancel</button>
+            </div>
+        </div>
+
+        <div id="controls">
+            <div class="input-row">
+                <textarea id="userInput" placeholder="Message Mistral..."></textarea>
+                <button id="sendBtn" class="action">Send</button>
+                <button id="menuBtn" class="action">Menu</button>
+            </div>
+            <div class="btn-row">
+                <button id="genImgBtn" class="action full-btn">Generate Image</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modals -->
+    <div id="edit-overlay">
+        <textarea id="edit-textarea"></textarea>
+        <div id="edit-controls">
+            <button id="save-large-edit" class="action" style="background:var(--primary); flex:1;">Save</button>
+            <button id="cancel-large-edit" class="action" style="background:#444; flex:1;">Cancel</button>
+        </div>
+    </div>
+
+    <div id="summary-view-modal" class="modal">
+        <div class="modal-content" style="max-width:500px;">
+            <div class="modal-header">
+                <h2>Batch Summary</h2>
+                <span onclick="document.getElementById('summary-view-modal').style.display='none'" class="close-x">×</span>
+            </div>
+            <div id="summary-content" style="white-space:pre-wrap; color:#ccc; line-height:1.5;"></div>
+        </div>
+    </div>
+
+    <div id="settingsModal" class="modal">
+        <div class="modal-content">
+            <div style="display:flex; justify-content:space-between; margin-bottom:15px;">
+                <h2 style="margin:0;">Settings</h2>
+                <span id="close-modal-x" style="cursor:pointer; font-size:2em;">×</span>
+            </div>
+
+            <details open>
+                <summary>Mistral Chat Model</summary>
+                <div class="field"><label>Model ID</label><input type="text" id="set-model-chat" list="model-history-list"><datalist id="model-history-list"></datalist></div>
+                <div class="field"><label>Temperature</label><input type="number" id="set-temp-chat" step="0.1"></div>
+                <div class="field"><label>Max Output Tokens</label><input type="number" id="set-tokens-chat" step="100"></div>
+                <div class="field" style="display:flex; gap:10px;">
+                    <div style="flex:1;"><label>Freq Penalty</label><input type="number" id="set-freq-chat" step="0.1"></div>
+                    <div style="flex:1;"><label>Pres Penalty</label><input type="number" id="set-pres-chat" step="0.1"></div>
+                </div>
+            </details>
+
+            <details>
+                <summary>Image Generation (Z-Image)</summary>
+                <div class="field" style="display:flex; align-items:center; gap:10px; margin-top:10px;">
+                    <input type="checkbox" id="set-guided" style="width:20px;"><label for="set-guided" style="margin:0;">Guided Mode</label>
+                </div>
+                <div class="field"><label>Image Prompt Model</label><input type="text" id="set-model-img"></div>
+                <div class="field"><label>Image Context Depth (Messages)</label><input type="number" id="set-img-depth" min="1" max="20"></div>
+                <div class="field"><label>Aspect Ratio</label><select id="set-ar"><option value="1:1">Square (1:1)</option><option value="4:3">Landscape (4:3)</option><option value="3:4">Portrait (3:4)</option><option value="16:9">Widescreen (16:9)</option><option value="9:16">Vertical (9:16)</option></select></div>
+                <div class="field" style="display:flex; align-items:center; gap:10px;"><input type="checkbox" id="set-hd" style="width:auto;"><label for="set-hd" style="margin:0;">HD Mode</label></div>
+
+                <h4 style="margin-bottom:5px; margin-top:20px; color:var(--accent);">Visual Memory (Characters)</h4>
+                <div style="background:#111; padding:10px; border-radius:8px;">
+                    <div class="field"><label>Scan Depth (Messages)</label><input type="number" id="set-visual-depth" value="50"></div>
+                    <button id="scan-visuals-btn" class="msg-btn" style="width:100%; margin-bottom:10px; padding:10px; background:#444;">Scan Context</button>
+                    <label>Current Memory:</label>
+                    <textarea id="visual-memory-text" rows="4" style="font-size:0.9em;"></textarea>
+                    <button id="save-visuals-btn" class="msg-btn" style="width:100%; margin-top:5px; background:var(--primary);">Save Manual Edits</button>
+                </div>
+            </details>
+
+            <details>
+                <summary>Summarizer (Context Memory)</summary>
+                <div class="field" style="background:#111; padding:10px; border-radius:8px;">
+                    <div style="display:flex; gap:10px; align-items:center;">
+                        <input type="checkbox" id="sum-enabled" style="width:20px;">
+                        <label for="sum-enabled" style="margin:0;">Enable Auto-Summarization</label>
+                    </div>
+                    <div id="sum-options" style="margin-top:10px; display:none;">
+                        <label>Threshold</label><input type="number" id="sum-threshold">
+                        <label>Keep Recent</label><input type="number" id="sum-keep">
+                        <label>Batch Size</label><input type="number" id="sum-batch">
+                        <label>System Prompt</label><textarea id="sum-prompt" rows="2"></textarea>
+                    </div>
+                </div>
+            </details>
+
+            <details>
+                <summary>System Prompts</summary>
+                <button id="expand-main-prompt" class="action" style="width:100%; margin-top:10px; background:#333;">Edit Main System Prompt</button>
+            </details>
+
+            <button id="save-settings-btn" class="action" style="width:100%; background:var(--accent); margin-top:20px; height:60px;">Save All Changes</button>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>
+<!-- Last Updated: 2026-02-17 13:00:00 -->

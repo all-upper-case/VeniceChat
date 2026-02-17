@@ -1,0 +1,4 @@
+{
+    "model": "mistral-small-latest",
+    "context_depth": 4
+}
