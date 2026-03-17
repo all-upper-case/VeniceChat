@@ -1,0 +1,11 @@
+{
+    "chunk_id": "1/4",
+    "payload": {
+        "model": "tts-kokoro",
+        "input": "The phone vibrates between their joined hands, a sharp buzz that makes Ethan flinch, his knuckles bumping against Maya\u2019s bare thigh. She lifts the device, tilting it so they can both see the screen, where a video file has appeared in the chat window from ScholarlyPursuits, the thumbnail showing the same sunlit kitchen but now empty of people, the marble countertop bearing a handwritten sign that reads \"Thursday, 3:47 PM\" alongside a copy of today\u2019s newspaper, the headline about a local zoning dispute clearly visible. Maya\u2019s thumb hovers, then presses play. The camera angle is steady, professional, capturing the woman from CultivatedGardens as she enters the frame wearing nothing but an apron, the fabric a pale linen that contrasts with the dark hair between her legs, trimmed into a neat shape that makes Maya unconsciously touch her own sparse patch. The woman\u2014she introduces herself as Vivian, her voice cultured and warm\u2014speaks directly to the lens while her hands knead dough on the counter, the motion obscene in its domesticity. \"We\u2019re not law enforcement, darling,\" Vivian says, her smile reaching her eyes as she presses her palms into the flour, her breasts swaying slightly with the rhythm. \"We\u2019re simply educators with appetites. We can be in your town by next Tuesday, early afternoon. We\u2019ll book a suite at the Marriott near your high school\u2014discreet, separate entrances, no questions asked. We\u2019d need you to secure the house for three hours minimum, perhaps four if we\u2019re to do this properly.\"  The video cuts, then shows the man\u2014he calls himself Julian\u2014sitting in a leather chair, fully dressed in a tweed jacket that looks too warm for the season, holding a riding crop that he taps against his palm with a methodical patience. \"We understand your parents attend Bible study on Tuesdays and Thursdays,\" he says, the words sending a chill down Maya\u2019s spine because she does not remember telling them the days, only that the parents were out.",
+        "voice": "af_nova",
+        "response_format": "mp3",
+        "speed": 0.8
+    },
+    "url": "https://api.venice.ai/api/v1/audio/speech"
+}

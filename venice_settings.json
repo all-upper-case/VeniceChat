@@ -1,0 +1,10 @@
+{
+    "model": "mistral-31-24b",
+    "include_venice_system_prompt": false,
+    "vision_high_res": false,
+    "temperature": 0.8,
+    "max_tokens": 6000,
+    "reasoning_effort": "medium",
+    "frequency_penalty": 0,
+    "presence_penalty": 0
+}

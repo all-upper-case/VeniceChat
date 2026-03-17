@@ -1,0 +1,4 @@
+Based on the following first exchange of a conversation, generate a short, descriptive title for the chat.
+Output ONLY the title.
+The title must be exactly four words long.
+Do not use quotes, punctuation, or any other text.

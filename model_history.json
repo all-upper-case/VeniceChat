@@ -1,6 +1,17 @@
 [
-    "mistral-large-latest",
-    "mistral-medium-latest",
-    "labs-mistral-small-creative",
-    "open-mistral-nemo"
+    "zai-org-glm-5",
+    "deepseek-ai-DeepSeek-R1",
+    "kimi-k2-5",
+    "qwen3-coder-480b-a35b-instruct",
+    "hermes-3-llama-3.1-405b",
+    "venice-role-play-uncensored",
+    "",
+    "creative",
+    "venice-uncensored-role-play",
+    "venice-uncensored",
+    "uncensored",
+    "zai-org-glm-4.7",
+    "qwen3-4b",
+    "fastest",
+    "mistral-31-24b"
 ]

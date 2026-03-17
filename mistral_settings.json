@@ -1,7 +1,0 @@
-{
-    "model": "mistral-large-latest",
-    "temperature": 0.9,
-    "max_tokens": 4000,
-    "frequency_penalty": 0,
-    "presence_penalty": 0
-}

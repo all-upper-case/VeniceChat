@@ -1,0 +1,11 @@
+{
+    "chunk_id": "1/2",
+    "payload": {
+        "model": "tts-kokoro",
+        "input": "The request for the purity ring comes on Monday morning, delivered with downcast eyes and fingers twisting in the hem of her modesty skirt\u2014the denim one that falls past her knees, retrieved from the back of the closet where it had been exiled since she turned fourteen. Maya waits until her father is drinking his coffee, the black liquid trembling in the ceramic mug with the fish symbol on it, his hands still uncertain after yesterday\u2019s violence. \"I want to consecrate myself,\" she says, her voice barely audible above the refrigerator\u2019s hum, her posture arranged to suggest both fragility and resolve. \"After what happened... what people thought... I want something visible. A covenant.\"  Her mother\u2019s eyes fill immediately, the tears of a woman desperate to believe in redemption. Her father sets down the mug with a click that sounds like a period at the end of a sentence. \"Your mother has her grandmother\u2019s ring,\" he says, his voice thick. \"The sapphire. It was meant for your wedding day, but... yes. A promise to yourself. To God.\"  Maya extends her left hand, palm up, and feels the cool weight of the antique gold sliding onto her finger, the stone dark blue as a bruise. She closes her fist around it and smiles, a tremulous expression that masks the calculation beneath\u2014this ring is currency, a visible token of her rehabilitation that will buy her hours of unsupervised time, solitary walks for \"prayer and reflection,\" bathroom locks that will not be questioned. On Monday night, while her parents attend an emergency elder board meeting to discuss the \"deepfake scandal\" affecting the youth group, Maya slips out the back door. The moon is a thin fingernail scraping the sky, providing just enough light to navigate the hedge. She digs with her bare hands, nails raking through mulch and loam, until her fingers brush the hard rectangle of the case. The phone is dead, the battery drained after three days in the dirt.",
+        "voice": "af_nova",
+        "response_format": "mp3",
+        "speed": 0.8
+    },
+    "url": "https://api.venice.ai/api/v1/audio/speech"
+}

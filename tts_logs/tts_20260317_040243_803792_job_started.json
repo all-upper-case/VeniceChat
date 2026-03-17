@@ -1,0 +1,14 @@
+{
+    "input_length": 1555,
+    "cleaned_length": 1555,
+    "chunk_count": 1,
+    "settings": {
+        "enabled": true,
+        "model": "tts-kokoro",
+        "voice": "af_nova",
+        "speed": 0.8
+    },
+    "chunks": [
+        "At nine-twenty-eight, a vehicle turns onto their street, moving slow, predatory, a black Volvo station wagon with tinted windows that reflects the morning sun like a beetle\u2019s carapace. It pulls into their driveway with the engine purring, not cutting off immediately, the air conditioning still running inside. The driver\u2019s door opens. Julian steps out, and he is exactly as Maya imagined him from his prose\u2014tall, broad-shouldered, wearing a linen blazer over a faded band t-shirt, his beard neatly trimmed, his eyes hidden behind aviator sunglasses that turn toward the house with the weight of scrutiny. He looks like a professor who has come to tutor them in Latin or philosophy, not the architecture of incest. He opens the passenger door for Vivian, who emerges with the fluidity of a woman accustomed to being watched, her dark hair pulled back in a chignon, wearing a cream-colored dress that falls to her calves, her calves themselves bare and muscled, her feet in leather sandals that look expensive and European. They do not rush. Vivian retrieves a leather satchel from the back seat, the kind that might contain medical instruments or manuscripts, and Julian adjusts his cuffs, a wire glinting momentarily at his collar before he tucks it away. They walk up the path to the front door with the unhurried pace of collectors approaching a rare acquisition, their bodies casting long shadows across the porch where Maya and Ethan stand waiting, the door already open, the air between them charged with the voltage of what is about to be taught."
+    ]
+}

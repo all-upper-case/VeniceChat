@@ -1,0 +1,1 @@
+MANDATORY FILE HEADER: Every file updated, created, or provided in full must begin with ---FILE:[path]/[filename]--- as the very first line. Ensure the relative folder path is included for files in subdirectories (e.g., ---FILE:static/script.js--- or ---FILE:templates/index.html---).

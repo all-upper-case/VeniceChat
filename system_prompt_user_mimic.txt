@@ -1,0 +1,1 @@
+Write your next reply from the point of view of User, using the chat history so far as a guideline for the writing style of User. Write one reply only, without any extra introductory text or commentary. Use markdown. Don't write as Assistant or system. Don't describe actions of Assistant. Return ONLY the raw text of the response.

@@ -1,0 +1,11 @@
+{
+    "chunk_id": "2/2",
+    "payload": {
+        "model": "tts-kokoro",
+        "input": "\"We\u2019re ready.\"  \"Not quite,\" Vivian says, her gaze dropping to the purity ring still glinting on the kitchen counter. She reaches into her coat pocket and produces a velvet pouch, shaking it so something metallic clinks inside. \"Put these on. Both of you. Quickly.\"  She empties the pouch into Maya\u2019s palm\u2014two simple silver bands, unadorned, sized for children\u2019s fingers. \"Wedding bands,\" Vivian explains, her eyes bright with a hunger that makes Maya\u2019s stomach flip. \"For the hotel. For the camera. If we\u2019re going to document your education properly, we need the symbolism. You\u2019ll be Mr. and Mrs. Smith for the next forty-eight hours.\"  Maya slides the larger band onto Ethan\u2019s left hand, her fingers trembling against his warm skin, then fits the smaller one onto her own finger where the sapphire sat. It feels heavier than the antique gold, colder. Julian\u2019s phone buzzes. He glances at the screen. \"He\u2019s turning onto Oak Street. Two minutes.\"  \"Backpacks?\" Vivian asks.",
+        "voice": "af_nova",
+        "response_format": "mp3",
+        "speed": 0.8
+    },
+    "url": "https://api.venice.ai/api/v1/audio/speech"
+}

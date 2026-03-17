@@ -1,0 +1,11 @@
+{
+    "chunk_id": "2/2",
+    "payload": {
+        "model": "tts-kokoro",
+        "input": "\"We propose arriving at your home at two o\u2019clock next Tuesday, giving us time to set up equipment, conduct an interview, and begin Ethan\u2019s education in anal preparation before your parents return at six. We\u2019ll bring enemas, graduated dilators, and a camera that shoots in 4K. You\u2019ll earn five thousand for the afternoon, ten if you spend the night in the suite with us afterward, though we understand that may be... difficult to arrange.\"  The video ends, and immediately a text follows: \"We\u2019ve also sent a small advance to your wallet. Consider it a gesture of good faith. Check your balance.\"",
+        "voice": "af_nova",
+        "response_format": "mp3",
+        "speed": 0.8
+    },
+    "url": "https://api.venice.ai/api/v1/audio/speech"
+}

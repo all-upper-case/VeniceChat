@@ -1,0 +1,11 @@
+{
+    "chunk_id": "2/2",
+    "payload": {
+        "model": "tts-kokoro",
+        "input": "She sleeps with the phone pressed to her breast, the screen still lit with the CarnalCrypt logo, her fingers sticky and her breathing evening out into the shallow rhythm of dreamless exhaustion. Morning arrives with the scrape of her father\u2019s razor against his throat in the bathroom down the hall, the sound carrying through the vents. Maya wakes to find Ethan already in her doorway, dressed in jeans and a clean t-shirt, his hair wet from a shower that has washed away the smell of their shared sin. He looks at her with eyes that are red-rimmed but alert, terrified and exhilarated in equal measure.",
+        "voice": "af_nova",
+        "response_format": "mp3",
+        "speed": 0.8
+    },
+    "url": "https://api.venice.ai/api/v1/audio/speech"
+}

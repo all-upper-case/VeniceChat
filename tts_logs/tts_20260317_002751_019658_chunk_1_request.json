@@ -1,0 +1,11 @@
+{
+    "chunk_id": "2/2",
+    "payload": {
+        "model": "tts-kokoro",
+        "input": "Each species occupies a specific altitude and attitude\u2014some hugging the ground in grasslands, others establishing territories thirty feet high in forest canopies, their wings clear as windowpane or fogged with pruinose blue powder that reduces drag and signals sexual maturity to rivals below.",
+        "voice": "af_nova",
+        "response_format": "mp3",
+        "speed": 0.8
+    },
+    "url": "https://api.venice.ai/api/v1/audio/speech"
+}

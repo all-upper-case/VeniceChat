@@ -1,0 +1,11 @@
+{
+    "chunk_id": "2/2",
+    "payload": {
+        "model": "tts-kokoro",
+        "input": "Maya squints at the dense text, her arousal cooling as her brain engages with the legalistic prose\u2014clauses about consent, about digital rights in perpetuity, about the irrevocable assignment of image rights to Cultivated Holdings LLC for distribution through their \"educational archive.\" The payment structure is outlined in cold detail: $5,000 for the initial session, escalating bonuses for \"completion milestones,\" a revenue-sharing model for subsequent content based on viewership metrics from CarnalCrypt. \"They\u2019re making us employees,\" Maya breathes, her hips shifting unconsciously against Ethan\u2019s stationary hand. \"We\u2019re being hired.\"  Ethan withdraws his fingers slowly, bringing them to his mouth to taste her, his eyes never leaving the screen. \"Is that better or worse?\"  Maya locks the phone, plunging the room back into darkness, the afterimage of the contract floating in her vision like a retinal burn. She rolls toward him, pressing her face into the hollow of his throat where his pulse beats rabbit-quick against her lips. \"Better,\" she decides, the word vibrating against his skin. \"Because employees can quit. Employees can steal the client list and start their own LLC.\"",
+        "voice": "af_nova",
+        "response_format": "mp3",
+        "speed": 0.8
+    },
+    "url": "https://api.venice.ai/api/v1/audio/speech"
+}

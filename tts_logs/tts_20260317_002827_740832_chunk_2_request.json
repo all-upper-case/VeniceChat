@@ -1,0 +1,11 @@
+{
+    "chunk_id": "3/4",
+    "payload": {
+        "model": "tts-kokoro",
+        "input": "\"We have an hour before they\u2019re home. Maybe seventy minutes. We need to decide now, and we need to get the house back to normal.\"  She turns back to him, her hazel eyes sharp, calculating. \"Next Tuesday. We tell them we\u2019re sick Monday night, stay home from school Tuesday. They\u2019ll go to Bible study anyway\u2014they never miss, even when we\u2019re ill. They\u2019ll leave early if we tell them we\u2019re sleeping and don\u2019t want to be disturbed. We can say... we can say we\u2019re doing a school project together, a presentation, and we need the house quiet to film it. They\u2019ll be so relieved we\u2019re being productive that they\u2019ll leave us alone.\"  Ethan nods frantically, grabbing his clothes from the floor, pulling his shirt over his head inside out in his haste. \"And the money? What if they check our phones?\"  \"We hide it,\" Maya says, already moving to strip the bed, yanking the soiled sheets into a ball, her mind racing ahead to the bleach she\u2019ll need for the mattress, the shower they\u2019ll have to take, the evidence they must erase. \"We tell Vivian and Julian to come Tuesday at two. We\u2019ll message them from the bathroom, delete the app after we confirm. We\u2019ll redownload it when we\u2019re ready.\"  She pauses, looking at the wedding photo on the floor, her parents young and hopeful, and feels a pang of something that might be guilt but tastes more like anticipation. \"But first,\" she says, her voice dropping to a whisper as she hears the distant sound of a car turning onto their street, too early, panic spiking in her throat, \"we have to survive tonight. Dad is going to want to talk to you about Jesus and purity while Mom cries. You have to act ashamed. You have to promise never to look at porn again.\"  Ethan stares at her, his eyes wide, and she crosses to him, pressing her hand against his erection, squeezing hard enough to make him gasp.",
+        "voice": "af_nova",
+        "response_format": "mp3",
+        "speed": 0.8
+    },
+    "url": "https://api.venice.ai/api/v1/audio/speech"
+}
