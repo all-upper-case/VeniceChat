@@ -1,0 +1,11 @@
+{
+    "chunk_id": "1/2",
+    "payload": {
+        "model": "tts-kokoro",
+        "input": "Vivian guides Ethan to the armchair by the window, her fingers interlaced with his, the size difference stark\u2014her hand swallowing his, the knuckles of her ring finger pressing against his palm where a boy\u2019s soft skin has not yet calloused from labor or age. She sits, pulling him between her knees, the camel coat finally shed to reveal her body in full: the swell of her stomach where it meets her hips, the weight of her breasts straining against silk, the dark triangle of hair that contrasts with the sparse, barely-grown patch between Maya\u2019s thighs. \"Take off your shirt,\" Vivian commands, her voice dropping an octave, losing the cultured warmth and gaining something ragged, desperate. \"Let me see what thirteen looks like when it\u2019s trying to be brave.\"  Ethan\u2019s fingers fumble with the buttons, the white fabric parting to reveal the flat plane of his chest, ribs visible beneath skin that has never known hair, nipples small and pink and tight. Vivian leans forward, her mouth finding his sternum, her tongue tracing the bone with a wet heat that makes him gasp, her hands sliding down to grip his narrow hips, thumbs digging into the hollows above his pelvis where bone meets flesh. Julian stands at the bedroom doorway, the Arri Alexa already mounted on a tripod, the lens cap removed, the red recording light blinking with a silent, hungry pulse. He crooks his finger at Maya, who sits frozen on the mattress, her floral dress bunched around her waist, the purity ring glinting obscene against her bare thigh. \"Come here,\" Julian says, and when she moves toward him, he catches her wrist, his grip iron, the bones of his adult hand completely encircling the delicate circumference of her arm. He lifts her hand to his mouth, sucks her index finger between his lips, his teeth grazing the knuckle with a pressure that borders on pain. \"You\u2019re going to help me adjust the white balance. Do you know what that means?\"  Maya shakes her head, her hair tangled, her eyes wide.",
+        "voice": "af_nova",
+        "response_format": "mp3",
+        "speed": 0.8
+    },
+    "url": "https://api.venice.ai/api/v1/audio/speech"
+}

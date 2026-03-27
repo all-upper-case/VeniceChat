@@ -1,10 +1,10 @@
 {
-    "model": "mistral-31-24b",
+    "model": "kimi-k2-5",
     "include_venice_system_prompt": false,
-    "vision_high_res": false,
-    "temperature": 0.8,
+    "vision_high_res": true,
+    "temperature": 1,
     "max_tokens": 6000,
-    "reasoning_effort": "medium",
+    "reasoning_effort": "high",
     "frequency_penalty": 0,
     "presence_penalty": 0
 }

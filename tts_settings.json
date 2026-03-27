@@ -1,6 +1,6 @@
 {
     "enabled": true,
     "model": "tts-kokoro",
-    "voice": "af_nova",
-    "speed": 0.8
+    "voice": "af_sarah",
+    "speed": 1
 }

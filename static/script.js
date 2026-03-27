@@ -15,8 +15,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const modal = document.getElementById('settingsModal');
     const editOverlay = document.getElementById('edit-overlay');
     const editTextarea = document.getElementById('edit-textarea');
-    const guidedOverlay = document.getElementById('guided-overlay');
+    const guidedModal = document.getElementById('guided-modal');
     const guidedInput = document.getElementById('guided-input');
+    const refineGuidanceModal = document.getElementById('refine-guidance-modal');
+    const refineGuidanceInput = document.getElementById('refine-guidance-input');
     const vmTextarea = document.getElementById('visual-memory-text');
     const analyticsModal = document.getElementById('analytics-modal');
     const loreExtractorModal = document.getElementById('lore-extractor-modal');
@@ -35,6 +37,12 @@ document.addEventListener('DOMContentLoaded', () => {
         } else {
             console.warn(`SafeBind Warning: Element '${id}' not found for event '${event}'.`);
         }
+    };
+
+    const autoExpandTextarea = (ta) => {
+        if (!ta) return;
+        ta.style.height = 'auto';
+        ta.style.height = ta.scrollHeight + 'px';
     };
 
     function renderDiff(oldStr, newStr) {
@@ -114,6 +122,11 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    function applyInterfaceSettings(fontSize, bgColor) {
+        document.documentElement.style.setProperty('--font-size', `${fontSize}px`);
+        document.documentElement.style.setProperty('--bg-dark', bgColor);
+    }
+
     const init = async () => {
         try {
             const mRes = await fetch('/venice_models');
@@ -144,9 +157,27 @@ document.addEventListener('DOMContentLoaded', () => {
             if(d && d.tts) {
                 window.ttsSettings = d.tts;
             }
+
+            // Fetch persisted balance
+            try {
+                const bRes = await fetch('/get_balance');
+                const bData = await bRes.json();
+                if (bData && bData.balance) {
+                    updateBalanceDisplay(bData.balance);
+                }
+            } catch (e) {
+                console.warn("Failed to fetch persisted balance:", e);
+            }
+
             await loadHistory();
             await loadSidebar();
             updateAttachmentButtonVisibility();
+
+            // Auto-expand all textareas on init and bind listeners
+            document.querySelectorAll('textarea').forEach(ta => {
+                autoExpandTextarea(ta);
+                ta.addEventListener('input', () => autoExpandTextarea(ta));
+            });
         } catch (e) {
             console.error("Initialization failed:", e);
         }
@@ -155,143 +186,241 @@ document.addEventListener('DOMContentLoaded', () => {
     init();
 
     // --- TTS LOGIC ---
+    let ttsCache = {}; // Map of contentHash -> blobUrl
     let currentTTS = {
         msgIndex: -1,
-        audio: null,
-        stopFlag: false,
-        unlocked: false // Track if we've primed the iOS audio engine
+        contentHash: null,
+        audio: null
     };
 
-    // Helper to prime the audio engine (Crucial for iOS/Safari)
-    function unlockIOSAudio() {
-        if (currentTTS.unlocked) return;
-        const silentSrc = 'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=';
-        const audio = new Audio(silentSrc);
-        audio.play().then(() => {
-            currentTTS.unlocked = true;
-            console.log("iOS Audio Engine Unlocked");
-        }).catch(e => console.warn("Audio unlock failed", e));
+    function getContentHash(text) {
+        // Simple string hash for client-side cache keying
+        let hash = 0;
+        for (let i = 0; i < text.length; i++) {
+            const char = text.charCodeAt(i);
+            hash = ((hash << 5) - hash) + char;
+            hash |= 0;
+        }
+        return hash.toString();
     }
 
-    async function handleTTS(index) {
-        // SYNCHRONOUS: This happens the instant you tap
-        unlockIOSAudio(); 
+    function updateTTSButtonStates() {
+        const allBtns = document.querySelectorAll('.tts-btn');
+        allBtns.forEach(btn => {
+            const idx = parseInt(btn.dataset.index);
+            const msg = chatHistory[idx];
+            if (!msg) return;
+            const textContent = Array.isArray(msg.content) ? (msg.content.find(p => p.type === 'text')?.text || "") : msg.content;
+            const hash = getContentHash(textContent);
 
+            if (ttsCache[hash]) {
+                btn.classList.add('tts-ready');
+                if (currentTTS.msgIndex === idx && currentTTS.contentHash === hash) {
+                    if (currentTTS.audio && !currentTTS.audio.paused) {
+                        btn.innerHTML = '⏹ Stop';
+                    } else {
+                        btn.innerHTML = '▶ Play';
+                    }
+                } else {
+                    btn.innerHTML = '▶ Play';
+                }
+            }
+        });
+    }
+
+    function renderTTSControls(index) {
+        const targetDiv = document.querySelector(`#msg-${index} .tools-panel`);
+        if (!targetDiv) return;
+
+        // Remove any existing controls
+        const existing = targetDiv.querySelector('.tts-playback-controls');
+        if (existing) existing.remove();
+
+        const msg = chatHistory[index];
+        const textContent = Array.isArray(msg.content) ? (msg.content.find(p => p.type === 'text')?.text || "") : msg.content;
+        const hash = getContentHash(textContent);
+
+        if (currentTTS.msgIndex !== index || currentTTS.contentHash !== hash || !ttsCache[hash]) return;
+
+        const controls = document.createElement('div');
+        controls.className = 'tts-playback-controls';
+        controls.innerHTML = `
+            <button class="tts-ctrl-btn" data-skip="-15" title="Back 15s">-15s</button>
+            <button class="tts-ctrl-btn" data-skip="-5" title="Back 5s">-5s</button>
+            <button class="tts-ctrl-btn play-pause-btn" title="Play/Pause">⏸</button>
+            <button class="tts-ctrl-btn" data-skip="5" title="Forward 5s">+5s</button>
+            <button class="tts-ctrl-btn" data-skip="15" title="Forward 15s">+15s</button>
+            <div class="tts-progress-container">
+                <div class="tts-progress-bar"></div>
+            </div>
+        `;
+
+        controls.querySelectorAll('[data-skip]').forEach(btn => {
+            btn.onclick = (e) => {
+                e.stopPropagation();
+                if (currentTTS.audio) {
+                    currentTTS.audio.currentTime += parseFloat(btn.dataset.skip);
+                }
+            };
+        });
+
+        const ppBtn = controls.querySelector('.play-pause-btn');
+        ppBtn.onclick = (e) => {
+            e.stopPropagation();
+            if (!currentTTS.audio) return;
+            if (currentTTS.audio.paused) {
+                currentTTS.audio.play();
+                ppBtn.textContent = '⏸';
+            } else {
+                currentTTS.audio.pause();
+                ppBtn.textContent = '▶';
+            }
+            updateTTSButtonStates();
+        };
+
+        targetDiv.appendChild(controls);
+
+        // Progress Tracking
+        if (currentTTS.audio) {
+            const bar = controls.querySelector('.tts-progress-bar');
+            currentTTS.audio.ontimeupdate = () => {
+                const pct = (currentTTS.audio.currentTime / currentTTS.audio.duration) * 100;
+                if (bar) bar.style.width = pct + '%';
+            };
+            ppBtn.textContent = currentTTS.audio.paused ? '▶' : '⏸';
+        }
+    }
+
+    let ttsRefAudioBase64 = null;
+
+    safeBind('tts-ref-audio', 'change', (e) => {
+        const file = e.target.files[0];
+        if (!file) {
+            ttsRefAudioBase64 = null;
+            document.getElementById('tts-clone-status').style.display = 'none';
+            document.getElementById('clear-tts-clone-btn').style.display = 'none';
+            return;
+        }
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            // Mistral expects the Base64 data without the Data URL prefix
+            const b64 = event.target.result.split(',')[1];
+            ttsRefAudioBase64 = b64;
+            const status = document.getElementById('tts-clone-status');
+            if (status) status.style.display = 'block';
+            const clearBtn = document.getElementById('clear-tts-clone-btn');
+            if (clearBtn) clearBtn.style.display = 'block';
+        };
+        reader.readAsDataURL(file);
+    });
+
+    safeBind('clear-tts-clone-btn', 'click', () => {
+        ttsRefAudioBase64 = null;
+        document.getElementById('tts-ref-audio').value = '';
+        document.getElementById('tts-clone-status').style.display = 'none';
+        document.getElementById('clear-tts-clone-btn').style.display = 'none';
+    });
+
+    safeBind('set-tts-model', 'change', (e) => {
+        const cloneContainer = document.getElementById('mistral-clone-container');
+        if (cloneContainer) {
+            cloneContainer.style.display = e.target.value.includes('voxtral') ? 'block' : 'none';
+        }
+    });
+
+    async function handleTTS(index) {
         const msg = chatHistory[index];
         if (!msg || !msg.content) return;
 
-        const btn = document.querySelector(`#msg-${index} .tts-btn`);
-
-        // Handle Stop Button Logic
-        if (currentTTS.msgIndex === index) {
-            currentTTS.stopFlag = true;
-            if (currentTTS.audio) {
-                currentTTS.audio.pause();
-                currentTTS.audio = null;
-            }
-            currentTTS.msgIndex = -1;
-            if (btn) btn.textContent = '▶ Narrate';
-            return;
-        }
-
-        // Stop any other playing messages
-        if (currentTTS.msgIndex !== -1) {
-            currentTTS.stopFlag = true;
-            if (currentTTS.audio) currentTTS.audio.pause();
-            const oldBtn = document.querySelector(`#msg-${currentTTS.msgIndex} .tts-btn`);
-            if (oldBtn) oldBtn.textContent = '▶ Narrate';
-        }
-
-        currentTTS.msgIndex = index;
-        currentTTS.stopFlag = false;
-        if (btn) btn.textContent = '⌛...';
-
-        // Clean and chunk text locally
         const textContent = Array.isArray(msg.content) ? (msg.content.find(p => p.type === 'text')?.text || "") : msg.content;
-        const cleanText = (textContent || "").replace(/<think>[\s\S]*?<\/think>/gi, '').replace(/<[^>]+>/g, '').replace(/[*_`#]/g, '').replace(/\[.*?\]\(.*?\)/g, '').trim();
+        const hash = getContentHash(textContent);
+        const btn = document.querySelector(`#msg-${index} .tts-btn`);
+        if (!btn) return;
 
-        if (!cleanText) {
-            if (btn) btn.textContent = '▶ Narrate';
-            currentTTS.msgIndex = -1;
-            return;
+        // If switching messages or content changed at same index, pause current
+        if ((currentTTS.msgIndex !== index || currentTTS.contentHash !== hash) && currentTTS.audio) {
+            currentTTS.audio.pause();
         }
 
-        const chunks = [];
-        const maxChars = 3000;
-        let remaining = cleanText;
-        while(remaining.length > 0) {
-            if (remaining.length <= maxChars) {
-                chunks.push(remaining);
-                remaining = "";
-            } else {
-                let splitIdx = remaining.lastIndexOf('\n\n', maxChars);
-                if (splitIdx === -1) splitIdx = remaining.lastIndexOf('\n', maxChars);
-                if (splitIdx === -1) splitIdx = remaining.lastIndexOf('.', maxChars);
-                if (splitIdx === -1) splitIdx = maxChars;
-                chunks.push(remaining.substring(0, splitIdx + 1).trim());
-                remaining = remaining.substring(splitIdx + 1).trim();
-            }
-        }
+        // 1. GENERATION PHASE (If not in cache)
+        if (!ttsCache[hash]) {
+            btn.innerHTML = '⌛ Generating...';
+            btn.disabled = true;
 
-        if (btn) btn.textContent = '⏹ Stop';
-
-        const fetchAudio = async (textChunk) => {
             try {
                 const res = await fetch('/tts', {
-                    method: 'POST', headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ text: textChunk })
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        text: textContent,
+                        ref_audio: ttsRefAudioBase64 // Pass the cloned voice if loaded
+                    })
                 });
-                if (res.ok) {
-                    const balance = res.headers.get('x-venice-balance-usd');
-                    if(balance) updateBalanceDisplay(balance);
-                    return await res.blob();
+
+                if (!res.ok) {
+                    const err = await res.json();
+                    throw new Error(err.error || "Generation failed");
                 }
-            } catch(e) { console.error("Fetch failed", e); }
-            return null;
-        };
 
-        let nextBlob = null;
+                const d = await res.json();
+                if (d.balance) updateBalanceDisplay(d.balance);
 
-        for (let i = 0; i < chunks.length; i++) {
-            if (currentTTS.stopFlag) break;
+                ttsCache[hash] = d.url;
+                btn.classList.add('tts-ready');
+            } catch (e) {
+                console.error("TTS Error:", e);
+                alert("TTS Error: " + e.message);
+                btn.innerHTML = '❌ Error';
+                return;
+            } finally {
+                btn.disabled = false;
+                updateTTSButtonStates();
+            }
+        }
 
-            let currentBlob = (i === 0) ? await fetchAudio(chunks[i]) : nextBlob;
-            if (!currentBlob) break;
-
-            // Start pre-fetching the next chunk while we prepare to play this one
-            let prefetchPromise = (i + 1 < chunks.length) ? fetchAudio(chunks[i+1]) : null;
-
-            // Convert blob to URL and play
-            const url = URL.createObjectURL(currentBlob);
-            currentTTS.audio = new Audio(url);
-
-            try {
-                await new Promise((resolve, reject) => {
-                    currentTTS.audio.onplay = () => {
-                        // Once the first chunk successfully starts, iOS considers the "session" active
-                        if (prefetchPromise) prefetchPromise.then(b => nextBlob = b);
-                    };
-                    currentTTS.audio.onended = resolve;
-                    currentTTS.audio.onerror = reject;
-                    currentTTS.audio.play().catch(reject);
-                });
-            } catch(e) {
-                console.error("Playback error", e);
-                // If it fails here, it's likely still an autoplay block
-                if (e.name === "NotAllowedError") {
-                    alert("iOS blocked playback. Try tapping 'Narrate' again.");
-                }
-                break;
+        // 2. PLAYBACK PHASE
+        if (currentTTS.msgIndex !== index || currentTTS.contentHash !== hash) {
+            currentTTS.msgIndex = index;
+            currentTTS.contentHash = hash;
+            if (currentTTS.audio) {
+                currentTTS.audio.pause();
+                currentTTS.audio.onended = null;
+                currentTTS.audio.ontimeupdate = null;
             }
 
-            URL.revokeObjectURL(url);
-            if (prefetchPromise) nextBlob = await prefetchPromise;
+            // Create a brand new Audio object to ensure fresh duration detection
+            const audioObj = new Audio(ttsCache[hash]);
+            audioObj.preload = "auto";
+            currentTTS.audio = audioObj;
+
+            currentTTS.audio.onended = () => {
+                updateTTSButtonStates();
+                renderTTSControls(index);
+            };
+
+            // Critical: Wait for metadata so we have a valid duration for seeking
+            currentTTS.audio.addEventListener('loadedmetadata', () => {
+                renderTTSControls(index);
+                updateTTSButtonStates();
+            });
+
+            // Fallback for immediate UI update
+            renderTTSControls(index);
         }
 
-        if (currentTTS.msgIndex === index) {
-            currentTTS.msgIndex = -1;
-            if (btn) btn.textContent = '▶ Narrate';
+        if (currentTTS.audio) {
+            if (!currentTTS.audio.paused) {
+                currentTTS.audio.pause();
+            } else {
+                currentTTS.audio.play().catch(e => {
+                    console.error("Playback Blocked:", e);
+                    alert("Playback blocked by browser. Click Play again.");
+                });
+            }
         }
+
+        updateTTSButtonStates();
+        renderTTSControls(index);
     }
 
     // --- ARCHITECT LOGIC ---
@@ -321,6 +450,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const txt = architectInput.value.trim();
         if(!txt) return;
         architectInput.value = '';
+        autoExpandTextarea(architectInput);
 
         const uDiv = document.createElement('div'); uDiv.className = 'message user'; uDiv.innerText = txt;
         architectDisplay.appendChild(uDiv);
@@ -389,8 +519,33 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch(e) { console.error(e); alert("Failed to launch scenario."); }
     }
 
+    let activeRefineIndex = -1;
+
     async function handleAIRefine(index) {
-        if (!confirm("Have Venice rewrite this message to remove banned phrases?")) return;
+        activeRefineIndex = index;
+        if (refineGuidanceModal) {
+            refineGuidanceModal.style.display = 'block';
+            if (refineGuidanceInput) {
+                refineGuidanceInput.value = '';
+                refineGuidanceInput.focus();
+            }
+        }
+    }
+
+    safeBind('refine-guidance-cancel', 'click', () => {
+        if (refineGuidanceModal) refineGuidanceModal.style.display = 'none';
+        activeRefineIndex = -1;
+    });
+
+    safeBind('refine-guidance-cancel-x', 'click', () => {
+        if (refineGuidanceModal) refineGuidanceModal.style.display = 'none';
+        activeRefineIndex = -1;
+    });
+
+    safeBind('refine-guidance-submit', 'click', async () => {
+        const index = activeRefineIndex;
+        const guidance = refineGuidanceInput ? refineGuidanceInput.value.trim() : "";
+        if (refineGuidanceModal) refineGuidanceModal.style.display = 'none';
 
         const tools = document.querySelectorAll('.tools-panel');
         tools.forEach(t => t.style.display = 'none');
@@ -406,7 +561,7 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const res = await fetch('/ai_refine_message', {
                 method: 'POST', headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({index: index})
+                body: JSON.stringify({index: index, guidance: guidance})
             });
             const d = await res.json();
             if (d.success) {
@@ -422,7 +577,399 @@ document.addEventListener('DOMContentLoaded', () => {
             alert("Failed to refine message.");
             if (overlay) overlay.remove();
         }
+        activeRefineIndex = -1;
+    });
+
+    // Character Gallery Vars
+    const charactersModal = document.getElementById('characters-modal');
+    const charGalleryGrid = document.getElementById('character-gallery-grid');
+    const charSearchInput = document.getElementById('char-search-input');
+    let allCharacters = [];
+
+    safeBind('open-characters-btn', 'click', () => {
+        if (charactersModal) charactersModal.style.display = 'block';
+        if (allCharacters.length === 0) fetchCharacters();
+    });
+
+    const charEditorModal = document.getElementById('character-editor-modal');
+
+    safeBind('open-create-persona-btn', 'click', () => {
+        openCharacterEditor(null);
+    });
+
+    safeBind('close-char-editor-x', 'click', () => {
+        if(charEditorModal) charEditorModal.style.display = 'none';
+    });
+
+    function openCharacterEditor(charData = null) {
+        if (!charEditorModal) return;
+
+        // Populate Model Select
+        const select = document.getElementById('ce-model');
+        select.innerHTML = '';
+        if (availableModels) {
+            for (const group in availableModels) {
+                const optgroup = document.createElement('optgroup');
+                optgroup.label = group;
+                availableModels[group].forEach(m => {
+                    const opt = document.createElement('option');
+                    opt.value = m.id;
+                    opt.textContent = m.name;
+                    optgroup.appendChild(opt);
+                });
+                select.appendChild(optgroup);
+            }
+        }
+
+        const title = document.getElementById('char-editor-title');
+        const nameIn = document.getElementById('ce-name');
+        const descIn = document.getElementById('ce-desc');
+        const instIn = document.getElementById('ce-inst');
+        const slugIn = document.getElementById('ce-slug');
+        const webIn = document.getElementById('ce-web');
+        const delBtn = document.getElementById('ce-delete-btn');
+        const statusDiv = document.getElementById('ce-status');
+
+        statusDiv.textContent = "";
+
+        if (charData) {
+            title.textContent = "Edit Persona: " + charData.name;
+            nameIn.value = charData.name || "";
+            descIn.value = charData.description || "";
+            instIn.value = charData.instructions || "";
+            select.value = charData.modelId || "venice-uncensored";
+            slugIn.value = charData.slug || "";
+            webIn.checked = !!charData.webEnabled;
+            delBtn.style.display = 'block';
+        } else {
+            title.textContent = "Create New Persona";
+            nameIn.value = ""; descIn.value = ""; instIn.value = ""; slugIn.value = "";
+            select.value = "venice-uncensored";
+            webIn.checked = false;
+            delBtn.style.display = 'none';
+        }
+
+        charEditorModal.style.display = 'block';
     }
+
+    safeBind('ce-save-btn', 'click', async () => {
+        const btn = document.getElementById('ce-save-btn');
+        const statusDiv = document.getElementById('ce-status');
+
+        const payload = {
+            name: document.getElementById('ce-name').value.trim(),
+            description: document.getElementById('ce-desc').value.trim(),
+            instructions: document.getElementById('ce-inst').value.trim(),
+            modelId: document.getElementById('ce-model').value,
+            webEnabled: document.getElementById('ce-web').checked,
+            isPublic: false
+        };
+
+        if (!payload.name || !payload.instructions) {
+            statusDiv.textContent = "Name and Instructions are required.";
+            return;
+        }
+
+        const slug = document.getElementById('ce-slug').value;
+        const isEdit = !!slug;
+
+        btn.disabled = true;
+        btn.textContent = "Saving...";
+        statusDiv.textContent = "Sending to Venice...";
+
+        try {
+            const url = isEdit ? `/edit_character/${slug}` : `/create_character`;
+            const method = isEdit ? 'PUT' : 'POST';
+
+            const res = await fetch(url, {
+                method: method,
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(payload)
+            });
+            const d = await res.json();
+
+            if (d.success) {
+                statusDiv.textContent = "Saved successfully!";
+                setTimeout(() => {
+                    charEditorModal.style.display = 'none';
+                    fetchCharacters(); // Refresh gallery
+                }, 1000);
+            } else {
+                statusDiv.textContent = "API Error: " + (d.error || JSON.stringify(d.data));
+            }
+        } catch (e) {
+            statusDiv.textContent = "Network Error.";
+        }
+        btn.disabled = false;
+        btn.textContent = "Save Persona";
+    });
+
+    safeBind('ce-delete-btn', 'click', async () => {
+        const slug = document.getElementById('ce-slug').value;
+        if (!slug || !confirm("Permanently delete this persona from your Venice account?")) return;
+
+        const btn = document.getElementById('ce-delete-btn');
+        btn.disabled = true;
+        btn.textContent = "Deleting...";
+
+        try {
+            const res = await fetch(`/delete_character/${slug}`, { method: 'DELETE' });
+            const d = await res.json();
+            if (d.success) {
+                charEditorModal.style.display = 'none';
+                fetchCharacters();
+            } else {
+                alert("Error deleting: " + (d.error || JSON.stringify(d)));
+                btn.disabled = false;
+                btn.textContent = "Delete";
+            }
+        } catch (e) {
+            alert("Network Error.");
+            btn.disabled = false;
+            btn.textContent = "Delete";
+        }
+    });
+
+    safeBind('close-characters-x', 'click', () => {
+        if (charactersModal) charactersModal.style.display = 'none';
+    });
+
+    safeBind('char-search-btn', 'click', () => {
+        fetchCharacters(charSearchInput.value);
+    });
+
+    if (charSearchInput) {
+        charSearchInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') fetchCharacters(charSearchInput.value);
+        });
+    }
+
+    async function fetchCharacters(query = '') {
+        const loading = document.getElementById('char-loading');
+        const category = document.getElementById('char-category-filter')?.value || '';
+        const modelId = document.getElementById('char-model-filter')?.value || '';
+
+        if (loading) loading.style.display = 'block';
+        if (charGalleryGrid) charGalleryGrid.innerHTML = '';
+
+        try {
+            let url = `/get_characters?search=${encodeURIComponent(query)}&category=${category}&modelId=${modelId}`;
+            const res = await fetch(url);
+            const data = await res.json();
+
+            if (loading) loading.style.display = 'none';
+            if (Array.isArray(data)) {
+                if (!query && !category && !modelId) allCharacters = data;
+                renderCharacterGallery(data);
+            }
+        } catch (e) {
+            console.error("Character fetch failed:", e);
+            if (loading) loading.style.display = 'none';
+        }
+    }
+
+    function renderCharacterGallery(chars) {
+        if (!charGalleryGrid) return;
+        charGalleryGrid.innerHTML = '';
+
+        chars.forEach(char => {
+            const card = document.createElement('div');
+            card.className = 'char-card';
+            card.style.cssText = `
+                background: #1a1a1a;
+                border: 1px solid #333;
+                border-radius: 12px;
+                padding: 15px;
+                display: flex;
+                flex-direction: column;
+                gap: 10px;
+                position: relative;
+                transition: transform 0.2s, border-color 0.2s;
+            `;
+
+            card.onmouseenter = () => { card.style.transform = 'translateY(-3px)'; card.style.borderColor = 'var(--primary)'; };
+            card.onmouseleave = () => { card.style.transform = 'translateY(0)'; card.style.borderColor = '#333'; };
+
+            const topRow = document.createElement('div');
+            topRow.style.display = 'flex';
+            topRow.style.gap = '12px';
+            topRow.style.alignItems = 'center';
+
+            // Use the proxy for images to handle Bearer authentication
+            const img = document.createElement('img');
+            const rawImgUrl = char.photoUrl || 'https://venice.ai/placeholder-avatar.png';
+            img.src = `/get_character_image?url=${encodeURIComponent(rawImgUrl)}`;
+            img.style.cssText = 'width: 60px; height: 60px; border-radius: 50%; object-fit: cover; border: 2px solid #444;';
+
+            const info = document.createElement('div');
+            info.style.flex = '1';
+            info.style.minWidth = '0';
+
+            const ratingHtml = char.stats?.averageRating ? `<span style="color:#fbbf24; margin-left:5px;">★${char.stats.averageRating.toFixed(1)}</span>` : '';
+
+            info.innerHTML = `
+                <div style="font-weight:bold; color:white; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-size:1.1em;">${char.name} ${ratingHtml}</div>
+                <div style="font-size:0.75em; color:var(--text-dim);">@${char.slug} • by ${char.author || 'Anonymous'}</div>
+                <div style="font-size:0.7em; color:var(--primary); margin-top:2px;">Opt: ${char.modelId || 'Universal'}</div>
+            `;
+
+            topRow.appendChild(img);
+            topRow.appendChild(info);
+
+            const desc = document.createElement('div');
+            desc.style.cssText = 'font-size: 0.85em; color: #bbb; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; height: 3.6em;';
+            desc.textContent = char.description || "No description provided.";
+
+            const statsRow = document.createElement('div');
+            statsRow.style.cssText = 'display: flex; justify-content: space-between; align-items: center; margin-top: auto; border-top: 1px solid #2a2a2a; padding-top: 10px;';
+
+            const count = char.stats?.imports || 0;
+            statsRow.innerHTML = `<span style="font-size:0.75em; color:var(--text-dim);">${count.toLocaleString()} Imports</span>`;
+
+            const btnGroup = document.createElement('div');
+            btnGroup.style.display = 'flex';
+            btnGroup.style.gap = '5px';
+
+            const peekBtn = document.createElement('button');
+            peekBtn.className = 'msg-btn';
+            peekBtn.style.cssText = 'padding: 4px 8px; border-color: #555; font-size: 0.75em;';
+            peekBtn.innerHTML = '👁️ Logic';
+            peekBtn.title = "View the character's System Prompt / Instructions";
+            peekBtn.onclick = (e) => {
+                e.stopPropagation();
+                openCharacterLogic(char.slug);
+            };
+
+            const useBtn = document.createElement('button');
+            useBtn.className = 'msg-btn';
+            useBtn.style.cssText = 'padding: 4px 12px; border-color: var(--primary); color: var(--primary); font-size: 0.75em; font-weight: bold;';
+            useBtn.textContent = 'Use Persona';
+            useBtn.onclick = (e) => {
+                e.stopPropagation();
+                selectCharacter(char);
+            };
+
+            btnGroup.appendChild(peekBtn);
+            btnGroup.appendChild(useBtn);
+            statsRow.appendChild(btnGroup);
+
+            card.appendChild(topRow);
+            card.appendChild(desc);
+            card.appendChild(statsRow);
+            charGalleryGrid.appendChild(card);
+        });
+    }
+
+    async function openCharacterLogic(slug) {
+        try {
+            const res = await fetch(`/get_character_details/${slug}`);
+            const char = await res.json();
+
+            if (!char.instructions) {
+                alert("Character logic is private or not provided.");
+                return;
+            }
+            activeEditType = 'logic_view';
+
+            // Inject Edit Button into the edit overlay
+            const controls = document.getElementById('edit-controls');
+            let editBtn = document.getElementById('char-quick-edit-btn');
+            if (!editBtn) {
+                editBtn = document.createElement('button');
+                editBtn.id = 'char-quick-edit-btn';
+                editBtn.className = 'action';
+                editBtn.style.cssText = 'background:var(--purple); flex:0.5;';
+                editBtn.textContent = 'Edit in Creator';
+                controls.insertBefore(editBtn, controls.firstChild);
+            }
+            editBtn.style.display = 'block';
+            editBtn.onclick = () => {
+                editOverlay.style.display = 'none';
+                openCharacterEditor(char);
+            };
+
+            editTextarea.value = char.instructions;
+            editTextarea.readOnly = true;
+            const saveBtn = document.getElementById('save-large-edit');
+            if (saveBtn) saveBtn.style.display = 'none';
+
+            editOverlay.style.display = 'block';
+
+            // Handle closing cleanup
+            const originalClose = document.getElementById('cancel-large-edit').onclick;
+            document.getElementById('cancel-large-edit').onclick = () => {
+                editTextarea.readOnly = false;
+                if (saveBtn) saveBtn.style.display = 'block';
+                const eb = document.getElementById('char-quick-edit-btn');
+                if (eb) eb.style.display = 'none';
+                editOverlay.style.display = 'none';
+                document.getElementById('cancel-large-edit').onclick = originalClose;
+            };
+        } catch (e) {
+            alert("Failed to fetch detailed character logic.");
+        }
+    }
+
+    async function selectCharacter(char) {
+        let confirmMsg = `Switch to persona: ${char.name}?`;
+        if (char.modelId) {
+            confirmMsg += `\n\nNote: This will also set your chat model to ${char.modelId} for best performance.`;
+        }
+
+        if (!confirm(confirmMsg)) return;
+
+        try {
+            const res = await fetch('/update_character', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ 
+                    slug: char.slug,
+                    modelId: char.modelId 
+                })
+            });
+            if (res.ok) {
+                if (charactersModal) charactersModal.style.display = 'none';
+                updateActiveCharacterUI(char);
+                if (confirm("Character selected. Would you like to start a fresh chat with this persona?")) {
+                    await fetch('/new_chat', {method:'POST'});
+                }
+                await loadHistory();
+            }
+        } catch (e) {
+            alert("Failed to select character.");
+        }
+    }
+
+    function updateActiveCharacterUI(char) {
+        const info = document.getElementById('active-character-info');
+        const img = document.getElementById('active-char-img');
+        const name = document.getElementById('active-char-name');
+
+        if (!char) {
+            if (info) info.style.display = 'none';
+            return;
+        }
+
+        if (info && img && name) {
+            info.style.display = 'block';
+            const rawImgUrl = char.photoUrl || 'https://venice.ai/placeholder-avatar.png';
+            img.src = `/get_character_image?url=${encodeURIComponent(rawImgUrl)}`;
+            name.textContent = char.name;
+        }
+    }
+
+    safeBind('clear-character-btn', 'click', async () => {
+        if (!confirm("Remove character persona? The chat will return to the default system prompt.")) return;
+        try {
+            await fetch('/update_character', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ slug: null })
+            });
+            updateActiveCharacterUI(null);
+            await loadHistory();
+        } catch (e) {}
+    });
 
     async function loadHistory() {
         try {
@@ -432,6 +979,24 @@ document.addEventListener('DOMContentLoaded', () => {
             summaries = data.summaries || [];
             currentVisualMemory = data.visual_memory || "";
             if (vmTextarea) vmTextarea.value = currentVisualMemory;
+
+            // Character UI handling
+            if (data.character_slug) {
+                let char = allCharacters.find(c => c.slug === data.character_slug);
+                if (char) {
+                    updateActiveCharacterUI(char);
+                } else {
+                    updateActiveCharacterUI({ name: data.character_slug, slug: data.character_slug });
+                }
+
+                // SIMULATED GREETING: If chat is brand new (only system prompt)
+                if (chatHistory.length === 1 && chatHistory[0].role === 'system') {
+                    // Slight delay to ensure UI is updated
+                    setTimeout(() => triggerGen("Initialize our conversation with a characteristic greeting in character."), 500);
+                }
+            } else {
+                updateActiveCharacterUI(null);
+            }
 
             const compareContainer = document.getElementById('compare-mode-container');
             if (compareContainer) {
@@ -632,6 +1197,11 @@ document.addEventListener('DOMContentLoaded', () => {
             const refineBtn = document.createElement('button'); refineBtn.className = 'msg-btn'; refineBtn.textContent = 'AI Refine';
             refineBtn.onclick = () => handleAIRefine(idx);
 
+            const delBtn = document.createElement('button'); 
+            delBtn.className = 'msg-btn delete-msg-btn'; 
+            delBtn.textContent = 'Delete';
+            delBtn.onclick = () => handleDeleteMessage(idx);
+
             btnRow.append(editBtn, regenBtn);
             if (msg.role === 'assistant' && !isImage) {
                 const regenModelBtn = document.createElement('button'); 
@@ -646,6 +1216,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (window.ttsSettings && window.ttsSettings.enabled && !isImage) {
                 const ttsBtn = document.createElement('button');
                 ttsBtn.className = 'msg-btn tts-btn';
+                ttsBtn.dataset.index = idx;
                 ttsBtn.style.borderColor = 'var(--accent)';
                 ttsBtn.style.color = 'var(--accent)';
                 ttsBtn.textContent = '▶ Narrate';
@@ -653,8 +1224,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 btnRow.append(ttsBtn);
             }
 
-            btnRow.append(branchBtn, refineBtn);
+            btnRow.append(branchBtn, refineBtn, delBtn);
             toolsPanel.appendChild(btnRow);
+
+            // After appending everything to toolsPanel, update state if this was playing
+            setTimeout(() => {
+                updateTTSButtonStates();
+                if (currentTTS.msgIndex === idx) renderTTSControls(idx);
+            }, 0);
 
             if (msg.original_content) {
                 const diffRow = document.createElement('div');
@@ -697,6 +1274,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
                 statHtml += `Msg #${textMsgCounter}`;
                 if (isSummed) statHtml += ` <span class="sum-badge">SUMMARIZED</span>`;
+
+                let textContentForCount = Array.isArray(msg.content) ? (msg.content.find(p => p.type === 'text')?.text || "") : msg.content;
+                statHtml += ` <span style="color:var(--text-dim); margin-left:8px;">[${textContentForCount.length} chars]</span>`;
+
                 if (msg.model) statHtml += `<br>Model: <span style="color:var(--primary);">${msg.model}</span>`;
 
                 if (msg.usage) {
@@ -1199,7 +1780,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (role === 'user') {
             const txt = chatHistory[idx].content;
             chatHistory = chatHistory.slice(0, idx);
-            if (userInput) userInput.value = txt;
+            if (userInput) { userInput.value = txt; autoExpandTextarea(userInput); }
             await saveHistory(); renderChat();
         } else {
             chatHistory = chatHistory.slice(0, idx);
@@ -1335,6 +1916,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if(isGenerating) return;
 
         userInput.value = '';
+        autoExpandTextarea(userInput);
 
         let messagePayload = txt;
         if (attachedImageBase64) {
@@ -1458,6 +2040,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 const {done, value} = await reader.read();
                 if(done) break;
                 const chunk = dec.decode(value);
+
+                const isAtBottom = chatbox.scrollHeight - chatbox.scrollTop <= chatbox.clientHeight + 100;
+
                 chunk.split('\n\n').forEach(l=>{
                    if(l.startsWith('data: ')){
                        try { 
@@ -1479,6 +2064,10 @@ document.addEventListener('DOMContentLoaded', () => {
                        } catch(e){}
                    } 
                 });
+
+                if (isAtBottom) {
+                    chatbox.scrollTop = chatbox.scrollHeight;
+                }
             }
 
             if (finalUsageA) { compUsageA.prompt += finalUsageA.prompt_tokens; compUsageA.comp += finalUsageA.completion_tokens; }
@@ -1580,6 +2169,10 @@ document.addEventListener('DOMContentLoaded', () => {
         lastWfmText = "";
         lastWfmUsage = null;
         isGenerating = true;
+
+        const statusMsg = document.getElementById('status-msg');
+        if (statusMsg) statusMsg.innerHTML = '';
+
         const div = document.createElement('div'); div.className = 'message assistant'; div.textContent = '...';
         if (chatbox) {
             chatbox.appendChild(div); 
@@ -1602,12 +2195,23 @@ document.addEventListener('DOMContentLoaded', () => {
                 const {done, value} = await reader.read();
                 if(done) break;
                 const chunk = dec.decode(value);
+
+                // Check if user is at bottom before updating content
+                const isAtBottom = chatbox.scrollHeight - chatbox.scrollTop <= chatbox.clientHeight + 100;
+
                 chunk.split('\n\n').forEach(l=>{
                    if(l.startsWith('data: ')){
                        try{ 
                            const d = JSON.parse(l.substring(6)); 
 
+                           if(d.status) {
+                               if (statusMsg) {
+                                   statusMsg.innerHTML = `<div class="spinner"></div> <span style="color:var(--purple)">${d.status}</span>`;
+                               }
+                           }
+
                            if(d.reasoning) {
+                               if (statusMsg) statusMsg.innerHTML = '';
                                if(!rBlock) {
                                    div.innerHTML = '';
                                    rBlock = document.createElement('div');
@@ -1626,6 +2230,7 @@ document.addEventListener('DOMContentLoaded', () => {
                            }
 
                            if(d.content) {
+                               if (statusMsg) statusMsg.innerHTML = '';
                                if(!contentDiv) {
                                    contentDiv = document.createElement('div');
                                    contentDiv.style.cssText = "white-space:pre-wrap; font-family:inherit;";
@@ -1647,20 +2252,34 @@ document.addEventListener('DOMContentLoaded', () => {
                                contentDiv.innerHTML = typeof marked !== 'undefined' ? marked.parse(full) : full;
                            }
 
+                           if(d.error) {
+                               if (statusMsg) statusMsg.innerHTML = '';
+                               console.error("Server Error:", d.error);
+                               full += "\n\n**System Error:** " + d.error;
+                               if(contentDiv) contentDiv.innerHTML = typeof marked !== 'undefined' ? marked.parse(full) : full;
+                               else div.textContent = full;
+                           }
+
                            if(d.balance) updateBalanceDisplay(d.balance);
                        }catch(e){}
                    } 
                 });
-                if (chatbox) chatbox.scrollTop = chatbox.scrollHeight;
+
+                if (isAtBottom) {
+                    chatbox.scrollTop = chatbox.scrollHeight;
+                }
             }
             await loadHistory();
-        } catch(e) { div.textContent = "Error"; }
+        } catch(e) { 
+            if (statusMsg) statusMsg.innerHTML = '';
+            div.textContent = "Error"; 
+        }
         finally { isGenerating = false; }
     }
 
     async function handleImageBtn() {
         if(guidedModeEnabled) { 
-            if (guidedOverlay) guidedOverlay.style.display='block'; 
+            if (guidedModal) guidedModal.style.display='block'; 
             if (guidedInput) guidedInput.focus(); 
         }
         else triggerImageGen("");
@@ -1669,7 +2288,7 @@ document.addEventListener('DOMContentLoaded', () => {
     async function triggerImageGen(g, debugMode = false) {
         if(isGenerating) return; 
         isGenerating = true; 
-        if (guidedOverlay) guidedOverlay.style.display='none';
+        if (guidedModal) guidedModal.style.display='none';
         const genBtn = document.getElementById('genImgBtn');
         let originalBtnText = "Generate Image";
         if (genBtn) {
@@ -1827,7 +2446,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 const reasoningContainer = document.getElementById('reasoning-effort-container');
                 if (reasoningContainer) {
-                    const isReasoning = modelId.includes('kimi-k2') || modelId.toLowerCase().includes('deepseek');
+                    const isReasoning = modelId.includes('kimi-k2') || modelId.toLowerCase().includes('deepseek') || modelId.includes('zai-org-glm');
                     reasoningContainer.style.display = isReasoning ? 'block' : 'none';
                 }
             };
@@ -1841,40 +2460,10 @@ document.addEventListener('DOMContentLoaded', () => {
             setVal('set-temp-wfm', d.wfm.temperature || 0.8);
             setVal('set-depth-wfm', d.wfm.context_depth || 10);
 
-            populateModelSelect('set-model-img', d.venice_img.model || "qwen3-4b");
-            setVal('set-gen-model-img', d.image_gen.model || "lustify-v7");
-            setVal('set-img-steps', d.image_gen.steps || 40);
-            setVal('set-img-cfg', d.image_gen.cfg_scale || 7.5);
+            populateModelSelect('set-model-refiner', d.refiner?.model || "venice-uncensored");
+            setVal('set-temp-refiner', d.refiner?.temperature || 0.3);
 
-            const imgModelSelect = document.getElementById('set-gen-model-img');
-            const updateRecs = (modelId) => {
-                const defs = {
-                    "lustify-v7": { steps: 40, cfg: 7.5 },
-                    "lustify-sdxl": { steps: 40, cfg: 7.5 },
-                    "anime-wai": { steps: 40, cfg: 7.5 },
-                    "chroma": { steps: 40, cfg: 7.5 },
-                    "hidream": { steps: 40, cfg: 7.5 },
-                    "z-image-turbo": { steps: 6, cfg: 1.5 },
-                    "qwen-image": { steps: 6, cfg: 1.5 },
-                    "qwen-image-2": { steps: 8, cfg: 2.0 },
-                    "flux-2-pro": { steps: 25, cfg: 3.5 },
-                    "grok-imagine": { steps: 25, cfg: 3.5 },
-                    "venice-sd35": { steps: 30, cfg: 5.0 },
-                    "recraft-v4": { steps: 30, cfg: 6.0 },
-                    "seeddream-v4.5": { steps: 30, cfg: 5.0 },
-                    "seeddream-v5-lite": { steps: 30, cfg: 5.0 },
-                    "imagineart-1.5-pro": { steps: 30, cfg: 5.0 }
-                };
-                const rec = defs[modelId] || { steps: 30, cfg: 7.0 };
-                const sEl = document.getElementById('rec-steps');
-                const cEl = document.getElementById('rec-cfg');
-                if (sEl) sEl.textContent = `(Rec: ${rec.steps})`;
-                if (cEl) cEl.textContent = `(Rec: ${rec.cfg})`;
-            };
-            if (imgModelSelect) {
-                imgModelSelect.onchange = (e) => updateRecs(e.target.value);
-                updateRecs(imgModelSelect.value);
-            }
+            populateModelSelect('set-model-img', d.venice_img.model || "qwen3-4b");
 
             setVal('set-art-style', d.image_gen.art_style || "None");
             setVal('set-negative-styles', d.image_gen.negative_styles || "");
@@ -1887,7 +2476,11 @@ document.addEventListener('DOMContentLoaded', () => {
             applyInterfaceSettings(fontSize, bgColor);
 
             const w = d.image_gen.width || 1024; const h = d.image_gen.height || 1024;
-            setCheck('set-hd', (w > 1300 || h > 1300));
+            const resTier = d.image_gen.res_tier || "standard";
+            const resRadio = document.querySelector(`input[name="res-tier"][value="${resTier}"]`);
+            if (resRadio) resRadio.checked = true;
+
+            setVal('set-ar', d.image_gen.aspect_ratio || "3:4");
             guidedModeEnabled = d.image_gen.guided_mode || false;
             setCheck('set-guided', guidedModeEnabled);
 
@@ -1911,9 +2504,14 @@ document.addEventListener('DOMContentLoaded', () => {
             const ragOpts = document.getElementById('rag-options');
             if (ragOpts) ragOpts.style.display = d.rag.enabled ? 'block' : 'none';
 
-            setCheck('tts-enabled', d.tts.enabled);
             setVal('set-tts-model', d.tts.model || "tts-kokoro");
-            setVal('set-tts-voice', d.tts.voice || "af_sky");
+
+            const mistralIdInput = document.getElementById('mistral-voice-id');
+            if (d.tts.model.includes('voxtral')) {
+                if (mistralIdInput) mistralIdInput.value = d.tts.voice || "";
+            } else {
+                setVal('set-tts-voice', d.tts.voice || "af_sky");
+            }
             setVal('set-tts-speed', d.tts.speed || 1.0);
             const speedDisp = document.getElementById('tts-speed-val');
             if(speedDisp) speedDisp.textContent = (d.tts.speed || 1.0) + "x";
@@ -1921,40 +2519,55 @@ document.addEventListener('DOMContentLoaded', () => {
             const ttsOpts = document.getElementById('tts-options');
             if (ttsOpts) ttsOpts.style.display = d.tts.enabled ? 'block' : 'none';
 
+            // Mistral UI Priority Feedback
+            const mistralIdInput_fb = document.getElementById('mistral-voice-id');
+            const cloneStatus = document.getElementById('tts-clone-status');
+            const clearCloneBtn = document.getElementById('clear-tts-clone-btn');
+
+            if (ttsRefAudioBase64) {
+                if (cloneStatus) cloneStatus.style.display = 'block';
+                if (clearCloneBtn) clearCloneBtn.style.display = 'block';
+            }
+
             if (modal) modal.style.display = 'block';
         } catch(e) {
             console.error("Failed to open settings:", e);
         }
     }
 
-    function applyInterfaceSettings(fontSize, bgColor) {
-        document.documentElement.style.setProperty('--font-size', fontSize + 'px');
-        document.documentElement.style.setProperty('--bg-dark', bgColor);
-    }
+    function calcPixels(ar, resTier) {
+        let w = 1024, h = 1024;
 
-    function calcPixels(ar, hd) {
-        let w=1024, h=1024;
+        // Base Aspect Ratio logic (Standard ~1MP)
+        if (ar === "1:1") { w = 1024; h = 1024; }
+        else if (ar === "4:3") { w = 1152; h = 864; }
+        else if (ar === "3:4") { w = 864; h = 1152; }
+        else if (ar === "16:9") { w = 1216; h = 704; }
+        else if (ar === "9:16") { w = 704; h = 1216; }
+        else if (ar === "2:3") { w = 832; h = 1248; }
+        else if (ar === "3:2") { w = 1248; h = 832; }
 
-        // Use Venice-optimized "Golden Ratio" multiples of 32
-        if(ar==="4:3") { w=1152; h=864; } 
-        else if(ar==="3:4") { w=864; h=1152; }
-        else if(ar==="16:9") { w=1216; h=704; } 
-        else if(ar==="9:16") { w=704; h=1216; }
-        else if(ar==="2:3") { w=832; h=1248; }
-        else if(ar==="3:2") { w=1248; h=832; }
-
-        if(hd) { 
-            // 1.2x boost for HD mode while staying within stability limits
-            w = Math.round((w * 1.2) / 32) * 32; 
-            h = Math.round((h * 1.2) / 32) * 32; 
+        if (resTier === "hd") {
+            // HD Tier: Scale linearly by ~1.4x (Approx 2MP)
+            w = Math.floor((w * 1.414) / 32) * 32;
+            h = Math.floor((h * 1.414) / 32) * 32;
+        } else if (resTier === "2k") {
+            // 2K Tier: Longest side is exactly 2048 (Approx 4MP)
+            const ratio = w / h;
+            if (w >= h) {
+                w = 2048;
+                h = Math.floor((2048 / ratio) / 32) * 32;
+            } else {
+                h = 2048;
+                w = Math.floor((2048 * ratio) / 32) * 32;
+            }
         }
 
-        // Strict Caps for stability on decentralized nodes
-        // Hard cap at 1280 for standard models to prevent black images (NaN errors)
-        w = Math.min(w, 1280);
-        h = Math.min(h, 1280);
+        // Final safety bounds for Z-Image Turbo (Max 4MP / 2048px)
+        w = Math.min(Math.max(w, 256), 2048);
+        h = Math.min(Math.max(h, 256), 2048);
 
-        return {w, h};
+        return { w, h };
     }
 
     async function runAnalytics() {
@@ -2078,18 +2691,31 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    safeBind('dismiss-compare-btn', 'click', async () => {
+        if (!confirm("Discard the backup summaries? This will disable Comparison Mode for this chat session.")) return;
+        try {
+            const res = await fetch('/clear_backups', { method: 'POST' });
+            if (res.ok) {
+                await loadHistory();
+            }
+        } catch (e) {
+            alert("Failed to clear backups.");
+        }
+    });
+
     safeBind('sendBtn', 'click', sendMessage);
     safeBind('genImgBtn', 'click', handleImageBtn);
     safeBind('toggleGuidedBtn', 'click', () => {
-        if (!guidedOverlay) return;
-        guidedOverlay.style.display = (guidedOverlay.style.display === 'none') ? 'block' : 'none';
-        if (guidedOverlay.style.display === 'block' && guidedInput) guidedInput.focus();
+        if (!guidedModal) return;
+        guidedModal.style.display = (guidedModal.style.display === 'none') ? 'block' : 'none';
+        if (guidedModal.style.display === 'block' && guidedInput) guidedInput.focus();
     });
     safeBind('guided-submit', 'click', () => {
         const debugMode = document.getElementById('guided-debug-mode')?.checked || false;
         triggerImageGen(guidedInput?.value, debugMode);
     });
-    safeBind('guided-cancel', 'click', () => { if(guidedOverlay) guidedOverlay.style.display='none'; });
+    safeBind('guided-cancel', 'click', () => { if(guidedModal) guidedModal.style.display='none'; });
+    safeBind('guided-cancel-x', 'click', () => { if(guidedModal) guidedModal.style.display='none'; });
 
     function showDebugModal(debugData) {
         const modal = document.getElementById('debug-modal');
@@ -2276,12 +2902,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     safeBind('save-settings-btn', 'click', async () => {
         const arEl = document.getElementById('set-ar');
-        const hdEl = document.getElementById('set-hd');
+        const resTierEl = document.querySelector('input[name="res-tier"]:checked');
         const guidedEl = document.getElementById('set-guided');
 
         const ar = arEl ? arEl.value : "3:4";
-        const hd = hdEl ? hdEl.checked : true;
-        const {w,h} = calcPixels(ar,hd);
+        const resTier = resTierEl ? resTierEl.value : "standard";
+        const {w,h} = calcPixels(ar, resTier);
         guidedModeEnabled = guidedEl ? guidedEl.checked : false;
 
         const getVal = (id, def) => { const el = document.getElementById(id); return el ? el.value : def; };
@@ -2306,6 +2932,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 temperature: parseFloat(getVal('set-temp-wfm', 0.8)),
                 context_depth: parseInt(getVal('set-depth-wfm', 10))
             },
+            refiner: {
+                model: getVal('set-model-refiner', 'venice-uncensored'),
+                temperature: parseFloat(getVal('set-temp-refiner', 0.3))
+            },
             venice_img: { model: getVal('set-model-img', 'qwen3-4b'), context_depth: parseInt(getVal('set-img-depth', 3)) },
             summarizer: { 
                 enabled: getCheck('sum-enabled', false), 
@@ -2326,14 +2956,14 @@ document.addEventListener('DOMContentLoaded', () => {
             tts: {
                 enabled: getCheck('tts-enabled', false),
                 model: getVal('set-tts-model', 'tts-kokoro'),
-                voice: getVal('set-tts-voice', 'af_sky'),
+                voice: getVal('set-tts-model', '').includes('voxtral') ? getVal('mistral-voice-id', '') : getVal('set-tts-voice', 'af_sky'),
                 speed: parseFloat(getVal('set-tts-speed', 1.0))
             },
             image_gen: { 
-                model: getVal('set-gen-model-img', 'lustify-v7'),
-                steps: parseInt(getVal('set-img-steps', 40)),
-                cfg_scale: parseFloat(getVal('set-img-cfg', 7.5)),
+                num_inference_steps: 8,
                 width:w, height:h, 
+                res_tier: resTier,
+                aspect_ratio: ar,
                 guided_mode: guidedModeEnabled, 
                 art_style: getVal('set-art-style', 'None'), 
                 negative_styles: getVal('set-negative-styles', '') 
@@ -2360,14 +2990,26 @@ document.addEventListener('DOMContentLoaded', () => {
         const btn = document.getElementById('writeForMeBtn');
         if (!btn) return;
 
+        const currentInput = userInput ? userInput.value.trim() : "";
+        if (currentInput) {
+            if (!confirm("There is currently text in the prompt field. Do you want to use it as guidance for the Write For Me request?")) {
+                return;
+            }
+        }
+
         const ogText = btn.textContent;
         btn.textContent = "⏳"; btn.disabled = true;
         try {
-            const res = await fetch('/write_for_me', { method:'POST' });
+            const res = await fetch('/write_for_me', { 
+                method:'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ guidance: currentInput })
+            });
             const d = await res.json();
             if(d.success) { 
                 if (userInput) {
                     userInput.value = d.text; 
+                    autoExpandTextarea(userInput);
                     userInput.focus();
                 }
                 lastWfmText = d.text;
@@ -2469,13 +3111,100 @@ document.addEventListener('DOMContentLoaded', () => {
 
     safeBind('open-cache-debugger-btn', 'click', async () => {
         const modal = document.getElementById('cache-debug-modal');
-        if (modal) modal.style.display = 'block';
+        if (modal) {
+            modal.style.display = 'block';
+            document.body.style.overflow = 'hidden';
+        }
         await loadCacheDebug();
     });
 
     safeBind('close-cache-debug-x', 'click', () => {
         const modal = document.getElementById('cache-debug-modal');
-        if (modal) modal.style.display = 'none';
+        if (modal) {
+            modal.style.display = 'none';
+            document.body.style.overflow = '';
+        }
+    });
+
+    safeBind('open-last-io-btn', 'click', async () => {
+        const modal = document.getElementById('last-io-modal');
+        if (modal) {
+            modal.style.display = 'block';
+            document.body.style.overflow = 'hidden'; // Prevent background scrolling
+        }
+        await loadLastIO();
+    });
+
+    safeBind('close-last-io-x', 'click', () => {
+        const modal = document.getElementById('last-io-modal');
+        if (modal) {
+            modal.style.display = 'none';
+            document.body.style.overflow = ''; // Restore background scrolling
+        }
+    });
+
+    async function handleDeleteMessage(index) {
+        if (!confirm("Remove this message from the chat? This will remove it from the conversation context.")) return;
+
+        // Structure check: If we delete a message, we might end up with two consecutive roles.
+        // We'll remove it and then check the remaining list.
+        chatHistory.splice(index, 1);
+
+        // If a deletion results in two consecutive roles (e.g. User, [Deleted Assistant], User)
+        // most APIs will actually handle this fine, but for clean context, we can optionally merge them.
+        // For now, we just remove and save.
+
+        // Also clear from diff mode set if present
+        diffModeMsgs.delete(index);
+
+        await saveHistory();
+        renderChat();
+    }
+
+    async function loadLastIO() {
+        const reqPre = document.getElementById('last-io-request');
+        const resPre = document.getElementById('last-io-response');
+        const epSpan = document.getElementById('last-io-endpoint');
+        const timeSpan = document.getElementById('last-io-time');
+        if (!reqPre || !resPre) return;
+
+        reqPre.textContent = "Loading...";
+        resPre.textContent = "Loading...";
+        if(epSpan) epSpan.textContent = "Loading...";
+        if(timeSpan) timeSpan.textContent = "Loading...";
+
+        try {
+            const res = await fetch('/get_last_io');
+            const d = await res.json();
+            if(epSpan) epSpan.textContent = d.endpoint || "None";
+            if(timeSpan) {
+                if (d.timestamp) {
+                    const t = new Date(d.timestamp);
+                    timeSpan.textContent = t.toLocaleTimeString() + " " + t.toLocaleDateString();
+                } else {
+                    timeSpan.textContent = "None";
+                }
+            }
+            reqPre.textContent = JSON.stringify(d.request, null, 2) || "No request logged yet.";
+            resPre.textContent = JSON.stringify(d.response, null, 2) || "No response logged yet.";
+        } catch(e) {
+            reqPre.textContent = "Error fetching IO data.";
+        }
+    }
+
+    safeBind('view-tts-log-btn', 'click', async () => {
+        const modal = document.getElementById('tts-log-modal');
+        const display = document.getElementById('tts-log-display');
+        if (modal) modal.style.display = 'block';
+        if (display) display.textContent = "Fetching log...";
+
+        try {
+            const res = await fetch('/get_last_tts_log');
+            const data = await res.json();
+            display.textContent = JSON.stringify(data, null, 2);
+        } catch (e) {
+            display.textContent = "Error fetching TTS log: " + e.message;
+        }
     });
 
     safeBind('refresh-cache-debug-btn', 'click', async () => {

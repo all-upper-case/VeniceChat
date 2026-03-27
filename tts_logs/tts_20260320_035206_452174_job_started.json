@@ -1,0 +1,14 @@
+{
+    "input_length": 39,
+    "cleaned_length": 39,
+    "chunk_count": 1,
+    "settings": {
+        "enabled": true,
+        "model": "tts-kokoro",
+        "voice": "af_bella",
+        "speed": 0.9
+    },
+    "chunks": [
+        "(What do you think should happen next?)"
+    ]
+}

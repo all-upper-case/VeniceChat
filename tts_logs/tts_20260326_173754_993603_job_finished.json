@@ -1,0 +1,13 @@
+{
+    "total": 1,
+    "success": 0,
+    "bytes": 0,
+    "errors": [
+        {
+            "chunk": 0,
+            "type": "wave_decode_error",
+            "error": "file does not start with RIFF id",
+            "content_preview": "b'{\"audio_data\":\"UklGRiRGBQBXQVZFZm10IBAAAAABAAEAwF0'"
+        }
+    ]
+}

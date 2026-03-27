@@ -1,0 +1,11 @@
+{
+    "chunk_id": "2/2",
+    "payload": {
+        "model": "tts-kokoro",
+        "input": "She sniffs the air, then crawls past the phone, knocking it face-down with her knee, and buries her face in the kibble bowl. She eats noisily, her jaw working, grains scattering across the mat. She doesn\u2019t look at the screen again. \"Complete rejection of previous identity,\" Thorne says, closing the tablet with a snap. \"She no longer recognizes tools, technology, or social artifacts. Dietary preference for animal feed over human food. No evidence of episodic memory, self-reflection, or species identification. She has successfully transitioned to livestock status\u2014specifically, breeding stock with dairy function. Intelligence quotient unmeasurable by human metrics; functional cognition equivalent to high-functioning ungulate.\"  He stands and turns to you, adjusting his cuffs. \"Congratulations. The dehumanization is total. She is, for all psychological and agricultural purposes, a cow. I recommend branding the documentation for your records\u2014she\u2019s ready for her next insemination whenever you wish to breed her again.\"",
+        "voice": "af_bella",
+        "response_format": "mp3",
+        "speed": 0.9
+    },
+    "url": "https://api.venice.ai/api/v1/audio/speech"
+}

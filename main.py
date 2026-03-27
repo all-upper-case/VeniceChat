@@ -6,6 +6,9 @@ import requests
 import re
 import base64
 import uuid
+import wave
+import io
+import traceback
 from collections import Counter
 from flask import Flask, request, jsonify, render_template, Response, stream_with_context
 
@@ -22,14 +25,18 @@ app = Flask(__name__)
 # --- CONFIG ---
 # Using Venice.ai as the primary inference provider
 VENICE_API_KEY = os.environ.get('VENICE_API_KEY')
+FAL_KEY = os.environ.get('FAL_KEY')
+MISTRAL_API_KEY = os.environ.get('MISTRAL_API_KEY')
 VENICE_URL = 'https://api.venice.ai/api/v1/chat/completions'
 VENICE_EMBED_URL = 'https://api.venice.ai/api/v1/embeddings'
-VENICE_IMAGE_URL = 'https://api.venice.ai/api/v1/image/generate'
+VENICE_CHARACTERS_URL = 'https://api.venice.ai/api/v1/characters'
+FAL_URL = "https://fal.run/fal-ai/z-image/turbo"
 
 FILES = {
     "active_meta": 'active_chat_meta.json',
     "venice_settings": 'venice_settings.json',
     "venice_img_settings": 'venice_img_settings.json',
+    "refiner_settings": 'refiner_settings.json',
     "img_settings": 'image_settings.json',
     "summarizer_settings": 'summarizer_settings.json',
     "wfm_settings": 'wfm_settings.json',
@@ -55,14 +62,60 @@ FILES = {
     "rag_settings": 'rag_settings.json',
     "tts_settings": 'tts_settings.json',
     "payload_logs_dir": 'payload_logs',
-    "tts_logs_dir": 'tts_logs'
+    "tts_logs_dir": 'tts_logs',
+    "character_cache": 'character_cache.json',
+    "audio_cache_dir": 'static/audio_cache',
+    "balance": 'balance.json'
 }
 
 VENICE_SPEECH_URL = 'https://api.venice.ai/api/v1/audio/speech'
+MISTRAL_SPEECH_URL = 'https://api.mistral.ai/v1/audio/speech'
 
 # --- UTILS ---
+import hashlib
+os.makedirs(FILES["audio_cache_dir"], exist_ok=True)
+
+def get_persisted_balance():
+    return read_json(FILES["balance"], {"balance": None})
+
+def save_persisted_balance(balance):
+    if balance is not None:
+        write_json(FILES["balance"], {"balance": balance, "timestamp": datetime.datetime.now().isoformat()})
+
+def get_tts_cache_path(text, model, voice, speed, ref_audio=None):
+    """Generates a unique filename based on TTS parameters, prefixed with start of text."""
+    # Clean text for prefix: alphanumeric and spaces only, first 20 chars
+    clean_prefix = re.sub(r'[^a-zA-Z0-9\s]', '', text[:30]).strip().replace(' ', '_')
+    words = clean_prefix.split('_')[:5] # Take first 5 words
+    prefix = "_".join(words)
+
+    # Hash the ref_audio if present to distinguish between different clones of the same text
+    ref_hash = hashlib.md5(ref_audio.encode('utf-8')).hexdigest()[:8] if ref_audio else "none"
+
+    hash_input = f"{text}|{model}|{voice}|{speed}|{ref_hash}"
+    cache_hash = hashlib.md5(hash_input.encode('utf-8')).hexdigest()
+    return f"{prefix}_{cache_hash}.wav"
+
+LAST_IO = {"endpoint": None, "request": None, "response": None, "timestamp": None}
+LAST_TTS_LOG = {"event": "None", "timestamp": None, "data": "No TTS jobs run yet."}
+
+def update_last_io(endpoint, req, res):
+    global LAST_IO
+    LAST_IO = {
+        "endpoint": endpoint,
+        "request": req,
+        "response": res,
+        "timestamp": datetime.datetime.now().isoformat()
+    }
+
 def log_tts_event(event_type, data):
-    """Logs raw TTS API events to the tts_logs directory."""
+    """Logs raw TTS API events to the tts_logs directory and memory."""
+    global LAST_TTS_LOG
+    LAST_TTS_LOG = {
+        "event": event_type,
+        "timestamp": datetime.datetime.now().isoformat(),
+        "data": data
+    }
     os.makedirs(FILES["tts_logs_dir"], exist_ok=True)
     ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S_%f")
     log_fn = f"tts_{ts}_{event_type}.json"
@@ -98,6 +151,13 @@ def save_base64_image(data_uri):
             return data_uri
 
         header, encoded = data_uri.split(",", 1)
+
+        # Verify WebP integrity for Venice base64 strings
+        # Venice strings usually start with 'UklGR' (RIFF in base64)
+        if len(encoded) < 100:
+            print("[ERROR] Base64 string is too short to be a valid image.")
+            return "/static/error_placeholder.png"
+
         ext = header.split(";")[0].split("/")[1]
         if ext == 'jpeg': ext = 'jpg'
 
@@ -272,9 +332,10 @@ def retrieve_lore(query, k=3):
 # --- CHAT DATA HELPERS ---
 def load_chat_data(path):
     raw = read_json(path, [])
-    if isinstance(raw, list): return {"messages": raw, "summaries": [], "visual_memory": ""}
+    if isinstance(raw, list): return {"messages": raw, "summaries": [], "visual_memory": "", "character_slug": None}
     if "summaries" not in raw: raw["summaries"] = []
     if "visual_memory" not in raw: raw["visual_memory"] = ""
+    if "character_slug" not in raw: raw["character_slug"] = None
     return raw
 
 def save_chat_data(path, data):
@@ -284,14 +345,25 @@ def save_chat_data(path, data):
 def get_active_chat_path():
     meta = read_json(FILES["active_meta"], {"filename": None})
     fn = meta.get("filename")
+
+    # Check if we have a pending character from a selection event
+    pending_character = meta.get("pending_character")
+
     if not fn or not os.path.exists(os.path.join(FILES["conversations_dir"], fn)):
         ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
         fn = f"New_Chat_{ts}.json"
-        write_json(FILES["active_meta"], {"filename": fn})
+
+        # Preserve character slug if it was just selected
+        new_meta = {"filename": fn}
+        if pending_character:
+            new_meta["pending_character"] = pending_character
+        write_json(FILES["active_meta"], new_meta)
+
         write_json(os.path.join(FILES["conversations_dir"], fn), {
             "messages": [{"role": "system", "content": read_text(FILES["main_prompt"])}],
             "summaries": [],
-            "visual_memory": ""
+            "visual_memory": "",
+            "character_slug": pending_character
         })
     return os.path.join(FILES["conversations_dir"], fn)
 
@@ -323,7 +395,7 @@ def is_vision_model(model_id):
 # --- SUMMARIZATION ENGINE ---
 def process_summaries(chat_data):
     s_set = read_json(FILES["summarizer_settings"], {"enabled": False})
-    if not s_set.get("enabled", False): return chat_data
+    if not s_set.get("enabled", False): return
 
     msgs = chat_data["messages"]
     sums = chat_data["summaries"]
@@ -334,24 +406,24 @@ def process_summaries(chat_data):
 
     while True:
         last_sum_idx = sums[-1]["end_index"] if sums else 0
-
-        # Identify all text messages (non-system, non-image)
         valid_indices = [i for i, m in enumerate(msgs) if i > 0 and not (isinstance(m.get('content', ''), str) and m.get('content', '').startswith('__IMG_JSON__'))]
-
-        # Find valid messages that haven't been summarized yet
         available_valid = [i for i in valid_indices if i > last_sum_idx]
 
-        # How many valid messages are we forced to keep in raw context?
         if len(available_valid) <= keep:
             break
 
-        # We can summarize everything except the 'keep' most recent valid messages
         summarizable_valid = available_valid[:-keep]
 
         if len(available_valid) >= threshold and len(summarizable_valid) >= batch_size:
             batch_indices = summarizable_valid[:batch_size]
             start_idx = batch_indices[0]
             actual_end = batch_indices[-1]
+
+            text_msgs_before = len([i for i in valid_indices if i < start_idx])
+            h_start = text_msgs_before + 1
+            h_end = h_start + len(batch_indices) - 1
+
+            yield f"Summarizing messages #{h_start} through #{h_end}..."
 
             batch = msgs[start_idx : actual_end + 1]
             batch_cleaned = clean_for_api(batch)
@@ -387,7 +459,6 @@ def process_summaries(chat_data):
                 resp = r_sum.json()
 
                 if 'choices' not in resp or not resp['choices']:
-                    print(f"Summarizer API Error: {resp}")
                     break
 
                 summary_text = resp['choices'][0]['message']['content']
@@ -400,12 +471,11 @@ def process_summaries(chat_data):
                     "usage": usage
                 })
             except Exception as e:
-                print(f"Summarizer failed during API call: {e}")
+                print(f"Summarizer failed: {e}")
                 break
         else:
             break
 
-    return chat_data
 
 def build_context(chat_data, user_query=None, current_model=None):
     s_set = read_json(FILES["summarizer_settings"], {"enabled": False})
@@ -545,14 +615,15 @@ def index(): return render_template('index.html')
 @app.route('/architect_chat', methods=['POST'])
 def architect_chat():
     hist = request.json.get('history', [])
-    context = [{"role": "system", "content": read_text(FILES["architect_prompt"])}] + hist
+    context_initial = [{"role": "system", "content": read_text(FILES["architect_prompt"])}] + hist
 
     def generate():
+        # 1. Start Main Generation
         headers = {"Authorization": f"Bearer {VENICE_API_KEY}"}
         payload = {
             "model": "venice-uncensored",
             "temperature": 0.7,
-            "messages": apply_claude_caching(context, "venice-uncensored"), 
+            "messages": apply_claude_caching(context_initial, "venice-uncensored"), 
             "stream": True,
             "prompt_cache_key": "architect_session",
             "prompt_cache_retention": "24h",
@@ -629,7 +700,13 @@ def get_history():
         if data["backup_summaries"] != data.get("summaries", []):
             has_backup = True
 
-    return jsonify({"history": data["messages"], "summaries": data["summaries"], "visual_memory": data["visual_memory"], "has_backup": has_backup})
+    return jsonify({
+        "history": data["messages"], 
+        "summaries": data["summaries"], 
+        "visual_memory": data["visual_memory"], 
+        "character_slug": data.get("character_slug"),
+        "has_backup": has_backup
+    })
 
 @app.route('/check_summary_status', methods=['POST'])
 def check_summary_status():
@@ -930,7 +1007,9 @@ def undo_consolidation():
 @app.route('/ai_refine_message', methods=['POST'])
 def ai_refine_message():
     try:
-        idx = request.json.get('index')
+        req = request.json
+        idx = req.get('index')
+        guidance = req.get('guidance', '').strip()
         path = get_active_chat_path()
         data = load_chat_data(path)
 
@@ -938,22 +1017,23 @@ def ai_refine_message():
             return jsonify({"error": "Invalid message index"}), 400
 
         msg_content = data["messages"][idx]["content"]
-        banned = read_text(FILES["banned_phrases"])
-
         text_to_refine = get_text_content(data["messages"][idx])
 
+        ref_set = read_json(FILES["refiner_settings"], {"model": "venice-uncensored", "temperature": 0.3})
         system_prompt = read_text(FILES["refine_prompt"])
-        user_content = f"### BANNED PHRASES:\n{banned}\n\n### MESSAGE TO REWRITE:\n{text_to_refine}"
+
+        user_content = f"### ORIGINAL MESSAGE:\n{text_to_refine}\n\n### EDIT INSTRUCTIONS:\n{guidance if guidance else 'Polish the prose and fix any minor errors while keeping the meaning identical.'}"
 
         headers = {"Authorization": f"Bearer {VENICE_API_KEY}"}
+        model_id = ref_set.get("model", "venice-uncensored")
         cache_key = os.path.basename(path).replace('.json', '') + "_refine"
         payload = {
-            "model": "venice-uncensored",
-            "temperature": 0.3,
+            "model": model_id,
+            "temperature": float(ref_set.get("temperature", 0.3)),
             "messages": apply_claude_caching([
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_content}
-            ], "venice-uncensored"),
+            ], model_id),
             "prompt_cache_key": cache_key,
             "prompt_cache_retention": "24h",
             "venice_parameters": {
@@ -1013,22 +1093,32 @@ def write_for_me():
     try:
         path = get_active_chat_path()
         data = load_chat_data(path)
+        req_data = request.json or {}
+        guidance = req_data.get('guidance', '').strip()
 
         wfm_set = read_json(FILES["wfm_settings"], {"model": "venice-uncensored", "temperature": 0.8, "context_depth": 10})
         depth = int(wfm_set.get("context_depth", 10))
 
         all_msgs = [m for m in data["messages"] if m['role'] != 'system' and not (isinstance(m.get('content', ''), str) and m.get('content', '').startswith('__IMG_JSON__'))]
 
+        # Get only user messages for style mimicry
         user_msgs = [m for m in all_msgs if m['role'] == 'user']
         style_examples = user_msgs[-depth:] if depth > 0 else []
-        style_block = "\n\n".join([f"USER STYLE EXAMPLE:\n{get_text_content(m)}" for m in style_examples])
+        style_block = "\n\n".join([f"EXAMPLE USER MESSAGE:\n{get_text_content(m)}" for m in style_examples])
 
-        situation_msgs = all_msgs[-5:]
-        situation_block = "\n\n".join([f"{m['role'].upper()}:\n{get_text_content(m)}" for m in situation_msgs])
+        # Get the single most recent assistant message to respond to
+        assistant_msgs = [m for m in all_msgs if m['role'] == 'assistant']
+        last_assistant_msg = assistant_msgs[-1] if assistant_msgs else None
+
+        situation_block = ""
+        if last_assistant_msg:
+            situation_block = f"### MESSAGE TO RESPOND TO:\n{get_text_content(last_assistant_msg)}\n\nInstruction: Respond to the message above using the exact same style, voice, and format as the EXAMPLE USER MESSAGES provided below."
 
         system_instr = read_text(FILES["user_mimic_prompt"])
+        if guidance:
+            system_instr += f"\n\nUse the following raw text to guide the content of your reply, enriching it even if it seems like it's already complete: {guidance}"
 
-        prompt_content = f"### USER STYLE EXAMPLES (MIMIC THIS STYLE)\n{style_block}\n\n### CURRENT SITUATION (RESPOND TO THIS)\n{situation_block}"
+        prompt_content = f"{situation_block}\n\n### USER STYLE EXAMPLES (MIMIC THIS STYLE):\n{style_block}"
 
         messages = [
             {"role": "system", "content": system_instr},
@@ -1073,6 +1163,158 @@ def write_for_me():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+@app.route('/get_characters', methods=['GET'])
+def get_characters():
+    search = request.args.get('search', '')
+    limit = request.args.get('limit', 50)
+
+    cache = read_json(FILES["character_cache"], {"timestamp": 0, "data": []})
+    now = time.time()
+
+    if not search and cache["data"] and (now - cache["timestamp"] < 3600):
+        return jsonify(cache["data"])
+
+    try:
+        headers = {"Authorization": f"Bearer {VENICE_API_KEY}"}
+        params = {"limit": limit}
+        if search: params["search"] = search
+
+        r = requests.get(VENICE_CHARACTERS_URL, headers=headers, params=params)
+
+        # Log IO
+        res_data = r.json() if r.status_code == 200 else r.text
+        update_last_io(VENICE_CHARACTERS_URL, params, res_data)
+
+        r.raise_for_status()
+        data = res_data.get("data", [])
+
+        if not search:
+            write_json(FILES["character_cache"], {"timestamp": now, "data": data})
+
+        return jsonify(data)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/create_character', methods=['POST'])
+def create_character():
+    try:
+        headers = {"Authorization": f"Bearer {VENICE_API_KEY}", "Content-Type": "application/json"}
+        payload = request.json
+        r = requests.post(VENICE_CHARACTERS_URL, headers=headers, json=payload)
+        res_data = r.json() if r.status_code in [200, 201] else r.text
+        update_last_io(f"POST {VENICE_CHARACTERS_URL}", payload, res_data)
+        r.raise_for_status()
+        # Clear cache so new character shows up
+        write_json(FILES["character_cache"], {"timestamp": 0, "data": []})
+        return jsonify({"success": True, "data": res_data})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/edit_character/<slug>', methods=['PUT'])
+def edit_character(slug):
+    try:
+        headers = {"Authorization": f"Bearer {VENICE_API_KEY}", "Content-Type": "application/json"}
+        payload = request.json
+        url = f"{VENICE_CHARACTERS_URL}/{slug}"
+        r = requests.put(url, headers=headers, json=payload)
+        res_data = r.json() if r.status_code == 200 else r.text
+        update_last_io(f"PUT {url}", payload, res_data)
+        r.raise_for_status()
+        write_json(FILES["character_cache"], {"timestamp": 0, "data": []})
+        return jsonify({"success": True, "data": res_data})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/delete_character/<slug>', methods=['DELETE'])
+def delete_character(slug):
+    try:
+        headers = {"Authorization": f"Bearer {VENICE_API_KEY}"}
+        url = f"{VENICE_CHARACTERS_URL}/{slug}"
+        r = requests.delete(url, headers=headers)
+        res_data = r.json() if r.status_code == 200 else r.text
+        update_last_io(f"DELETE {url}", None, res_data)
+        r.raise_for_status()
+        write_json(FILES["character_cache"], {"timestamp": 0, "data": []})
+        return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/get_character_image', methods=['GET'])
+def get_character_image():
+    url = request.args.get('url')
+    if not url: return Response("Missing URL", status=400)
+
+    headers = {
+        "Authorization": f"Bearer {VENICE_API_KEY}",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+        "Accept": "image/webp,image/apng,image/*,*/*;q=0.8"
+    }
+    try:
+        r = requests.get(url, headers=headers, timeout=15)
+        if r.status_code == 200:
+            return Response(r.content, mimetype=r.headers.get('Content-Type', 'image/jpeg'))
+        else:
+            print(f"[IMAGE PROXY ERROR] {r.status_code} for URL: {url} - Resp: {r.text[:200]}")
+            # Provide transparent pixel or redirect to placeholder instead of 500 error
+            return app.send_static_file('error_placeholder.png') if os.path.exists('static/error_placeholder.png') else Response("Image failed", status=404)
+    except Exception as e:
+        print(f"[IMAGE PROXY EXCEPTION] {e}")
+        return Response(str(e), status=500)
+
+@app.route('/get_character_details/<slug>', methods=['GET'])
+def get_character_details(slug):
+    try:
+        headers = {"Authorization": f"Bearer {VENICE_API_KEY}"}
+        url = f"{VENICE_CHARACTERS_URL}/{slug}"
+        r = requests.get(url, headers=headers)
+        res_data = r.json() if r.status_code == 200 else r.text
+        update_last_io(url, None, res_data)
+        r.raise_for_status()
+        return jsonify(res_data.get("data", {}))
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/get_last_io')
+def get_last_io():
+    return jsonify(LAST_IO)
+
+@app.route('/get_balance')
+def get_balance_route():
+    return jsonify(get_persisted_balance())
+
+@app.route('/update_character', methods=['POST'])
+def update_character():
+    slug = request.json.get('slug')
+    model_id = request.json.get('modelId')
+    path = get_active_chat_path()
+
+    # Update current file
+    data = load_chat_data(path)
+    data["character_slug"] = slug
+    save_chat_data(path, data)
+
+    # Update metadata to preserve this character for the NEXT "new chat"
+    meta = read_json(FILES["active_meta"], {})
+    meta["pending_character"] = slug
+    write_json(FILES["active_meta"], meta)
+
+    # Model Affinity Sync
+    if model_id:
+        v_set = read_json(FILES["venice_settings"], {})
+        v_set["model"] = model_id
+        write_json(FILES["venice_settings"], v_set)
+
+    return jsonify({"success": True})
+
+@app.route('/clear_backups', methods=['POST'])
+def clear_backups():
+    path = get_active_chat_path()
+    chat_data = load_chat_data(path)
+    if "backup_summaries" in chat_data:
+        del chat_data["backup_summaries"]
+        save_chat_data(path, chat_data)
+    return jsonify({"success": True})
+
 @app.route('/chat', methods=['POST'])
 def chat():
     data = request.json
@@ -1110,49 +1352,64 @@ def chat():
     save_chat_data(path, chat_data)
 
     idx = len(chat_data["messages"]) - 1
-    chat_data = process_summaries(chat_data)
-    save_chat_data(path, chat_data)
-
-    temp_data = {"messages": chat_data["messages"][:-1], "summaries": chat_data["summaries"], "visual_memory": chat_data.get("visual_memory", "")}
-    query_text = data.get('message', '')
-    if isinstance(query_text, list):
-        query_text = get_text_content({"content": query_text})
-
-    context = build_context(temp_data, user_query=query_text, current_model=model_to_use)
-
-    char_system = 0
-    char_summary = 0
-    char_raw = 0
-
-    for m in context:
-        c = m.get('content', '')
-        if isinstance(c, str):
-            c_len = len(c)
-            content_str = c
-        elif isinstance(c, list):
-            content_str = get_text_content(m)
-            c_len = len(content_str)
-        else:
-            c_len = 0
-            content_str = ""
-
-        role = m.get('role')
-
-        if role == 'system':
-            # Check if this specific system message is a summary
-            if "RECENT SUMMARY" in content_str or "CONSOLIDATED ARCHIVE" in content_str:
-                char_summary += c_len
-            else:
-                # Banned phrases, Visual Memory, RAG, and Main Prompt are all 'System'
-                char_system += c_len
-        else:
-            char_raw += c_len
-
-    total_chars = char_system + char_summary + char_raw
 
     def generate():
+        nonlocal chat_data
+
+        # 1. Process Summaries and stream status REAL-TIME
+        s_set = read_json(FILES["summarizer_settings"], {"enabled": False})
+        if s_set.get("enabled"):
+            for status_msg in process_summaries(chat_data):
+                yield f"data: {json.dumps({'status': status_msg})}\n\n"
+
+        save_chat_data(path, chat_data)
+
+        # Build context AFTER summarization is complete
+        temp_data = {"messages": chat_data["messages"][:-1], "summaries": chat_data["summaries"], "visual_memory": chat_data.get("visual_memory", "")}
+        query_text = data.get('message', '')
+        if isinstance(query_text, list):
+            query_text = get_text_content({"content": query_text})
+
+        context = build_context(temp_data, user_query=query_text, current_model=model_to_use)
+
+        # Character Logic ...
+        if chat_data.get("character_slug") and context and context[0]["role"] == "system":
+            pass
+
+        # Token Analytics ...
+        char_system = 0
+        char_summary = 0
+        char_raw = 0
+        for m in context:
+            c = m.get('content', '')
+            content_str = get_text_content(m) if isinstance(c, list) else str(c)
+            c_len = len(content_str)
+            role = m.get('role')
+            if role == 'system':
+                if "RECENT SUMMARY" in content_str or "CONSOLIDATED ARCHIVE" in content_str: char_summary += c_len
+                else: char_system += c_len
+            else: char_raw += c_len
+        total_chars = char_system + char_summary + char_raw
+
+        # 2. Start Main Generation
         headers = {"Authorization": f"Bearer {VENICE_API_KEY}"}
         cache_key = os.path.basename(path).replace('.json', '')
+
+        venice_params = {
+            "include_venice_system_prompt": v_set.get("include_venice_system_prompt", True),
+            "strip_thinking_response": True
+        }
+
+        if chat_data.get("character_slug"):
+            venice_params["character_slug"] = chat_data["character_slug"]
+            venice_params["include_venice_system_prompt"] = True
+
+            # Pass web search/scraping settings if provided in v_set
+            if v_set.get("enable_web_search"):
+                venice_params["enable_web_search"] = v_set.get("enable_web_search", "off")
+            if v_set.get("enable_web_scraping"):
+                venice_params["enable_web_scraping"] = v_set.get("enable_web_scraping", False)
+
         payload = {
             "model": model_to_use,
             "temperature": float(v_set.get("temperature", 0.7)),
@@ -1164,11 +1421,11 @@ def chat():
             "stream": True,
             "prompt_cache_key": cache_key,
             "prompt_cache_retention": "24h",
-            "venice_parameters": {
-                "include_venice_system_prompt": v_set.get("include_venice_system_prompt", True),
-                "strip_thinking_response": True
-            }
+            "venice_parameters": venice_params
         }
+
+        # Store for the Last IO debugger
+        update_last_io(VENICE_URL, payload, None)
 
         # --- CACHE DEBUG LOGGING ---
         try:
@@ -1185,28 +1442,30 @@ def chat():
         reasoning = ""
         usage = None
         balance = None
+        full_response_json = []
         try:
             with requests.post(VENICE_URL, headers=headers, json=payload, stream=True) as r:
                 r.raise_for_status()
                 balance = r.headers.get('x-venice-balance-usd')
+                save_persisted_balance(balance)
                 for line in r.iter_lines():
                     if line:
                         decoded = line.decode('utf-8')
                         if "[DONE]" in decoded: break
                         try:
-                            chunk = json.loads(decoded[6:])
+                            chunk_raw = decoded[6:]
+                            chunk = json.loads(chunk_raw)
+                            full_response_json.append(chunk)
                             if "usage" in chunk: usage = chunk["usage"]
                             if len(chunk['choices'])>0:
                                 delta = chunk['choices'][0]['delta']
-
-                                # Handle reasoning content
+                                # ... standard yield logic ...
                                 if 'reasoning_content' in delta and delta['reasoning_content']:
                                     r_part = delta['reasoning_content']
                                     reasoning += r_part
                                     chat_data["messages"][idx]["reasoning"] = reasoning
                                     yield f"data: {json.dumps({'reasoning': r_part})}\n\n"
 
-                                # Handle standard content
                                 if 'content' in delta and delta['content']:
                                     c = delta['content']
                                     full += c
@@ -1215,6 +1474,9 @@ def chat():
 
                                 save_chat_data(path, chat_data)
                         except: pass
+
+            # Store final combined response
+            update_last_io(VENICE_URL, payload, full_response_json)
 
             if usage:
                 prompt_tokens = usage.get("prompt_tokens", 0)
@@ -1230,27 +1492,14 @@ def chat():
                 yield f"data: {json.dumps({'usage': usage, 'balance': balance})}\n\n"
 
         except Exception as e:
-            chat_data["messages"].pop()
+            if not full and not reasoning:
+                chat_data["messages"].pop()
+            else:
+                chat_data["messages"][idx]["content"] = full + f"\n\n*(Stream error: {str(e)})*"
             save_chat_data(path, chat_data)
             yield f"data: {json.dumps({'error': str(e)})}\n\n"
 
     return Response(stream_with_context(generate()), mimetype='text/event-stream')
-
-def validate_dimensions(width, height, model_id):
-    """Enforces Venice.ai API constraints: Rule of 32 and 1280px cap for standard models."""
-    # List of models known to have a 1280px limit for base generation
-    PRIVATE_MODELS = ['lustify-v7', 'lustify-sdxl', 'anime-wai', 'z-image-turbo', 'qwen-image', 'chroma', 'hidream', 'venice-sd35']
-
-    # Rule of 32
-    valid_w = (int(width) // 32) * 32
-    valid_h = (int(height) // 32) * 32
-
-    # 1280px Cap for standard models
-    if any(m in model_id for m in PRIVATE_MODELS):
-        valid_w = min(valid_w, 1280)
-        valid_h = min(valid_h, 1280)
-
-    return valid_w, valid_h
 
 @app.route('/generate_image', methods=['POST'])
 def generate_image():
@@ -1298,6 +1547,7 @@ def generate_image():
 
             p_res_raw = requests.post(VENICE_URL, headers=h, json={
                 "model": prompt_model,
+                "temperature": 0.1,
                 "messages": [
                     {"role":"system","content":read_text(FILES["img_prompt_instr"])},
                     {"role":"user","content":context_str}
@@ -1321,85 +1571,38 @@ def generate_image():
 
     # Step 2: Image Generation
     try:
-        vh = {"Authorization": f"Bearer {VENICE_API_KEY}", "Content-Type": "application/json"}
+        fh = {"Authorization": f"Key {FAL_KEY}", "Content-Type": "application/json"}
 
-        gen_model = i_set.get("model", "lustify-v7")
-        steps = int(i_set.get("steps", 40))
-        cfg_scale = float(i_set.get("cfg_scale", 7.5))
-
-        # Determine if we use System A (Dimensions) or System B (Categorical)
-        CATEGORICAL_MODELS = ['nano-banana', 'recraft-v4-pro']
-
-        neg_prompt = neg_styles if neg_styles else "blurry, low quality, distorted anatomy"
+        # Z-Image Turbo specific defaults and constraints
+        # Hard-coded to 8 as per Turbo optimization documentation
+        steps = 8
 
         payload = {
-            "model": gen_model,
-            "prompt": prompt,
-            "negative_prompt": neg_prompt,
-            "steps": steps,
-            "cfg_scale": cfg_scale,
-            "safe_mode": False
+            "prompt": prompt, 
+            "num_inference_steps": 8, 
+            "enable_safety_checker": False, 
+            "enable_prompt_expansion": False,
+            "image_size": {
+                "width": int(i_set.get("width", 1024)), 
+                "height": int(i_set.get("height", 1024))
+            },
+            "output_format": "jpeg"
         }
 
-        if any(m in gen_model for m in CATEGORICAL_MODELS):
-            # System B
-            payload["resolution"] = "2K" if i_set.get("hd_mode") else "1K"
-            # Map dimension ratios back to aspect_ratio strings
-            w_raw = int(i_set.get("width", 1024))
-            h_raw = int(i_set.get("height", 1024))
-            ratio = w_raw / h_raw
-            if 0.9 <= ratio <= 1.1: payload["aspect_ratio"] = "1:1"
-            elif ratio > 1.3: payload["aspect_ratio"] = "16:9" if ratio > 1.6 else "4:3"
-            else: payload["aspect_ratio"] = "9:16" if ratio < 0.6 else "3:4"
-        else:
-            # System A (Standard)
-            width, height = validate_dimensions(i_set.get("width", 1024), i_set.get("height", 1024), gen_model)
-            payload["width"] = width
-            payload["height"] = height
-
-        v_res_raw = requests.post(VENICE_IMAGE_URL, headers=vh, json=payload, timeout=90)
+        f_res_raw = requests.post(FAL_URL, headers=fh, json=payload, timeout=60)
 
         try:
-            v_res = v_res_raw.json()
+            f_res = f_res_raw.json()
         except:
-            v_res = {"raw_text": v_res_raw.text}
+            f_res = {"raw_text": f_res_raw.text}
 
-        debug_logs["image_request"] = {"payload": payload, "response": v_res, "status": v_res_raw.status_code}
+        debug_logs["image_request"] = {"payload": payload, "response": f_res, "status": f_res_raw.status_code}
 
-        # Fallback Logic: if 500, try a "Safe" minimal request
-        if v_res_raw.status_code != 200:
-            if v_res_raw.status_code == 500:
-                print("500 Error detected, attempting minimal fallback request...")
-                fallback_payload = {
-                    "model": gen_model,
-                    "prompt": prompt[:500], # Shorter prompt
-                    "width": 1024,
-                    "height": 1024,
-                    "safe_mode": False
-                }
-                fb_res_raw = requests.post(VENICE_IMAGE_URL, headers=vh, json=fallback_payload, timeout=60)
-                if fb_res_raw.status_code == 200:
-                    v_res = fb_res_raw.json()
-                    debug_logs["fallback_request"] = {"payload": fallback_payload, "response": v_res}
-                else:
-                    err_info = v_res.get('error', v_res.get('raw_text', 'Unknown'))
-                    return jsonify({"error": f"Venice API Error {v_res_raw.status_code}: {err_info}", "debug": debug_logs if debug_mode else None}), 500
-            else:
-                err_info = v_res.get('error', v_res.get('raw_text', 'Unknown'))
-                return jsonify({"error": f"Venice API Error {v_res_raw.status_code}: {err_info}", "debug": debug_logs if debug_mode else None}), 500
+        if 'images' not in f_res:
+            error_detail = f_res.get('detail', f_res.get('raw_text', 'Unknown error'))
+            return jsonify({"error": f"FAL Image Gen Error {f_res_raw.status_code}: {error_detail}", "debug": debug_logs if debug_mode else None}), 500
 
-        # Venice response can be a URL or a base64 string
-        image_data = v_res['images'][0]
-        if isinstance(image_data, dict) and 'url' in image_data:
-            url = image_data['url']
-        elif isinstance(image_data, str):
-            # Venice returns base64 strings (starting with UklGR for WebP)
-            # We wrap it in a data URI so the frontend can render it
-            data_uri = f"data:image/webp;base64,{image_data}"
-            # Save locally to prevent bloating JSON files
-            url = save_base64_image(data_uri)
-        else:
-            return jsonify({"error": "Unexpected image data format from Venice.", "debug": debug_logs if debug_mode else None}), 500
+        url = f_res['images'][0]['url']
 
         img_msg = {"role": "assistant", "content": f"__IMG_JSON__{json.dumps({'url': url, 'prompt': prompt})}"}
         chat_data["messages"].append(img_msg)
@@ -1412,31 +1615,55 @@ def generate_image():
 
 @app.route('/scan_visuals', methods=['POST'])
 def scan_visuals():
-    depth = int(request.json.get('depth', 50))
-    path = get_active_chat_path()
-    chat_data = load_chat_data(path)
-
-    msgs = clean_for_api(chat_data["messages"])
-    target_msgs = msgs[-depth:]
-    blob = "\n".join([f"{m['role']}: {get_text_content(m)}" for m in target_msgs])
-
-    existing = chat_data.get("visual_memory", "")
-    prompt = f"EXISTING VISUAL MEMORY:\n{existing}\n\nRECENT CHAT LOG:\n{blob}"
-
     try:
+        depth = int(request.json.get('depth', 50))
+        path = get_active_chat_path()
+        chat_data = load_chat_data(path)
+
+        msgs = clean_for_api(chat_data["messages"])
+        target_msgs = msgs[-depth:]
+        blob = "\n".join([f"{m['role']}: {get_text_content(m)}" for m in target_msgs])
+
+        existing = chat_data.get("visual_memory", "")
+        prompt = f"EXISTING VISUAL MEMORY:\n{existing}\n\nRECENT CHAT LOG:\n{blob}"
+
+        # Use the model configured for image prompting, falling back to venice-uncensored
+        p_set = read_json(FILES["venice_img_settings"], {})
+        model_to_use = p_set.get("model", "venice-uncensored")
+
         h = {"Authorization": f"Bearer {VENICE_API_KEY}"}
-        res = requests.post(VENICE_URL, headers=h, json={
-            "model": "venice-uncensored",
-            "messages": apply_claude_caching([{"role":"system","content":read_text(FILES["visual_prompt"])}, {"role":"user","content":prompt}], "venice-uncensored"),
-            "prompt_cache_key": os.path.basename(path).replace('.json', '') + "_scan",
+        cache_key = get_cache_key(path, "_scan")
+
+        payload = {
+            "model": model_to_use,
+            "messages": apply_claude_caching([
+                {"role": "system", "content": read_text(FILES["visual_prompt"])}, 
+                {"role": "user", "content": prompt}
+            ], model_to_use),
+            "prompt_cache_key": cache_key,
             "prompt_cache_retention": "24h",
-            **VENICE_DEFAULTS
-        }).json()
-        new_mem = res['choices'][0]['message']['content']
-        chat_data["visual_memory"] = new_mem
-        save_chat_data(path, chat_data)
-        return jsonify({"success": True, "memory": new_mem})
-    except Exception as e: return jsonify({"error": str(e)}), 500
+            "venice_parameters": {
+                "include_venice_system_prompt": False,
+                "strip_thinking_response": True
+            }
+        }
+
+        r = requests.post(VENICE_URL, headers=h, json=payload)
+        update_last_io(VENICE_URL, payload, r.text)
+        r.raise_for_status()
+
+        res = r.json()
+        if 'choices' in res and res['choices']:
+            new_mem = res['choices'][0]['message']['content'].strip()
+            chat_data["visual_memory"] = new_mem
+            save_chat_data(path, chat_data)
+            return jsonify({"success": True, "memory": new_mem})
+        else:
+            return jsonify({"error": "No content returned from API", "raw": res}), 500
+
+    except Exception as e:
+        print(f"[SCAN VISUALS ERROR] {traceback.format_exc()}")
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/update_history', methods=['POST'])
 def update_history():
@@ -1469,17 +1696,66 @@ def sidebar_data():
 
 @app.route('/rename_chat', methods=['POST'])
 def rename_chat():
-    old, new = request.json.get('old'), request.json.get('new')
-    os.rename(os.path.join(FILES["conversations_dir"], old), os.path.join(FILES["conversations_dir"], new+".json"))
+    old, new_base = request.json.get('old'), request.json.get('new')
+
+    new_name = new_base + ".json"
+    counter = 1
+    while os.path.exists(os.path.join(FILES["conversations_dir"], new_name)):
+        new_name = f"{new_base}_{counter}.json"
+        counter += 1
+
+    os.rename(
+        os.path.join(FILES["conversations_dir"], old), 
+        os.path.join(FILES["conversations_dir"], new_name)
+    )
+
     meta = read_json(FILES["active_meta"], {})
-    if meta.get("filename") == old: write_json(FILES["active_meta"], {"filename": new+".json"})
-    return jsonify({"success": True})
+    if meta.get("filename") == old: 
+        write_json(FILES["active_meta"], {"filename": new_name})
+
+    return jsonify({"success": True, "new_filename": new_name})
 
 @app.route('/delete_chat', methods=['POST'])
 def delete_chat():
     fn = request.json.get('filename')
-    os.remove(os.path.join(FILES["conversations_dir"], fn))
-    return jsonify({"success": True})
+    path = os.path.join(FILES["conversations_dir"], fn)
+
+    try:
+        if os.path.exists(path):
+            data = load_chat_data(path)
+
+            # Delete associated images
+            for m in data.get("messages", []):
+                c = m.get('content', '')
+                # Handle standard image messages
+                if isinstance(c, str) and c.startswith('__IMG_JSON__'):
+                    try:
+                        img_info = json.loads(c.replace('__IMG_JSON__', ''))
+                        url = img_info.get('url')
+                        if url and url.startswith('/static/uploads/'):
+                            img_path = os.path.join(FILES["uploads_dir"], os.path.basename(url))
+                            if os.path.exists(img_path): os.remove(img_path)
+                    except: pass
+                # Handle vision input images
+                elif isinstance(c, list):
+                    for part in c:
+                        if part.get('type') == 'image_url':
+                            url = part['image_url']['url']
+                            if url.startswith('/static/uploads/'):
+                                img_path = os.path.join(FILES["uploads_dir"], os.path.basename(url))
+                                if os.path.exists(img_path): os.remove(img_path)
+
+            # Delete the conversation file
+            os.remove(path)
+
+            # Cleanup payload logs
+            log_path = os.path.join(FILES["payload_logs_dir"], fn)
+            if os.path.exists(log_path): os.remove(log_path)
+
+            return jsonify({"success": True})
+        return jsonify({"error": "File not found"}), 404
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/generate_chat_title', methods=['POST'])
 def generate_chat_title():
@@ -1616,113 +1892,182 @@ def save_lorebook():
     write_text(FILES["lorebook"], text)
     return jsonify({"success": True})
 
+def chunk_text_for_tts(text, max_chars=2000):
+    """Consolidated chunking logic. Splits by sentence to avoid mid-word breaks."""
+    clean_text = re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL)
+    clean_text = re.sub(r'<[^>]+>', '', clean_text)
+    clean_text = re.sub(r'\[.*?\]\(.*?\)', '', clean_text)
+    clean_text = re.sub(r'[*_`#]', '', clean_text)
+    clean_text = clean_text.replace('\n', ' ').strip()
+
+    sentences = re.split('(?<=[.!?]) +', clean_text)
+    chunks = []
+    current = ""
+    for s in sentences:
+        if len(current) + len(s) <= max_chars:
+            current += (" " if current else "") + s
+        else:
+            if current: chunks.append(current.strip())
+            current = s
+    if current: chunks.append(current.strip())
+    return chunks
+
 @app.route('/tts', methods=['POST'])
 def tts():
+    """Generates and returns a URL to a concatenated MP3 file for a message."""
     try:
         data = request.json
         text = data.get('text', '')
         if not text:
             return jsonify({"error": "No text provided"}), 400
 
-        # 1. CLEANING & PREP
-        # Clean markdown/HTML for better narration
-        clean_text = re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL)
-        clean_text = re.sub(r'<[^>]+>', '', clean_text)
-        clean_text = re.sub(r'\[.*?\]\(.*?\)', '', clean_text)
-        clean_text = re.sub(r'[*_`#]', '', clean_text)
-        clean_text = clean_text.replace('\n', ' ').strip()
-
         t_set = read_json(FILES["tts_settings"], {"enabled": False, "model": "tts-kokoro", "voice": "af_sky", "speed": 1.0})
 
-        # 2. CENTRALIZED CHUNKING (Single Process)
-        def chunk_text(t, max_chars=2000): # Reduced limit for reliability
-            # Split by punctuation to avoid mid-sentence breaks
-            sentences = re.split('(?<=[.!?]) +', t)
-            chunks = []
-            current = ""
-            for s in sentences:
-                if len(current) + len(s) <= max_chars:
-                    current += (" " if current else "") + s
-                else:
-                    if current: chunks.append(current.strip())
-                    current = s
-            if current: chunks.append(current.strip())
-            return chunks
+        is_mistral = t_set.get("model", "").startswith("voxtral")
+        ref_audio = data.get('ref_audio')
 
-        text_chunks = chunk_text(clean_text)
+        # Fallback: Read sample.wav from server disk if Mistral and no UI upload
+        if is_mistral and not ref_audio:
+            try:
+                if os.path.exists("sample.wav"):
+                    with open("sample.wav", "rb") as f:
+                        ref_audio = base64.b64encode(f.read()).decode('utf-8')
+            except Exception as e:
+                print(f"Error reading sample.wav: {e}")
 
+        # Check Cache first
+        cache_fn = get_tts_cache_path(text, t_set.get("model"), t_set.get("voice"), t_set.get("speed"), ref_audio)
+        cache_path = os.path.join(FILES["audio_cache_dir"], cache_fn)
+
+        if os.path.exists(cache_path):
+            return jsonify({
+                "url": f"/static/audio_cache/{cache_fn}",
+                "cached": True
+            })
+
+        text_chunks = chunk_text_for_tts(text)
         log_tts_event("job_started", {
-            "input_length": len(text),
-            "cleaned_length": len(clean_text),
-            "chunk_count": len(text_chunks),
+            "input_len": len(text),
+            "chunks": len(text_chunks),
             "settings": t_set,
-            "chunks": text_chunks
+            "has_ref_audio": bool(ref_audio)
         })
 
-        headers = {
-            "Authorization": f"Bearer {VENICE_API_KEY}",
-            "Content-Type": "application/json"
-        }
+        api_key = MISTRAL_API_KEY if is_mistral else VENICE_API_KEY
+        endpoint = MISTRAL_SPEECH_URL if is_mistral else VENICE_SPEECH_URL
+        headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
 
-        def generate_audio():
-            success_count = 0
-            for i, chunk in enumerate(text_chunks):
+        success_count = 0
+        last_balance = "0"
+
+        wav_params = None
+        frames = bytearray()
+
+        chunk_errors = []
+
+        for i, chunk in enumerate(text_chunks):
+            if not chunk: continue
+
+            if is_mistral:
+                payload = {
+                    "model": t_set.get("model", "voxtral-mini-tts-2603"),
+                    "input": chunk,
+                    "response_format": "wav"
+                }
+                # Priority 1: One-off clone from uploaded file in UI
+                if ref_audio:
+                    payload["ref_audio"] = ref_audio
+                # Priority 2: Use saved Voice ID from settings
+                else:
+                    payload["voice_id"] = t_set.get("voice")
+            else:
                 payload = {
                     "model": t_set.get("model", "tts-kokoro"),
                     "input": chunk,
                     "voice": t_set.get("voice", "af_sky"),
-                    "response_format": "mp3",
+                    "response_format": "wav",
                     "speed": float(t_set.get("speed", 1.0))
                 }
 
-                chunk_id = f"{i+1}/{len(text_chunks)}"
-                start_time = time.time()
+            try:
+                r = requests.post(endpoint, headers=headers, json=payload, timeout=90)
 
-                try:
-                    # Log RAW API Input
-                    log_tts_event(f"chunk_{i}_request", {
-                        "chunk_id": chunk_id,
-                        "payload": payload,
-                        "url": VENICE_SPEECH_URL
-                    })
+                # Store Last IO for TTS debugging
+                update_last_io(endpoint, payload, {"status": r.status_code, "length": len(r.content) if r.status_code == 200 else 0})
 
-                    print(f"[TTS DEBUG] Requesting chunk {chunk_id} ({len(chunk)} chars)...")
-                    r = requests.post(VENICE_SPEECH_URL, headers=headers, json=payload, timeout=90)
+                if r.status_code == 200:
+                    audio_content = r.content
 
-                    elapsed = time.time() - start_time
+                    # Handle Mistral's JSON-wrapped base64 response
+                    if is_mistral:
+                        try:
+                            json_res = r.json()
+                            if isinstance(json_res, dict) and 'audio_data' in json_res:
+                                audio_content = base64.b64decode(json_res['audio_data'])
+                        except Exception as json_e:
+                            print(f"Mistral JSON decode error: {json_e}")
+                            # Fallback if it's already binary for some reason
+                            pass
 
-                    # Log RAW API Output (Headers and Status)
-                    log_tts_event(f"chunk_{i}_response", {
-                        "chunk_id": chunk_id,
-                        "status": r.status_code,
-                        "headers": dict(r.headers),
-                        "elapsed_seconds": elapsed,
-                        "error_text": r.text if r.status_code != 200 else None
-                    })
-
-                    if r.status_code == 200:
+                    try:
+                        with wave.open(io.BytesIO(audio_content), 'rb') as w:
+                            if wav_params is None:
+                                wav_params = w.getparams()
+                            frames.extend(w.readframes(w.getnframes()))
                         success_count += 1
-                        print(f"[TTS DEBUG] Chunk {chunk_id} success. Bytes: {len(r.content)}")
-                        yield r.content
-                    else:
-                        print(f"[TTS DEBUG] Chunk {chunk_id} failed with status {r.status_code}")
-                except Exception as e:
-                    print(f"[TTS DEBUG] Exception on chunk {chunk_id}: {str(e)}")
-                    log_tts_event(f"chunk_{i}_exception", {
-                        "chunk_id": chunk_id,
-                        "error": str(e)
+                    except Exception as wave_e:
+                        chunk_errors.append({
+                            "chunk": i,
+                            "type": "wave_decode_error",
+                            "error": str(wave_e),
+                            "content_preview": str(audio_content[:50])
+                        })
+
+                    if r.headers.get('x-venice-balance-usd'):
+                        last_balance = r.headers.get('x-venice-balance-usd')
+                        save_persisted_balance(last_balance)
+                else:
+                    chunk_errors.append({
+                        "chunk": i,
+                        "type": "http_error",
+                        "status": r.status_code,
+                        "error": r.text,
+                        "payload": payload
                     })
+            except Exception as e:
+                chunk_errors.append({"chunk": i, "type": "exception", "error": str(e)})
 
-            log_tts_event("job_finished", {
-                "total_chunks": len(text_chunks),
-                "successful_chunks": success_count
-            })
+        log_tts_event("job_finished", {
+            "total": len(text_chunks), 
+            "success": success_count, 
+            "bytes": len(frames),
+            "errors": chunk_errors
+        })
 
-        return Response(stream_with_context(generate_audio()), mimetype="audio/mpeg")
+        if success_count == 0 or wav_params is None:
+            return jsonify({
+                "error": "Failed to generate any valid audio chunks.",
+                "details": chunk_errors
+            }), 500
+
+        # Save to disk as a properly formatted WAV file
+        with wave.open(cache_path, "wb") as w:
+            w.setparams(wav_params)
+            w.writeframes(frames)
+
+        return jsonify({
+            "url": f"/static/audio_cache/{cache_fn}",
+            "balance": last_balance,
+            "cached": False
+        })
 
     except Exception as e:
         log_tts_event("global_error", {"error": str(e)})
         return jsonify({"error": str(e)}), 500
+
+@app.route('/get_last_tts_log')
+def get_last_tts_log():
+    return jsonify(LAST_TTS_LOG)
 
 @app.route('/get_settings')
 def get_settings():
@@ -1730,6 +2075,7 @@ def get_settings():
         "main_prompt": read_text(FILES["main_prompt"]),
         "venice": read_json(FILES["venice_settings"], {"model": "venice-uncensored", "temperature": 0.9, "max_tokens": 4000, "reasoning_effort": "medium"}),
         "venice_img": read_json(FILES["venice_img_settings"], {}),
+        "refiner": read_json(FILES["refiner_settings"], {"model": "venice-uncensored", "temperature": 0.3}),
         "image_gen": read_json(FILES["img_settings"], {"model": "lustify-v7", "steps": 40, "cfg_scale": 7.5, "width": 864, "height": 1152}),
         "summarizer": read_json(FILES["summarizer_settings"], {
             "enabled": False, 
@@ -1753,12 +2099,19 @@ def save_settings():
     if "main_prompt" in d: write_text(FILES["main_prompt"], d["main_prompt"])
     if "venice" in d: write_json(FILES["venice_settings"], d["venice"])
     if "venice_img" in d: write_json(FILES["venice_img_settings"], d["venice_img"])
+    if "refiner" in d: write_json(FILES["refiner_settings"], d["refiner"])
     if "summarizer" in d: write_json(FILES["summarizer_settings"], d["summarizer"])
     if "rag" in d: write_json(FILES["rag_settings"], d["rag"])
-    if "tts" in d: write_json(FILES["tts_settings"], d["tts"])
+    if "tts" in d:
+        write_json(FILES["tts_settings"], d["tts"])
     if "wfm" in d: write_json(FILES["wfm_settings"], d["wfm"])
     if "interface" in d: write_json(FILES["interface_settings"], d["interface"])
-    if "image_gen" in d: write_json(FILES["img_settings"], d["image_gen"])
+    if "image_gen" in d:
+        current = read_json(FILES["img_settings"], {})
+        # Merge presets if they exist in file but not in incoming payload (partial update safety)
+        if "presets" in current and "presets" not in d["image_gen"]:
+            d["image_gen"]["presets"] = current["presets"]
+        write_json(FILES["img_settings"], d["image_gen"])
 
     if "venice" in d and "model" in d["venice"]:
         h = read_json(FILES["model_history"], [])

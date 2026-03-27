@@ -39,10 +39,19 @@ args = "dev_server"
 name = "dev_server"
 author = "agent"
 
-[workflows.workflow.metadata]
-outputType = "webview"
-
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "python main.py"
 waitForPort = 5000
+
+[workflows.workflow.metadata]
+outputType = "webview"
+
+[[workflows.workflow]]
+name = "Apply_Updates"
+mode = "sequential"
+author = 25353716
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "python apply_updates.py"

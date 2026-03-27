@@ -1,0 +1,11 @@
+{
+    "chunk_id": "2/2",
+    "payload": {
+        "model": "tts-kokoro",
+        "input": "\"Yeah,\" Vera says, releasing her with a shove that sends her head snapping back. \"She\u2019s been asking about you, actually. Reads your old social media like scripture. Wants to know how I broke you so completely. She\u2019s jealous of you, Maya. Jealous that you got to be my main bitch, that you got thrown away first. She thinks that means you won.\"  Vera stands and turns to you, crushing the cigarette under her boot. \"She\u2019s ripe. Ready. I\u2019ve been softening her up, but she needs the real treatment. The agricultural shit. She\u2019s still got her virginity\u2014technical, anyway. I\u2019ve been saving that for something special. Thought I might rent her out to some friends, but...\" She gestures expansively at the basement, the nursing animals, the broken woman tied to the post. \"This setup you\u2019ve got here? The breeding program? She\u2019d be perfect for it. Younger stock. More resilient. More grateful for the degradation.\"",
+        "voice": "af_bella",
+        "response_format": "mp3",
+        "speed": 0.9
+    },
+    "url": "https://api.venice.ai/api/v1/audio/speech"
+}

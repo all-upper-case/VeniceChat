@@ -1,0 +1,11 @@
+{
+    "chunk_id": "1/1",
+    "payload": {
+        "model": "tts-kokoro",
+        "input": "A thought suddenly occurs to me. \"Hey Vera, you wouldn't happen to have any other pathetic little exes you've traumatized and thrown away, do you? (She should say yes; the girl she dated after Maya is 16 now, and has a similar kind of absolutely brainless, beta, inferiority complex submissiveness and masochism as Maya.)",
+        "voice": "af_bella",
+        "response_format": "mp3",
+        "speed": 0.9
+    },
+    "url": "https://api.venice.ai/api/v1/audio/speech"
+}

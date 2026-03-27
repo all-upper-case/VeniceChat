@@ -1,0 +1,10 @@
+{
+    "input_len": 121,
+    "chunks": 1,
+    "settings": {
+        "enabled": true,
+        "model": "voxtral-mini-tts-2603",
+        "voice": "af_bella",
+        "speed": 1
+    }
+}

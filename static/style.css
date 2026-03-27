@@ -222,7 +222,8 @@ body {
 textarea {
     flex: 1; background: #1a1a1a; border: 1px solid var(--border);
     color: white; border-radius: 10px; padding: 12px; resize: none;
-    height: 100px; font-family: inherit; font-size: var(--font-size);
+    min-height: 100px; max-height: 400px; font-family: inherit; font-size: var(--font-size);
+    overflow-y: auto;
 }
 textarea:focus { outline: none; border-color: var(--primary); }
 
@@ -248,7 +249,16 @@ button.action {
     background: var(--bg-card); margin: 5% auto; width: 90%; max-width: 600px;
     border-radius: 15px; padding: 25px; max-height: 90vh; overflow-y: auto;
     border: 1px solid var(--border);
+    -webkit-overflow-scrolling: touch; /* Fix for iOS smooth scrolling */
+    overscroll-behavior: contain; /* Prevent scroll bubbling to background */
 }
+
+/* Ensure pre tags inside modals are also touch-scrollable */
+.modal-content pre {
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+}
+
 .modal-header {
     display: flex; justify-content: space-between; align-items: center;
     margin-bottom: 20px; border-bottom: 1px solid var(--border); padding-bottom: 10px;
@@ -280,6 +290,7 @@ details[open] summary::after { content: "-"; }
 #edit-overlay {
     display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
     background: rgba(0,0,0,0.95); z-index: 6000; padding: 20px;
+    -webkit-overflow-scrolling: touch;
 }
 #edit-textarea {
     width: 100%; height: 80%; background: #1a1a1a; color: white;
@@ -293,7 +304,33 @@ details[open] summary::after { content: "-"; }
     border: 1px solid var(--accent); border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.3);
 }
 
-#status-msg { text-align: center; color: #666; font-size: 0.85em; height: 1.2em; margin-bottom: 5px; }
+#status-msg { 
+    text-align: center; 
+    color: #888; 
+    font-size: 0.8em; 
+    min-height: 1.8em; 
+    margin-bottom: 8px; 
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    background: rgba(0,0,0,0.2);
+    border-radius: 6px;
+    border: 1px solid rgba(255,255,255,0.03);
+}
+
+.spinner {
+    width: 14px;
+    height: 14px;
+    border: 2px solid rgba(255, 255, 255, 0.1);
+    border-top-color: var(--purple);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
 
 /* ANALYTICS */
 .stat-card {
@@ -326,6 +363,7 @@ details[open] summary::after { content: "-"; }
     flex: 1; min-height: 200px; max-height: 400px; overflow-y: auto;
     background: #111; border-radius: 8px; padding: 10px; display: flex; flex-direction: column; gap: 10px;
     border: 1px solid #333;
+    -webkit-overflow-scrolling: touch;
 }
 .compare-chatbox .message { padding: 8px 12px; font-size: 0.9em; max-width: 100%; }
 .compare-stats {
@@ -339,6 +377,73 @@ details[open] summary::after { content: "-"; }
 .compare-badge {
     display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 0.75em;
     font-weight: bold; margin-bottom: 5px; background: #444; color: #eee;
+}
+
+.tts-btn.tts-ready {
+    border-color: var(--accent) !important;
+    background: rgba(16, 185, 129, 0.1);
+    box-shadow: 0 0 5px rgba(16, 185, 129, 0.3);
+}
+
+.tts-btn.tts-ready::after {
+    content: ' ✓';
+    font-size: 0.9em;
+}
+
+.tts-playback-controls {
+    margin-top: 10px;
+    padding: 10px;
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 8px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    align-items: center;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.tts-ctrl-btn {
+    background: #333;
+    border: 1px solid #444;
+    color: white;
+    padding: 4px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.8em;
+    min-width: 40px;
+}
+
+.tts-ctrl-btn:hover {
+    background: var(--primary);
+    border-color: var(--primary);
+}
+
+.tts-ctrl-btn.play-pause-btn {
+    background: var(--accent);
+    border-color: var(--accent);
+    font-size: 1em;
+}
+
+.tts-progress-container {
+    flex-basis: 100%;
+    height: 4px;
+    background: #222;
+    border-radius: 2px;
+    margin-top: 8px;
+    overflow: hidden;
+}
+
+.tts-progress-bar {
+    height: 100%;
+    background: var(--accent);
+    width: 0%;
+    transition: width 0.1s linear;
+}
+
+.msg-btn.delete-msg-btn:hover {
+    background: var(--danger);
+    border-color: var(--danger);
+    color: white;
 }
 
 @media (max-width: 700px) {

@@ -1,0 +1,11 @@
+{
+    "input_len": 6734,
+    "chunks": 4,
+    "settings": {
+        "enabled": true,
+        "model": "tts-kokoro",
+        "voice": "af_sarah",
+        "speed": 1
+    },
+    "has_ref_audio": false
+}

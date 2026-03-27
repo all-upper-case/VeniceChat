@@ -27,9 +27,21 @@
                 </div>
             </div>
             <button id="open-architect-btn" class="action full-btn" style="background:var(--purple); height:40px; font-size:0.9em;">⚡ Scenario Architect</button>
+            <button id="open-characters-btn" class="action full-btn" style="background:var(--primary); height:40px; font-size:0.9em; margin-top:10px;">👤 Character Gallery</button>
+            <div id="active-character-info" style="margin-top:10px; padding:10px; background:rgba(255,255,255,0.05); border:1px solid #333; border-radius:8px; display:none;">
+                <div style="display:flex; align-items:center; gap:10px;">
+                    <img id="active-char-img" src="" style="width:40px; height:40px; border-radius:50%; object-fit:cover; border:1px solid var(--primary);">
+                    <div style="flex:1; min-width:0;">
+                        <div id="active-char-name" style="font-weight:bold; font-size:0.9em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"></div>
+                        <div style="font-size:0.7em; color:var(--text-dim);">Active Persona</div>
+                    </div>
+                    <button id="clear-character-btn" class="icon-btn" title="Clear Character" style="color:var(--danger); opacity:1;">✕</button>
+                </div>
+            </div>
             <button id="open-analytics-btn" class="action full-btn" style="background:#0284c7; height:40px; font-size:0.9em; margin-top:10px;">📊 Chat Analytics</button>
             <button id="open-lore-extractor-btn" class="action full-btn" style="background:#059669; height:40px; font-size:0.9em; margin-top:10px;">📖 Lore Extractor</button>
             <button id="open-cache-debugger-btn" class="action full-btn" style="background:#eab308; color:#111; height:40px; font-size:0.9em; margin-top:10px;">🔍 Cache Debugger</button>
+            <button id="open-last-io-btn" class="action full-btn" style="background:#4b5563; height:40px; font-size:0.9em; margin-top:10px;">📜 Last API Exchange</button>
         </div>
         <ul id="chat-list"></ul>
     </div>
@@ -37,24 +49,51 @@
     <div id="main">
         <button id="mobile-menu-btn">☰</button>
         <div id="chatbox"></div>
-        <div id="status-msg"></div>
 
-        <div id="guided-overlay" style="display:none; background: #1a1a1a; padding: 15px; border: 1px solid var(--accent); border-radius: 8px; margin-bottom: 10px;">
-            <label style="display:block; margin-bottom:5px; color:var(--accent); font-weight:bold;">Visual Guidance / Raw Prompt:</label>
-            <textarea id="guided-input" placeholder="Add instructions for the LLM... or if Debug Mode is ON, enter the RAW image prompt here." style="width:100%; height:80px; margin-bottom:10px;"></textarea>
-            <div style="display:flex; align-items:center; margin-bottom:12px; gap:8px; background: rgba(0,0,0,0.2); padding: 8px; border-radius: 4px;">
-                <input type="checkbox" id="guided-debug-mode" style="width:18px; height:18px; cursor:pointer;">
-                <label for="guided-debug-mode" style="font-size:0.85em; color:#ddd; cursor:pointer; flex:1;">
-                    <strong>Debug Mode:</strong> Bypass LLM prompt writer. Use text above as raw prompt & show full API logs.
-                </label>
+    <!-- Guided Generation Modal -->
+    <div id="guided-modal" class="modal" style="z-index: 5800;">
+        <div class="modal-content" style="max-width:500px;">
+            <div class="modal-header">
+                <h2 style="color:var(--accent);">Guided Image Generation</h2>
+                <span id="guided-cancel-x" class="close-x">×</span>
             </div>
-            <div style="display:flex; gap:10px;">
-                <button id="guided-submit" class="action" style="flex:1; background:var(--accent);">Generate</button>
-                <button id="guided-cancel" class="action" style="flex:1; background:#444;">Cancel</button>
+            <div class="field">
+                <p style="font-size:0.85em; color:var(--text-dim); margin-bottom:10px;">Describe the specific scene, lighting, and style details you want to force into the next image generation.</p>
+                <textarea id="guided-input" placeholder="E.g. Close up photo, golden hour lighting, cinematic bokeh..." rows="4" style="font-size:0.95em;"></textarea>
+            </div>
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-top:15px;">
+                <label style="display:flex; align-items:center; gap:8px; font-size:0.85em; color:var(--text-dim); cursor:pointer;">
+                    <input type="checkbox" id="guided-debug-mode" style="width:18px; height:18px;">
+                    Debug Mode (Bypass LLM)
+                </label>
+                <div style="display:flex; gap:10px;">
+                    <button id="guided-submit" class="action" style="background:var(--accent); height:45px; padding:0 20px;">Generate</button>
+                    <button id="guided-cancel" class="action" style="background:#444; height:45px; padding:0 20px;">Cancel</button>
+                </div>
             </div>
         </div>
+    </div>
+
+    <!-- Refine Guidance Modal -->
+    <div id="refine-guidance-modal" class="modal" style="z-index: 5900;">
+        <div class="modal-content" style="max-width:500px;">
+            <div class="modal-header">
+                <h2 style="color:var(--purple);">AI Refinement Guidance</h2>
+                <span id="refine-guidance-cancel-x" class="close-x">×</span>
+            </div>
+            <div class="field">
+                <p style="font-size:0.85em; color:var(--text-dim); margin-bottom:10px;">Provide instructions to polish or modify the specific message content.</p>
+                <textarea id="refine-guidance-input" placeholder="E.g., 'Make her hair blonde', 'Add more sensory details to the third paragraph'..." rows="4" style="font-size:0.95em;"></textarea>
+            </div>
+            <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:15px;">
+                <button id="refine-guidance-submit" class="action" style="background:var(--purple); height:45px; padding:0 25px;">Apply Edits</button>
+                <button id="refine-guidance-cancel" class="action" style="background:#444; height:45px; padding:0 20px;">Cancel</button>
+            </div>
+        </div>
+    </div>
 
         <div id="controls">
+            <div id="status-msg"></div>
             <div class="input-row" style="position:relative;">
                 <textarea id="userInput" placeholder="Message Venice..."></textarea>
                 <div id="image-preview-container" style="display:none; position:absolute; bottom:calc(100% + 10px); left:0; background:#222; padding:10px; border-radius:8px; border:1px solid #444; z-index:100; align-items:flex-start; gap:10px;">
@@ -230,6 +269,44 @@
         </div>
     </div>
 
+    <div id="characters-modal" class="modal" style="z-index: 5200;">
+        <div class="modal-content" style="max-width:900px; height:85vh; display:flex; flex-direction:column;">
+            <div class="modal-header">
+                <h2>Venice Character Gallery</h2>
+                <span id="close-characters-x" class="close-x">×</span>
+            </div>
+
+            <div style="display:flex; gap:10px; margin-bottom:10px; flex-wrap: wrap;">
+                <button id="open-create-persona-btn" class="action" style="background:#059669; height:42px; padding:0 15px; font-weight:bold;">+ Create Persona</button>
+                <input type="text" id="char-search-input" placeholder="Search characters..." style="flex:2; padding:10px; background:#111; border:1px solid #333; color:white; border-radius:8px; min-width: 200px;">
+                <select id="char-category-filter" style="flex:1; padding:10px; background:#111; border:1px solid #333; color:white; border-radius:8px; min-width: 120px;">
+                    <option value="">All Categories</option>
+                    <option value="Roleplay">Roleplay</option>
+                    <option value="Assistant">Assistant</option>
+                    <option value="Philosophy">Philosophy</option>
+                    <option value="History">History</option>
+                    <option value="Anime">Anime</option>
+                    <option value="Storyteller">Storyteller</option>
+                </select>
+                <select id="char-model-filter" style="flex:1; padding:10px; background:#111; border:1px solid #333; color:white; border-radius:8px; min-width: 120px;">
+                    <option value="">All Models</option>
+                    <option value="venice-uncensored">Venice Uncensored</option>
+                    <option value="mistral-31-24b">Mistral 3.1 24B</option>
+                    <option value="llama-3.1-405b">Llama 405B</option>
+                </select>
+                <button id="char-search-btn" class="action" style="background:var(--primary); height:42px; padding:0 20px;">Search</button>
+            </div>
+
+            <div id="character-gallery-grid" style="flex:1; overflow-y:auto; display:grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap:15px;">
+                <!-- Characters injected here -->
+            </div>
+
+            <div id="char-loading" style="display:none; text-align:center; padding:50px; color:var(--text-dim);">
+                Fetching character personas...
+            </div>
+        </div>
+    </div>
+
     <div id="edit-overlay">
         <textarea id="edit-textarea"></textarea>
         <div id="edit-controls">
@@ -358,39 +435,12 @@
             </details>
 
             <details>
-                <summary>Image Generation (Venice)</summary>
+                <summary>Image Generation (Fal Z-Image)</summary>
                 <div class="field" style="display:flex; align-items:center; gap:10px; margin-top:10px;">
                     <input type="checkbox" id="set-guided" style="width:20px;"><label for="set-guided" style="margin:0;">Guided Mode</label>
                 </div>
-                <div class="field"><label>Image Prompt Model (Text)</label>
+                <div class="field"><label>Image Prompt Model (Venice)</label>
                     <select id="set-model-img"></select>
-                </div>
-                <div class="field"><label>Image Generation Model</label>
-                    <select id="set-gen-model-img">
-                        <optgroup label="Private & Uncensored ($0.01)">
-                            <option value="lustify-v7">Lustify v7 (Realistic)</option>
-                            <option value="lustify-sdxl">Lustify SDXL (High-res)</option>
-                            <option value="anime-wai">Anime WAI</option>
-                            <option value="qwen-image">Qwen Image (Fast)</option>
-                            <option value="venice-sd35">Venice SD35 (Balanced)</option>
-                            <option value="z-image-turbo">Z-Image Turbo</option>
-                            <option value="chroma">Chroma</option>
-                            <option value="hidream">HiDream</option>
-                        </optgroup>
-                        <optgroup label="Anonymized ($0.04 - $0.06)">
-                            <option value="flux-2-pro">Flux 2 Pro</option>
-                            <option value="grok-imagine">Grok Imagine</option>
-                            <option value="recraft-v4">Recraft V4</option>
-                            <option value="seeddream-v4.5">Seeddream V4.5</option>
-                            <option value="seeddream-v5-lite">Seeddream V5 Lite</option>
-                            <option value="qwen-image-2">Qwen Image 2</option>
-                            <option value="imagineart-1.5-pro">ImagineArt 1.5 Pro</option>
-                        </optgroup>
-                    </select>
-                </div>
-                <div class="field" style="display:flex; gap:10px;">
-                    <div style="flex:1;"><label>Steps <span id="rec-steps" style="color:var(--text-dim); font-size:0.8em; font-weight:normal;"></span></label><input type="number" id="set-img-steps" value="30"></div>
-                    <div style="flex:1;"><label>CFG Scale <span id="rec-cfg" style="color:var(--text-dim); font-size:0.8em; font-weight:normal;"></span></label><input type="number" id="set-img-cfg" step="0.1" value="7.0"></div>
                 </div>
                 <div class="field"><label>Art Style</label><select id="set-art-style">
                     <option value="None">None (Auto)</option>
@@ -415,38 +465,20 @@
                     <textarea id="set-negative-styles" placeholder="e.g. low quality, blurry, text, logo..." rows="2"></textarea>
                 </div>
                 <div class="field"><label>Image Context Depth (Messages)</label><input type="number" id="set-img-depth" min="1" max="20"></div>
-                <div class="field"><label>Aspect Ratio</label><select id="set-ar"><option value="1:1">Square (1:1)</option><option value="4:3">Landscape (4:3)</option><option value="3:4" selected>Portrait (3:4)</option><option value="16:9">Widescreen (16:9)</option><option value="9:16">Vertical (9:16)</option></select></div>
-                <div class="field" style="display:flex; align-items:center; gap:10px;"><input type="checkbox" id="set-hd" style="width:auto;" checked><label for="set-hd" style="margin:0;">HD Mode</label></div>
-
-                <div style="background: rgba(0,0,0,0.3); padding: 10px; border-radius: 6px; font-size: 0.8em; margin-top: 15px; border: 1px solid #444;">
-                    <h4 style="margin: 0 0 8px 0; color: var(--accent); font-size: 0.9em;">Parameter Quick-Reference</h4>
-                    <table style="width: 100%; border-collapse: collapse; color: #ccc;">
-                        <tr style="border-bottom: 1px solid #444; text-align: left;">
-                            <th style="padding: 4px;">Model Group</th>
-                            <th style="padding: 4px;">Steps</th>
-                            <th style="padding: 4px;">CFG</th>
-                        </tr>
-                        <tr>
-                            <td style="padding: 4px;">Lustify / SDXL</td>
-                            <td style="padding: 4px;">35-50</td>
-                            <td style="padding: 4px;">7.5</td>
-                        </tr>
-                        <tr>
-                            <td style="padding: 4px;">Z-Image / Qwen</td>
-                            <td style="padding: 4px;">4-8</td>
-                            <td style="padding: 4px;">1.5</td>
-                        </tr>
-                        <tr>
-                            <td style="padding: 4px;">Flux / Grok</td>
-                            <td style="padding: 4px;">25</td>
-                            <td style="padding: 4px;">3.5</td>
-                        </tr>
-                        <tr>
-                            <td style="padding: 4px;">SD 3.5</td>
-                            <td style="padding: 4px;">30</td>
-                            <td style="padding: 4px;">5.0</td>
-                        </tr>
-                    </table>
+                <div class="field"><label>Aspect Ratio</label><select id="set-ar"><option value="1:1">Square (1:1)</option><option value="4:3">Landscape (4:3)</option><option value="3:4" selected>Portrait (3:4)</option><option value="16:9">Widescreen (16:9)</option><option value="9:16">Vertical (9:16)</option><option value="2:3">Classic Portrait (2:3)</option><option value="3:2">Classic Landscape (3:2)</option></select></div>
+                <div class="field">
+                    <label>Resolution Tier</label>
+                    <div style="display:flex; gap:10px; background:#111; padding:10px; border-radius:8px; border:1px solid #444;">
+                        <label style="flex:1; display:flex; align-items:center; gap:5px; cursor:pointer; margin:0; font-size:0.85em;">
+                            <input type="radio" name="res-tier" value="standard" checked> Standard
+                        </label>
+                        <label style="flex:1; display:flex; align-items:center; gap:5px; cursor:pointer; margin:0; font-size:0.85em;">
+                            <input type="radio" name="res-tier" value="hd"> HD
+                        </label>
+                        <label style="flex:1; display:flex; align-items:center; gap:5px; cursor:pointer; margin:0; font-size:0.85em;">
+                            <input type="radio" name="res-tier" value="2k"> 2K
+                        </label>
+                    </div>
                 </div>
 
                 <h4 style="margin-bottom:5px; margin-top:20px; color:var(--accent);">Visual Memory (Characters)</h4>
@@ -480,7 +512,7 @@
 
                     <button id="edit-lorebook-btn" class="msg-btn" style="width:100%; margin-top:10px; padding:10px; background:#444;">Edit Lorebook Text</button>
                     <button id="rebuild-index-btn" class="msg-btn" style="width:100%; margin-top:10px; padding:10px; background:var(--purple); color:white; border-color:var(--purple);">Rebuild Vector Index</button>
-                    <p style="font-size:0.8em; color:var(--text-dim); margin-top:10px;">Rebuilding uses Mistral Embeddings API to convert lore into searchable vectors. Do this after editing the lorebook.</p>
+                    <p style="font-size:0.8em; color:var(--text-dim); margin-top:10px;">Rebuilding uses Venice Embeddings API to convert lore into searchable vectors. Do this after editing the lorebook.</p>
                 </div>
             </details>
 
@@ -527,18 +559,51 @@
                     </div>
 
                     <div id="tts-options" style="display:none;">
+                        <button id="view-tts-log-btn" class="msg-btn" style="width:100%; margin-bottom:15px; background:#4b5563; color:white; border-color:#666;">🔍 View Last TTS Diagnostic Log</button>
                         <div class="field">
-                            <label>TTS Model</label>
+                            <label>TTS Provider / Model</label>
                             <select id="set-tts-model">
-                                <option value="tts-kokoro">Kokoro (Best Quality)</option>
-                                <option value="tts-qwen3-0-6b">Qwen 3 0.6B (Emotion Support)</option>
-                                <option value="tts-qwen3-1-7b">Qwen 3 1.7B (High Quality)</option>
+                                <option value="tts-kokoro">Venice: Kokoro (Best Quality)</option>
+                                <option value="voxtral-mini-tts-2603">Mistral: Voxtral Mini (Fast/Clone)</option>
+                                <option value="tts-qwen3-0-6b">Venice: Qwen 3 0.6B</option>
+                                <option value="tts-qwen3-1-7b">Venice: Qwen 3 1.7B</option>
                             </select>
+                        </div>
+                        <div id="mistral-clone-container" style="display:none; background:rgba(139, 92, 246, 0.1); border:1px solid var(--purple); padding:10px; border-radius:8px; margin-bottom:15px;">
+                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:5px;">
+                                <label style="color:var(--purple); font-weight:bold; font-size:0.85em; margin:0;">Mistral Voice ID / Clone</label>
+                                <button id="clear-tts-clone-btn" class="msg-btn" style="padding:2px 8px; font-size:0.7em; background:var(--danger); border-color:var(--danger); color:white; display:none;">Clear Uploaded Sample</button>
+                            </div>
+                            <div style="display:flex; flex-direction:column; gap:8px;">
+                                <div id="mistral-id-field" style="margin-bottom:5px;">
+                                    <label style="font-size:0.7em; color:var(--text-dim); display:block; margin-bottom:2px;">Saved Voice ID (UUID from my_mistral_voices.json)</label>
+                                    <input type="text" id="mistral-voice-id" placeholder="Paste Voice ID here..." style="width:100%; padding:8px; background:#111; border:1px solid #444; color:white; border-radius:4px; font-size:0.85em;">
+                                </div>
+                                <div style="border-top: 1px solid rgba(255,255,255,0.05); padding-top:8px;">
+                                    <label style="font-size:0.7em; color:var(--text-dim); display:block; margin-bottom:2px;">OR: Upload New Sample (One-off Clone)</label>
+                                    <input type="file" id="tts-ref-audio" accept="audio/*" style="font-size:0.8em; width:100%;">
+                                    <div id="tts-clone-status" style="font-size:0.75em; color:var(--accent); display:none; margin-top:5px;">✓ Uploaded Sample takes priority over Voice ID</div>
+                                </div>
+                            </div>
                         </div>
                         <div class="field">
                             <label>Voice Selection</label>
                             <select id="set-tts-voice">
-                                <optgroup label="Kokoro - Female">
+                                <optgroup label="Mistral Voxtral - American">
+                                    <option value="af_sky">Sky (Female)</option>
+                                    <option value="af_bella">Bella (Female)</option>
+                                    <option value="af_nova">Nova (Female)</option>
+                                    <option value="am_adam">Adam (Male)</option>
+                                    <option value="am_echo">Echo (Male)</option>
+                                    <option value="am_liam">Liam (Male)</option>
+                                </optgroup>
+                                <optgroup label="Mistral Voxtral - British">
+                                    <option value="bf_alice">Alice (Female)</option>
+                                    <option value="bf_emma">Emma (Female)</option>
+                                    <option value="bm_george">George (Male)</option>
+                                    <option value="bm_lewis">Lewis (Male)</option>
+                                </optgroup>
+                                <optgroup label="Venice Kokoro - Female">
                                     <option value="af_sky">Sky (Default)</option>
                                     <option value="af_nova">Nova</option>
                                     <option value="af_bella">Bella</option>
@@ -547,12 +612,18 @@
                                     <option value="bf_emma">Emma (British)</option>
                                     <option value="bf_isabella">Isabella (British)</option>
                                 </optgroup>
-                                <optgroup label="Kokoro - Male">
+                                <optgroup label="Venice Kokoro - Male">
                                     <option value="am_liam">Liam</option>
                                     <option value="am_adam">Adam</option>
                                     <option value="am_michael">Michael</option>
                                     <option value="bm_george">George (British)</option>
                                     <option value="bm_lewis">Lewis (British)</option>
+                                </optgroup>
+                                <optgroup label="International">
+                                    <option value="zf_xiaobei">Chinese (Female)</option>
+                                    <option value="zm_yunxi">Chinese (Male)</option>
+                                    <option value="jf_alpha">Japanese (Female)</option>
+                                    <option value="jm_kumo">Japanese (Male)</option>
                                 </optgroup>
                             </select>
                         </div>
@@ -568,7 +639,18 @@
             </details>
 
             <details>
-                <summary>AI Refiner (Banned Phrases)</summary>
+                <summary>AI Refiner (Guided Edits)</summary>
+                <div class="field" style="background:#111; padding:10px; border-radius:8px;">
+                    <div class="field"><label>Refiner Model</label>
+                        <select id="set-model-refiner"></select>
+                    </div>
+                    <div class="field"><label>Temperature</label><input type="number" id="set-temp-refiner" step="0.1"></div>
+                    <p style="font-size:0.8em; color:var(--text-dim); margin-top:10px;">The Refiner rewrites existing messages based on your specific guidance while attempting to keep everything else verbatim.</p>
+                </div>
+            </details>
+
+            <details>
+                <summary>AI Refiner (Banned Phrases - Shared)</summary>
                 <div class="field" style="background:#111; padding:10px; border-radius:8px;">
                     <label>Persistent Banned Phrases (one per line)</label>
                     <p style="font-size:0.8em; color:var(--text-dim); margin-top:0;">Use "he/she" to catch both genders. Phrases are used by the AI Refiner to rewrite messages.</p>
@@ -613,19 +695,66 @@ eyes widened in surprise"></textarea>
     </div>
 
     <div id="cache-debug-modal" class="modal" style="z-index: 5200;">
-        <div class="modal-content" style="max-width:800px; display:flex; flex-direction:column;">
-            <div class="modal-header">
-                <h2>Token Cache Debugger</h2>
-                <span id="close-cache-debug-x" class="close-x">×</span>
-            </div>
-            <p style="color:var(--text-dim); font-size:0.9em; margin-top:0;">Compares the exact payload sent to the API in the most recent turn against the turn before it, pinpointing any changes that would break token caching.</p>
+        <!-- ... existing ... -->
+    </div>
 
-            <div id="cache-debug-results" style="background:#111; padding:15px; border-radius:8px; border:1px solid #333; margin-top:10px; font-family:monospace; white-space:pre-wrap; overflow-x:auto;">
-                Loading...
+    <div id="character-editor-modal" class="modal" style="z-index: 5400;">
+        <div class="modal-content" style="max-width:650px;">
+            <div class="modal-header">
+                <h2 id="char-editor-title">Create / Edit Persona</h2>
+                <span id="close-char-editor-x" class="close-x">×</span>
             </div>
-            <div style="margin-top: 15px; display: flex; gap: 10px;">
-                <button id="refresh-cache-debug-btn" class="action" style="background:var(--primary); flex: 1;">Refresh Data</button>
+            <div class="field"><label>Name</label><input type="text" id="ce-name" placeholder="E.g., Alan Watts"></div>
+            <div class="field"><label>Description (Bio)</label><textarea id="ce-desc" rows="2" placeholder="Public summary of the character..."></textarea></div>
+            <div class="field"><label>System Prompt (Instructions)</label><textarea id="ce-inst" rows="8" placeholder="The core logic, personality, and rules for this character..."></textarea></div>
+            <div class="field"><label>Preferred Model</label>
+                <select id="ce-model" style="width:100%; background:#111; color:white; border:1px solid #444; border-radius:4px; padding:10px;"></select>
             </div>
+            <div class="field" style="display:flex; align-items:center; gap:10px;">
+                <input type="checkbox" id="ce-web" style="width:20px;">
+                <label for="ce-web" style="margin:0; color:var(--text-main);">Enable Web Search Capability</label>
+            </div>
+            <input type="hidden" id="ce-slug">
+            <div style="display:flex; gap:10px; margin-top:20px;">
+                <button id="ce-save-btn" class="action" style="flex:1; background:var(--primary);">Save Persona</button>
+                <button id="ce-delete-btn" class="action" style="flex:0.5; background:var(--danger); display:none;">Delete</button>
+            </div>
+            <div id="ce-status" style="margin-top:10px; color:var(--text-dim); text-align:center; font-size:0.85em;"></div>
+        </div>
+    </div>
+
+    <div id="last-io-modal" class="modal" style="z-index: 5600;">
+        <div class="modal-content" style="max-width:900px; height:90vh; display:flex; flex-direction:column;">
+            <div class="modal-header">
+                <h2>Raw API Request & Response</h2>
+                <span id="close-last-io-x" class="close-x">×</span>
+            </div>
+            <p style="color:var(--text-dim); font-size:0.85em; margin-top:0;">This shows the raw JSON payload sent to Venice and the raw JSON response received for the most recent API call.</p>
+            <div style="background:rgba(255,255,255,0.05); padding:10px; border-radius:6px; border:1px solid #333; margin-bottom:15px; display:flex; justify-content:space-between; font-size:0.85em;">
+                <div><strong style="color:var(--accent);">Endpoint:</strong> <span id="last-io-endpoint" style="color:white;">None</span></div>
+                <div><strong style="color:var(--text-dim);">Time:</strong> <span id="last-io-time" style="color:white;">None</span></div>
+            </div>
+            <div style="flex:1; display:flex; flex-direction:column; gap:20px; overflow:hidden;">
+                <div style="flex:1; display:flex; flex-direction:column;">
+                    <h3 style="color:var(--accent); margin:0 0 5px 0; font-size:1em;">Sent Payload (Request)</h3>
+                    <pre id="last-io-request" style="flex:1; background:#111; padding:10px; border-radius:6px; font-size:0.85em; border:1px solid #333; color:#ccc; overflow:auto; margin:0;"></pre>
+                </div>
+                <div style="flex:1; display:flex; flex-direction:column;">
+                    <h3 style="color:var(--purple); margin:0 0 5px 0; font-size:1em;">Raw JSON Response Chunks</h3>
+                    <pre id="last-io-response" style="flex:1; background:#111; padding:10px; border-radius:6px; font-size:0.85em; border:1px solid #333; color:#ccc; overflow:auto; margin:0;"></pre>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="tts-log-modal" class="modal" style="z-index: 5700;">
+        <div class="modal-content" style="max-width:800px; height:80vh; display:flex; flex-direction:column;">
+            <div class="modal-header">
+                <h2>TTS Diagnostic Log</h2>
+                <span onclick="document.getElementById('tts-log-modal').style.display='none'" class="close-x">×</span>
+            </div>
+            <p style="color:var(--text-dim); font-size:0.85em; margin-top:0;">This log shows the internal status of the most recent TTS generation attempt.</p>
+            <div id="tts-log-display" style="flex:1; background:#111; padding:15px; border-radius:8px; overflow:auto; font-family:monospace; font-size:0.85em; color:#ccc; border:1px solid #333; white-space:pre-wrap;"></div>
         </div>
     </div>
 

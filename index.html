@@ -1,0 +1,634 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Venice & Z-Image</title>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css', v='12.1') }}">
+</head>
+<body>
+
+    <div id="sidebar" class="hidden">
+        <button id="new-chat-btn">+ New Chat</button>
+        <div id="sidebar-header">
+            <span>Recent Chats</span>
+            <button id="close-sidebar" class="icon-btn">✕</button>
+        </div>
+        <div id="account-balance-display" style="padding: 10px 15px; font-size: 0.85em; border-bottom: 1px solid var(--border); color: var(--accent); display: none;">
+            Balance: <span id="balance-amount">$0.00</span>
+        </div>
+        <div style="padding:10px; border-bottom:1px solid var(--border);">
+            <div style="margin-bottom: 10px;">
+                <label style="font-size: 0.75em; color: var(--text-dim); display: block; margin-bottom: 4px;">Rename with AI:</label>
+                <div style="display: flex; gap: 5px;">
+                    <select id="rename-model-select" style="flex: 1; background: #111; color: white; border: 1px solid #444; border-radius: 4px; font-size: 0.8em; padding: 4px;"></select>
+                    <button id="auto-rename-btn" class="action" style="background: var(--primary); height: 32px; padding: 0 8px; font-size: 0.8em; border-radius: 4px;" title="Auto-Rename Chat">🪄</button>
+                </div>
+            </div>
+            <button id="open-architect-btn" class="action full-btn" style="background:var(--purple); height:40px; font-size:0.9em;">⚡ Scenario Architect</button>
+            <button id="open-analytics-btn" class="action full-btn" style="background:#0284c7; height:40px; font-size:0.9em; margin-top:10px;">📊 Chat Analytics</button>
+            <button id="open-lore-extractor-btn" class="action full-btn" style="background:#059669; height:40px; font-size:0.9em; margin-top:10px;">📖 Lore Extractor</button>
+            <button id="open-cache-debugger-btn" class="action full-btn" style="background:#eab308; color:#111; height:40px; font-size:0.9em; margin-top:10px;">🔍 Cache Debugger</button>
+        </div>
+        <ul id="chat-list"></ul>
+    </div>
+
+    <div id="main">
+        <button id="mobile-menu-btn">☰</button>
+        <div id="chatbox"></div>
+        <div id="status-msg"></div>
+
+        <div id="guided-overlay" style="display:none; background: #1a1a1a; padding: 15px; border: 1px solid var(--accent); border-radius: 8px; margin-bottom: 10px;">
+            <label style="display:block; margin-bottom:5px; color:var(--accent); font-weight:bold;">Visual Guidance / Raw Prompt:</label>
+            <textarea id="guided-input" placeholder="Add instructions for the LLM... or if Debug Mode is ON, enter the RAW image prompt here." style="width:100%; height:80px; margin-bottom:10px;"></textarea>
+            <div style="display:flex; align-items:center; margin-bottom:12px; gap:8px; background: rgba(0,0,0,0.2); padding: 8px; border-radius: 4px;">
+                <input type="checkbox" id="guided-debug-mode" style="width:18px; height:18px; cursor:pointer;">
+                <label for="guided-debug-mode" style="font-size:0.85em; color:#ddd; cursor:pointer; flex:1;">
+                    <strong>Debug Mode:</strong> Bypass LLM prompt writer. Use text above as raw prompt & show full API logs.
+                </label>
+            </div>
+            <div style="display:flex; gap:10px;">
+                <button id="guided-submit" class="action" style="flex:1; background:var(--accent);">Generate</button>
+                <button id="guided-cancel" class="action" style="flex:1; background:#444;">Cancel</button>
+            </div>
+        </div>
+
+        <div id="controls">
+            <div class="input-row" style="position:relative;">
+                <textarea id="userInput" placeholder="Message Venice..."></textarea>
+                <div id="image-preview-container" style="display:none; position:absolute; bottom:calc(100% + 10px); left:0; background:#222; padding:10px; border-radius:8px; border:1px solid #444; z-index:100; align-items:flex-start; gap:10px;">
+                    <img id="image-preview" style="max-height:100px; max-width:100px; border-radius:4px; object-fit:cover;">
+                    <button id="remove-image-btn" class="icon-btn" style="background:var(--danger); color:white; border-radius:50%; width:24px; height:24px; display:flex; align-items:center; justify-content:center; padding:0; position:absolute; top:-10px; right:-10px;">✕</button>
+                </div>
+                <button id="attachBtn" class="action" title="Attach Image" style="display:none; background: #333; padding: 0 10px; font-size: 1.2em;">📎</button>
+                <input type="file" id="image-upload" accept="image/*" style="display:none;">
+                <button id="sendBtn" class="action">Send</button>
+            </div>
+            <div id="compare-mode-container" style="display:none; margin-bottom:10px; align-items:center; gap:10px;">
+                <label style="color:var(--accent); font-size:0.9em; display:flex; align-items:center; gap:5px; cursor:pointer; width:fit-content;">
+                    <input type="checkbox" id="compare-mode-cb" style="width:16px; height:16px;">
+                    <span title="Compare output between current summaries and pre-change summaries">Enable Comparison Mode (Backup Summaries Available)</span>
+                </label>
+                <button id="dismiss-compare-btn" class="icon-btn" style="color:var(--danger); font-size: 0.8em; margin-left: auto; opacity: 1; border: 1px solid var(--danger); border-radius: 4px; padding: 2px 8px;" title="Dismiss/Clear Backups">✕ Dismiss</button>
+            </div>
+            <div class="btn-row">
+                <button id="writeForMeBtn" class="action" style="background:var(--purple); flex: 1;" title="Write For Me">✨ Write For Me</button>
+                <div style="flex: 2; display: flex; gap: 5px;">
+                    <button id="genImgBtn" class="action" style="background:var(--accent); flex: 4;">Generate Image</button>
+                    <button id="toggleGuidedBtn" class="action" style="background:var(--bg-card); border: 1px solid var(--border); flex: 1; padding: 0;" title="Open Guided/Debug Mode">⚙️</button>
+                </div>
+                <button id="menuBtn" class="action" style="flex: 1;">Menu</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modals -->
+    <div id="regen-model-modal" class="modal" style="z-index: 5300;">
+        <div class="modal-content" style="max-width:400px;">
+            <h3 style="margin-top:0;">Select Model for Regeneration</h3>
+            <select id="regen-model-select" style="width:100%; padding:10px; background:#222; color:white; border:1px solid #444; border-radius:6px; margin-bottom:15px;"></select>
+            <div style="display:flex; gap:10px;">
+                <button id="regen-model-confirm" class="action" style="flex:1; background:var(--primary);">Regenerate</button>
+                <button id="regen-model-cancel" class="action" style="flex:1; background:#444;">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="lore-extractor-modal" class="modal" style="z-index: 5200;">
+        <div class="modal-content" style="max-width:800px; height:85vh; display:flex; flex-direction:column;">
+            <div class="modal-header">
+                <h2>Lore Extractor</h2>
+                <span id="close-lore-extractor-x" class="close-x">×</span>
+            </div>
+            <p style="color:var(--text-dim); font-size:0.9em; margin-top:0;">Scan raw chat messages to automatically generate encyclopedic entries for your Lorebook.</p>
+
+            <div style="display:flex; gap:15px; margin-bottom:15px; background:#111; padding:15px; border-radius:8px; flex-wrap: wrap; align-items:flex-end;">
+                <div style="flex:1; min-width:120px;">
+                    <label style="display:block; margin-bottom:5px; color:var(--text-dim); font-size:0.85em;">Range (Msg #)</label>
+                    <div style="display:flex; gap:5px; align-items:center;">
+                        <input type="number" id="le-start" style="width:100%; padding:8px; background:#222; border:1px solid #444; color:white; border-radius:4px;" min="1">
+                        <span style="color:#666;">to</span>
+                        <input type="number" id="le-end" style="width:100%; padding:8px; background:#222; border:1px solid #444; color:white; border-radius:4px;" min="1">
+                    </div>
+                </div>
+                <div style="flex:1; min-width:100px;">
+                    <label style="display:block; margin-bottom:5px; color:var(--text-dim); font-size:0.85em;">Batch Size (Msgs)</label>
+                    <input type="number" id="le-batch" value="20" style="width:100%; padding:8px; background:#222; border:1px solid #444; color:white; border-radius:4px;" min="5" max="50">
+                </div>
+                <div>
+                    <button id="run-lore-extractor-btn" class="action" style="background:var(--primary); height:35px; padding:0 20px;">Extract</button>
+                </div>
+            </div>
+
+            <div style="flex:1; display:flex; flex-direction:column; gap:10px;">
+                <label style="color:var(--accent); font-weight:bold;">Extracted Lore Draft:</label>
+                <textarea id="le-output" style="flex:1; resize:none; padding:15px; background:#1a1a1a; border:1px solid #333; color:#ccc; border-radius:8px; font-family:inherit; line-height:1.5;" placeholder="Extracted entries will appear here. You can review and edit them before appending to the main Lorebook..."></textarea>
+            </div>
+
+            <button id="le-save-btn" class="action" style="background:var(--accent); margin-top:15px; height:50px; display:none;">Append to Lorebook & Rebuild Index</button>
+        </div>
+    </div>
+
+    <div id="analytics-modal" class="modal" style="z-index: 5200;">
+        <div class="modal-content" style="max-width:900px; height:85vh; display:flex; flex-direction:column;">
+            <div class="modal-header">
+                <h2>Chat Analytics & Insights</h2>
+                <span id="close-analytics-x" class="close-x">×</span>
+            </div>
+
+            <div id="ana-global-stats" style="margin-bottom:20px; background:#111; padding:15px; border-radius:8px; border:1px solid #333;">
+                <h3 style="margin-top:0; color:var(--accent);">Global Memory & Data Profile</h3>
+                <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap:10px; margin-bottom:15px;">
+                    <div class="stat-card"><div class="stat-val" id="stat-g-raw">0</div><div class="stat-lbl">Words in Raw Msgs</div></div>
+                    <div class="stat-card"><div class="stat-val" id="stat-g-sum1">0</div><div class="stat-lbl">Words in Base Summaries</div></div>
+                    <div class="stat-card"><div class="stat-val" id="stat-g-sum2">0</div><div class="stat-lbl">Words in Consolidated Summaries</div></div>
+                </div>
+                <h4 style="margin-top:0; margin-bottom:10px; color:#ccc; border-top:1px solid #333; padding-top:10px;">Context Projection for Next Prompt (Est. Tokens)</h4>
+                <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap:10px;">
+                    <div class="stat-card" style="border-color:var(--primary);"><div class="stat-val" id="stat-p-tot">0</div><div class="stat-lbl">Total Input Tokens</div></div>
+                    <div class="stat-card"><div class="stat-val" id="stat-p-raw">0</div><div class="stat-lbl">From Raw Msgs</div></div>
+                    <div class="stat-card"><div class="stat-val" id="stat-p-sum">0</div><div class="stat-lbl">From Summaries</div></div>
+                    <div class="stat-card"><div class="stat-val" id="stat-p-sys">0</div><div class="stat-lbl">From System Inst.</div></div>
+                </div>
+            </div>
+
+            <div style="display:flex; gap:15px; margin-bottom:15px; background:#111; padding:15px; border-radius:8px; flex-wrap: wrap; align-items:flex-end;">
+                <div style="flex:1; min-width:120px;">
+                    <label style="display:block; margin-bottom:5px; color:var(--text-dim); font-size:0.85em;">Range (Msg #)</label>
+                    <div style="display:flex; gap:5px; align-items:center;">
+                        <input type="number" id="ana-start" style="width:100%; padding:8px; background:#222; border:1px solid #444; color:white; border-radius:4px;" min="1">
+                        <span style="color:#666;">to</span>
+                        <input type="number" id="ana-end" style="width:100%; padding:8px; background:#222; border:1px solid #444; color:white; border-radius:4px;" min="1">
+                    </div>
+                </div>
+                <div style="flex:1; min-width:150px;">
+                    <label style="display:block; margin-bottom:5px; color:var(--text-dim); font-size:0.85em;">Filter by Role</label>
+                    <select id="ana-role" style="width:100%; padding:8px; background:#222; border:1px solid #444; color:white; border-radius:4px;">
+                        <option value="both">Both (User + Assistant)</option>
+                        <option value="assistant">Assistant (AI Only)</option>
+                        <option value="user">User Only</option>
+                    </select>
+                </div>
+                <div>
+                    <button id="run-analytics-btn" class="action" style="background:var(--primary); height:35px; padding:0 20px;">Analyze</button>
+                </div>
+            </div>
+
+            <div id="analytics-results" style="flex:1; overflow-y:auto; display:none; padding-right:10px;">
+                <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap:10px; margin-bottom:20px;">
+                    <div class="stat-card"><div class="stat-val" id="stat-msgs">0</div><div class="stat-lbl">Messages</div></div>
+                    <div class="stat-card"><div class="stat-val" id="stat-words">0</div><div class="stat-lbl">Total Words</div></div>
+                    <div class="stat-card"><div class="stat-val" id="stat-vocab">0</div><div class="stat-lbl">Unique Words</div></div>
+                    <div class="stat-card" title="Higher % means broader vocabulary"><div class="stat-val" id="stat-richness">0%</div><div class="stat-lbl">Lexical Richness</div></div>
+                    <div class="stat-card"><div class="stat-val" id="stat-avg">0</div><div class="stat-lbl">Words/Message</div></div>
+                </div>
+
+                <p style="color:var(--text-dim); font-size:0.85em; font-style:italic; margin-top:0;">Tip: Click any phrase row below to quickly append it to your Banned Phrases list!</p>
+                <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap:20px;">
+                    <div>
+                        <h4 style="color:var(--accent); margin-top:0; border-bottom:1px solid #333; padding-bottom:5px;">Top Words</h4>
+                        <div id="ana-1gram" class="ana-list"></div>
+                    </div>
+                    <div>
+                        <h4 style="color:var(--accent); margin-top:0; border-bottom:1px solid #333; padding-bottom:5px;">Top 2-Word Phrases</h4>
+                        <div id="ana-2gram" class="ana-list"></div>
+                    </div>
+                    <div>
+                        <h4 style="color:var(--accent); margin-top:0; border-bottom:1px solid #333; padding-bottom:5px;">Top 3-Word Phrases</h4>
+                        <div id="ana-3gram" class="ana-list"></div>
+                    </div>
+                    <div>
+                        <h4 style="color:var(--accent); margin-top:0; border-bottom:1px solid #333; padding-bottom:5px;">Top 4-Word Phrases</h4>
+                        <div id="ana-4gram" class="ana-list"></div>
+                    </div>
+                    <div>
+                        <h4 style="color:var(--accent); margin-top:0; border-bottom:1px solid #333; padding-bottom:5px;">Top 5-Word Phrases</h4>
+                        <div id="ana-5gram" class="ana-list"></div>
+                    </div>
+                </div>
+            </div>
+            <div id="analytics-loading" style="display:none; text-align:center; padding:50px; color:var(--text-dim);">
+                Analyzing text data... This might take a moment.
+            </div>
+        </div>
+    </div>
+
+    <div id="architect-modal" class="modal">
+        <div class="modal-content" style="max-width:800px; height:90vh; display:flex; flex-direction:column;">
+            <div class="modal-header">
+                <h2>Scenario Architect</h2>
+                <span onclick="document.getElementById('architect-modal').style.display='none'" class="close-x">×</span>
+            </div>
+            <div id="architect-chat-display" style="flex:1; overflow-y:auto; background:#111; padding:15px; border-radius:8px; margin-bottom:15px; border:1px solid #333;">
+                <div class="message assistant">Hello. I am the Scenario Architect. I can help you design a rich starting prompt for a new roleplay or story. What kind of genre or setting are you looking for today?</div>
+            </div>
+            <div style="display:flex; gap:10px; height:80px;">
+                <textarea id="architect-input" placeholder="Describe your idea..." style="flex:1; resize:none; font-family:inherit;"></textarea>
+                <button id="architect-send-btn" class="action" style="background:var(--purple); width:100px;">Send</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="edit-overlay">
+        <textarea id="edit-textarea"></textarea>
+        <div id="edit-controls">
+            <button id="save-large-edit" class="action" style="background:var(--primary); flex:1;">Save</button>
+            <button id="cancel-large-edit" class="action" style="background:#444; flex:1;">Cancel</button>
+        </div>
+    </div>
+
+    <div id="summary-view-modal" class="modal" style="z-index: 5100;">
+        <div class="modal-content" style="max-width:800px;">
+            <div class="modal-header">
+                <h2>Batch Summary & Memory Manager</h2>
+                <span onclick="document.getElementById('summary-view-modal').style.display='none'" class="close-x">×</span>
+            </div>
+            <div style="margin-bottom: 15px; display: none; gap: 10px; flex-wrap: wrap; align-items: center;" id="summary-manager-controls">
+                <button id="consolidate-selected-btn" class="action" style="background:var(--purple); padding: 5px 15px; height: 35px;">Consolidate Selected</button>
+                <button id="toggle-raw-btn" class="action" style="background:#0284c7; padding: 5px 15px; height: 35px;" title="Send the original messages instead of the summary">Toggle Raw/Summary</button>
+                <button id="regen-selected-sums-btn" class="action" style="background:var(--danger); padding: 5px 15px; height: 35px;">Regen Selected</button>
+                <div style="display:flex; align-items:center; gap:5px;">
+                    <label style="color:#ccc; font-size:0.8em;">Batch:</label>
+                    <input type="number" id="cons-batch-size" value="0" title="0 to consolidate all selected into one" style="width:50px; padding:5px; background:#222; border:1px solid #444; color:white; border-radius:4px;">
+                </div>
+                <button id="select-all-sums-btn" class="action" style="background:#444; padding: 5px 15px; height: 35px;">Select All</button>
+                <div style="display:flex; align-items:center; gap:5px; margin-left:auto;">
+                    <label style="color:#ccc; font-size:0.9em;">Range:</label>
+                    <input type="number" id="range-start" placeholder="Start" style="width:60px; padding:5px; background:#222; border:1px solid #444; color:white; border-radius:4px;" min="1">
+                    <span style="color:#ccc;">to</span>
+                    <input type="number" id="range-end" placeholder="End" style="width:60px; padding:5px; background:#222; border:1px solid #444; color:white; border-radius:4px;" min="1">
+                    <button id="select-range-btn" class="action" style="background:#444; padding: 5px 10px; height: 35px; font-size:0.9em;">Select</button>
+                </div>
+            </div>
+            <div id="summary-content" style="white-space:pre-wrap; color:#ccc; line-height:1.5; max-height: 60vh; overflow-y: auto;"></div>
+            <div id="summary-controls" style="margin-top: 15px; display: none; gap: 10px;">
+                <button id="regen-batch-btn" class="action" style="flex: 1; background: var(--purple);">Regenerate This Batch</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="settingsModal" class="modal">
+        <div class="modal-content">
+            <div style="display:flex; justify-content:space-between; margin-bottom:15px;">
+                <h2 style="margin:0;">Settings</h2>
+                <span id="close-modal-x" style="cursor:pointer; font-size:2em;">×</span>
+            </div>
+
+            <details open>
+                <summary>Venice Chat Model</summary>
+                <div class="field"><label>Model ID</label>
+                    <select id="set-model-chat">
+                        <optgroup label="Flagship & Uncensored (Private)">
+                            <option value="venice-role-play-uncensored">Venice Role Play Uncensored (128K)</option>
+                            <option value="venice-uncensored">Venice Uncensored 1.1 (32K)</option>
+                            <option value="hermes-3-llama-3.1-405b">Hermes 3 Llama 3.1 405b (128K)</option>
+                            <option value="uncensored">Alias: Best Uncensored</option>
+                        </optgroup>
+                        <optgroup label="Reasoning & Coding (Private)">
+                            <option value="zai-org-glm-5">GLM 5 (198K)</option>
+                            <option value="zai-org-glm-4.7">GLM 4.7 (198K)</option>
+                            <option value="qwen3-coder-480b-a35b-instruct">Qwen 3 Coder 480b (256K)</option>
+                            <option value="kimi-k2-5">Kimi K2.5 (256K)</option>
+                            <option value="deepseek-ai-DeepSeek-R1">DeepSeek R1 (64K)</option>
+                            <option value="reasoning">Alias: Best Reasoning</option>
+                        </optgroup>
+                        <optgroup label="Efficient & Fast (Private)">
+                            <option value="mistral-31-24b">Mistral 3.1 24B (131K)</option>
+                            <option value="qwen3-4b">Venice Small (Qwen 3 4B) (40K)</option>
+                            <option value="llama-3.2-3b">Llama 3.2 3B (128K)</option>
+                            <option value="fastest">Alias: Best Fast</option>
+                            <option value="default">Alias: Default Balanced</option>
+                        </optgroup>
+                        <optgroup label="OpenAI Anonymized (Censored)">
+                            <option value="openai-gpt-54">GPT-5.4</option>
+                            <option value="openai-gpt-4o-2024-11-20">GPT-4o</option>
+                            <option value="openai-gpt-4o-mini-2024-07-18">GPT-4o Mini</option>
+                        </optgroup>
+                        <optgroup label="Anthropic & Others (Censored)">
+                            <option value="claude-opus-4-6">Claude Opus 4.6 (1M)</option>
+                            <option value="claude-sonnet-4-6">Claude Sonnet 4.6 (1M)</option>
+                            <option value="google-gemini-3-1-pro-preview">Gemini 3.1 Pro (1M)</option>
+                        </optgroup>
+                    </select>
+                </div>
+                <div id="model-info-panel" style="background:#111; padding:12px; border-radius:8px; border:1px solid #333; margin-bottom:15px; font-size:0.85em; display:none;">
+                    <div style="display:flex; justify-content:space-between; margin-bottom:5px;">
+                        <span id="mi-name" style="font-weight:bold; color:var(--accent);"></span>
+                        <span id="mi-pricing" style="color:var(--text-dim);"></span>
+                    </div>
+                    <div style="margin-bottom:8px;">
+                        <span id="mi-context" style="background:#222; padding:2px 6px; border-radius:4px; margin-right:5px; border:1px solid #444;"></span>
+                        <span id="mi-traits" style="color:var(--primary);"></span>
+                    </div>
+                    <div id="mi-desc" style="line-height:1.4; color:#ccc; margin-bottom:8px;"></div>
+                    <div id="mi-tags" style="display:flex; gap:5px; flex-wrap:wrap;"></div>
+                </div>
+                <div class="field" style="display:flex; align-items:center; gap:10px;">
+                    <input type="checkbox" id="set-venice-system" style="width:20px;">
+                    <label for="set-venice-system" style="margin:0;">Include Venice System Prompt</label>
+                </div>
+                <div class="field" style="display:flex; align-items:center; gap:10px;">
+                    <input type="checkbox" id="set-vision-high-res" style="width:20px;" checked>
+                    <label for="set-vision-high-res" style="margin:0;">High-Res Vision Detail (Uses more tokens)</label>
+                </div>
+                <div class="field" id="reasoning-effort-container" style="display:none;">
+                    <label>Reasoning Effort (CoT Intensity)</label>
+                    <select id="set-reasoning-effort">
+                        <option value="low">Low (Fast/Cheap)</option>
+                        <option value="medium" selected>Medium (Balanced)</option>
+                        <option value="high">High (Deep Thinking)</option>
+                    </select>
+                </div>
+                <div class="field"><label>Temperature</label><input type="number" id="set-temp-chat" step="0.1"></div>
+                <div class="field"><label>Max Output Tokens</label><input type="number" id="set-tokens-chat" step="100"></div>
+                <div class="field" style="display:flex; gap:10px;">
+                    <div style="flex:1;"><label>Freq Penalty</label><input type="number" id="set-freq-chat" step="0.1"></div>
+                    <div style="flex:1;"><label>Pres Penalty</label><input type="number" id="set-pres-chat" step="0.1"></div>
+                </div>
+            </details>
+
+            <details>
+                <summary>Write For Me (Impersonation)</summary>
+                <div class="field"><label>Model ID</label>
+                    <select id="set-model-wfm"></select>
+                </div>
+                <div class="field"><label>Temperature</label><input type="number" id="set-temp-wfm" step="0.1"></div>
+                <div class="field"><label>Context Depth (Messages)</label><input type="number" id="set-depth-wfm" min="1" max="50"></div>
+            </details>
+
+            <details>
+                <summary>Image Generation (Venice)</summary>
+                <div class="field" style="display:flex; align-items:center; gap:10px; margin-top:10px;">
+                    <input type="checkbox" id="set-guided" style="width:20px;"><label for="set-guided" style="margin:0;">Guided Mode</label>
+                </div>
+                <div class="field"><label>Image Prompt Model (Text)</label>
+                    <select id="set-model-img"></select>
+                </div>
+                <div class="field"><label>Image Generation Model</label>
+                    <select id="set-gen-model-img">
+                        <optgroup label="Private & Uncensored ($0.01)">
+                            <option value="lustify-v7">Lustify v7 (Realistic)</option>
+                            <option value="lustify-sdxl">Lustify SDXL (High-res)</option>
+                            <option value="anime-wai">Anime WAI</option>
+                            <option value="qwen-image">Qwen Image (Fast)</option>
+                            <option value="venice-sd35">Venice SD35 (Balanced)</option>
+                            <option value="z-image-turbo">Z-Image Turbo</option>
+                            <option value="chroma">Chroma</option>
+                            <option value="hidream">HiDream</option>
+                        </optgroup>
+                        <optgroup label="Anonymized ($0.04 - $0.06)">
+                            <option value="flux-2-pro">Flux 2 Pro</option>
+                            <option value="grok-imagine">Grok Imagine</option>
+                            <option value="recraft-v4">Recraft V4</option>
+                            <option value="seeddream-v4.5">Seeddream V4.5</option>
+                            <option value="seeddream-v5-lite">Seeddream V5 Lite</option>
+                            <option value="qwen-image-2">Qwen Image 2</option>
+                            <option value="imagineart-1.5-pro">ImagineArt 1.5 Pro</option>
+                        </optgroup>
+                    </select>
+                </div>
+                <div class="field" style="display:flex; gap:10px;">
+                    <div style="flex:1;"><label>Steps <span id="rec-steps" style="color:var(--text-dim); font-size:0.8em; font-weight:normal;"></span></label><input type="number" id="set-img-steps" value="30"></div>
+                    <div style="flex:1;"><label>CFG Scale <span id="rec-cfg" style="color:var(--text-dim); font-size:0.8em; font-weight:normal;"></span></label><input type="number" id="set-img-cfg" step="0.1" value="7.0"></div>
+                </div>
+                <div class="field"><label>Art Style</label><select id="set-art-style">
+                    <option value="None">None (Auto)</option>
+                    <option value="Cinematic Photo">Cinematic Photo</option>
+                    <option value="Anime / Manga">Anime / Manga</option>
+                    <option value="Oil Painting">Oil Painting</option>
+                    <option value="Digital Illustration">Digital Illustration</option>
+                    <option value="Watercolor">Watercolor</option>
+                    <option value="3D Render">3D Render</option>
+                    <option value="Dark Fantasy">Dark Fantasy</option>
+                    <option value="Cyberpunk">Cyberpunk</option>
+                    <option value="Pencil Sketch">Pencil Sketch</option>
+                    <option value="Steampunk">Steampunk</option>
+                    <option value="Synthwave">Synthwave</option>
+                    <option value="Studio Ghibli Style">Studio Ghibli Style</option>
+                    <option value="Vintage Polaroid">Vintage Polaroid</option>
+                    <option value="Vibrant Pop Art">Vibrant Pop Art</option>
+                    <option value="Gothic Horror">Gothic Horror</option>
+                    <option value="Pixel Art">Pixel Art</option>
+                </select></div>
+                <div class="field"><label>Negative Styles (Persistent)</label>
+                    <textarea id="set-negative-styles" placeholder="e.g. low quality, blurry, text, logo..." rows="2"></textarea>
+                </div>
+                <div class="field"><label>Image Context Depth (Messages)</label><input type="number" id="set-img-depth" min="1" max="20"></div>
+                <div class="field"><label>Aspect Ratio</label><select id="set-ar"><option value="1:1">Square (1:1)</option><option value="4:3">Landscape (4:3)</option><option value="3:4" selected>Portrait (3:4)</option><option value="16:9">Widescreen (16:9)</option><option value="9:16">Vertical (9:16)</option></select></div>
+                <div class="field" style="display:flex; align-items:center; gap:10px;"><input type="checkbox" id="set-hd" style="width:auto;" checked><label for="set-hd" style="margin:0;">HD Mode</label></div>
+
+                <div style="background: rgba(0,0,0,0.3); padding: 10px; border-radius: 6px; font-size: 0.8em; margin-top: 15px; border: 1px solid #444;">
+                    <h4 style="margin: 0 0 8px 0; color: var(--accent); font-size: 0.9em;">Parameter Quick-Reference</h4>
+                    <table style="width: 100%; border-collapse: collapse; color: #ccc;">
+                        <tr style="border-bottom: 1px solid #444; text-align: left;">
+                            <th style="padding: 4px;">Model Group</th>
+                            <th style="padding: 4px;">Steps</th>
+                            <th style="padding: 4px;">CFG</th>
+                        </tr>
+                        <tr>
+                            <td style="padding: 4px;">Lustify / SDXL</td>
+                            <td style="padding: 4px;">35-50</td>
+                            <td style="padding: 4px;">7.5</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 4px;">Z-Image / Qwen</td>
+                            <td style="padding: 4px;">4-8</td>
+                            <td style="padding: 4px;">1.5</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 4px;">Flux / Grok</td>
+                            <td style="padding: 4px;">25</td>
+                            <td style="padding: 4px;">3.5</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 4px;">SD 3.5</td>
+                            <td style="padding: 4px;">30</td>
+                            <td style="padding: 4px;">5.0</td>
+                        </tr>
+                    </table>
+                </div>
+
+                <h4 style="margin-bottom:5px; margin-top:20px; color:var(--accent);">Visual Memory (Characters)</h4>
+                <div style="background:#111; padding:10px; border-radius:8px;">
+                    <div class="field"><label>Scan Depth (Messages)</label><input type="number" id="set-visual-depth" value="50"></div>
+                    <button id="scan-visuals-btn" class="msg-btn" style="width:100%; margin-bottom:10px; padding:10px; background:#444;">Scan Context</button>
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <label>Current Memory:</label>
+                        <button id="expand-visual-btn" class="msg-btn" style="margin-bottom:5px; font-size:0.8em;">Expand / Edit</button>
+                    </div>
+                    <textarea id="visual-memory-text" rows="4" style="font-size:0.9em;"></textarea>
+                    <button id="save-visuals-btn" class="msg-btn" style="width:100%; margin-top:5px; background:var(--primary);">Save Manual Edits</button>
+                </div>
+            </details>
+
+            <details>
+                <summary>Lorebook (Retrieval Augmented Generation)</summary>
+                <div class="field" style="background:#111; padding:10px; border-radius:8px;">
+                    <div style="display:flex; gap:10px; align-items:center; margin-bottom:10px;">
+                        <input type="checkbox" id="rag-enabled" style="width:20px;">
+                        <label for="rag-enabled" style="margin:0;">Enable Lore Retrieval (RAG)</label>
+                    </div>
+
+                    <div id="rag-options" style="display:none;">
+                        <div class="field"><label>Retrieve Top K Chunks</label><input type="number" id="rag-k" value="3"></div>
+                        <div class="field" style="display:flex; gap:10px;">
+                            <div style="flex:1;"><label>Max Chunk Chars</label><input type="number" id="rag-max-chars" value="1200"></div>
+                            <div style="flex:1;"><label>Min Chunk Chars</label><input type="number" id="rag-min-chars" value="200"></div>
+                        </div>
+                    </div>
+
+                    <button id="edit-lorebook-btn" class="msg-btn" style="width:100%; margin-top:10px; padding:10px; background:#444;">Edit Lorebook Text</button>
+                    <button id="rebuild-index-btn" class="msg-btn" style="width:100%; margin-top:10px; padding:10px; background:var(--purple); color:white; border-color:var(--purple);">Rebuild Vector Index</button>
+                    <p style="font-size:0.8em; color:var(--text-dim); margin-top:10px;">Rebuilding uses Mistral Embeddings API to convert lore into searchable vectors. Do this after editing the lorebook.</p>
+                </div>
+            </details>
+
+            <details>
+                <summary>Summarizer (Context Memory)</summary>
+                <div class="field" style="background:#111; padding:10px; border-radius:8px;">
+                    <div style="display:flex; gap:10px; align-items:center;">
+                        <input type="checkbox" id="sum-enabled" style="width:20px;">
+                        <label for="sum-enabled" style="margin:0;">Enable Auto-Summarization</label>
+                    </div>
+                    <button id="view-all-summaries-btn" class="msg-btn" style="width:100%; margin-top:10px; margin-bottom:5px; padding:10px; background:#444;">View All Active Summaries</button>
+                    <button id="rebuild-all-summaries-btn" class="msg-btn" style="width:100%; margin-bottom:10px; padding:10px; background:var(--danger); color:white; border-color:var(--danger);">Rebuild All Summaries</button>
+                    <div id="sum-options" style="margin-top:10px; display:none;">
+                        <label>Primary Summary Model</label>
+                        <select id="sum-model" style="width:100%; margin-bottom:10px; background:#111; border:1px solid #444; color:white; padding:10px; border-radius:6px;"></select>
+
+                        <label>Trigger Threshold (Turns)</label><input type="number" id="sum-threshold">
+                        <label>Keep Recent (Turns)</label><input type="number" id="sum-keep">
+                        <label>Batch Size (Msgs)</label><input type="number" id="sum-batch">
+                        <label>System Prompt</label><textarea id="sum-prompt" rows="2"></textarea>
+
+                        <div style="border-top: 1px solid #333; margin-top: 15px; padding-top: 10px;">
+                            <h4 style="margin: 0 0 10px 0; color: var(--accent);">Memory Consolidation</h4>
+                            <label>Consolidation Model</label>
+                            <select id="sum-cons-model" style="width:100%; margin-bottom:10px; background:#111; border:1px solid #444; color:white; padding:10px; border-radius:6px;"></select>
+
+                            <label>Consolidation Prompt</label><textarea id="sum-cons-prompt" rows="3"></textarea>
+                        </div>
+                    </div>
+                </div>
+            </details>
+
+            <details>
+                <summary>System Prompts</summary>
+                <button id="expand-main-prompt" class="action" style="width:100%; margin-top:10px; background:#333;">Edit Main System Prompt</button>
+            </details>
+
+            <details>
+                <summary>Narrator (Text-to-Speech)</summary>
+                <div class="field" style="background:#111; padding:10px; border-radius:8px;">
+                    <div style="display:flex; gap:10px; align-items:center; margin-bottom:10px;">
+                        <input type="checkbox" id="tts-enabled" style="width:20px;">
+                        <label for="tts-enabled" style="margin:0;">Enable Auto-Narration / Buttons</label>
+                    </div>
+
+                    <div id="tts-options" style="display:none;">
+                        <div class="field">
+                            <label>TTS Model</label>
+                            <select id="set-tts-model">
+                                <option value="tts-kokoro">Kokoro (Best Quality)</option>
+                                <option value="tts-qwen3-0-6b">Qwen 3 0.6B (Emotion Support)</option>
+                                <option value="tts-qwen3-1-7b">Qwen 3 1.7B (High Quality)</option>
+                            </select>
+                        </div>
+                        <div class="field">
+                            <label>Voice Selection</label>
+                            <select id="set-tts-voice">
+                                <optgroup label="Kokoro - Female">
+                                    <option value="af_sky">Sky (Default)</option>
+                                    <option value="af_nova">Nova</option>
+                                    <option value="af_bella">Bella</option>
+                                    <option value="af_nicole">Nicole</option>
+                                    <option value="af_sarah">Sarah</option>
+                                    <option value="bf_emma">Emma (British)</option>
+                                    <option value="bf_isabella">Isabella (British)</option>
+                                </optgroup>
+                                <optgroup label="Kokoro - Male">
+                                    <option value="am_liam">Liam</option>
+                                    <option value="am_adam">Adam</option>
+                                    <option value="am_michael">Michael</option>
+                                    <option value="bm_george">George (British)</option>
+                                    <option value="bm_lewis">Lewis (British)</option>
+                                </optgroup>
+                            </select>
+                        </div>
+                        <div class="field">
+                            <label>Narration Speed</label>
+                            <input type="range" id="set-tts-speed" min="0.5" max="2.0" step="0.1" value="1.0" style="width:100%;">
+                            <div style="display:flex; justify-content:space-between; font-size:0.8em; color:var(--text-dim);">
+                                <span>Slower</span><span id="tts-speed-val">1.0x</span><span>Faster</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </details>
+
+            <details>
+                <summary>AI Refiner (Banned Phrases)</summary>
+                <div class="field" style="background:#111; padding:10px; border-radius:8px;">
+                    <label>Persistent Banned Phrases (one per line)</label>
+                    <p style="font-size:0.8em; color:var(--text-dim); margin-top:0;">Use "he/she" to catch both genders. Phrases are used by the AI Refiner to rewrite messages.</p>
+                    <textarea id="set-banned-phrases" rows="6" placeholder="e.g.
+shiver ran down his/her spine
+he/she couldn't help but
+eyes widened in surprise"></textarea>
+                </div>
+            </details>
+
+            <details>
+                <summary>Interface Settings</summary>
+                <div class="field">
+                    <label>Base Font Size (px)</label>
+                    <input type="number" id="set-font-size" value="16" min="12" max="24">
+                </div>
+                <div class="field">
+                    <label>Background Color</label>
+                    <input type="color" id="set-bg-color" value="#121212">
+                </div>
+            </details>
+
+            <button id="save-settings-btn" class="action" style="width:100%; background:var(--accent); margin-top:20px; height:60px;">Save All Changes</button>
+        </div>
+    </div>
+
+    <div id="debug-modal" class="modal" style="z-index: 5500;">
+        <div class="modal-content" style="max-width:800px;">
+            <div class="modal-header">
+                <h2>API Debug Logs</h2>
+                <span id="close-debug-x" class="close-x">×</span>
+            </div>
+            <div style="margin-bottom:10px;">
+                <h3 style="color:var(--accent); margin-bottom:5px;">Payload Sent</h3>
+                <pre id="debug-payload" style="background:#111; padding:10px; border-radius:6px; overflow-x:auto; font-size:0.85em; border:1px solid #333; color:#ccc; white-space:pre-wrap; word-wrap:break-word; max-height:300px; overflow-y:auto;"></pre>
+            </div>
+            <div>
+                <h3 style="color:var(--purple); margin-bottom:5px;">Response Received</h3>
+                <pre id="debug-response" style="background:#111; padding:10px; border-radius:6px; overflow-x:auto; font-size:0.85em; border:1px solid #333; color:#ccc; white-space:pre-wrap; word-wrap:break-word; max-height:300px; overflow-y:auto;"></pre>
+            </div>
+        </div>
+    </div>
+
+    <div id="cache-debug-modal" class="modal" style="z-index: 5200;">
+        <div class="modal-content" style="max-width:800px; display:flex; flex-direction:column;">
+            <div class="modal-header">
+                <h2>Token Cache Debugger</h2>
+                <span id="close-cache-debug-x" class="close-x">×</span>
+            </div>
+            <p style="color:var(--text-dim); font-size:0.9em; margin-top:0;">Compares the exact payload sent to the API in the most recent turn against the turn before it, pinpointing any changes that would break token caching.</p>
+
+            <div id="cache-debug-results" style="background:#111; padding:15px; border-radius:8px; border:1px solid #333; margin-top:10px; font-family:monospace; white-space:pre-wrap; overflow-x:auto;">
+                Loading...
+            </div>
+            <div style="margin-top: 15px; display: flex; gap: 10px;">
+                <button id="refresh-cache-debug-btn" class="action" style="background:var(--primary); flex: 1;">Refresh Data</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='script.js', v='2.1') }}"></script>
+</body>
+</html>

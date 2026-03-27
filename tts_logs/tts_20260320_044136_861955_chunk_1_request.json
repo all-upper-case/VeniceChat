@@ -1,0 +1,11 @@
+{
+    "chunk_id": "2/2",
+    "payload": {
+        "model": "tts-kokoro",
+        "input": "\"Subject designation?\"  \"Broodmare One,\" you say. \"Formerly human. Current cognitive baseline unknown.\"  He nods, making notes. \"We\u2019ll begin with the Stanford-Binet, modified for nonverbal subjects, then move to the self-awareness protocols.\"  He crouches before Maya, who tracks him with glassy, unfocused eyes. Her tongue darts out to lick a drop of milk from her nipple, a thoughtless, animal gesture. \"Subject,\" Thorne says sharply. \"What is your name?\"  Maya blinks. Her mouth opens, closes. She rocks forward on her knees, her spine curved, and tries to press her face to his shoe. \"Incorrect,\" Thorne notes, tapping the tablet. \"No name recognition. Attempting to groom dominant individual\u2014canine or bovine behavior. Marking zero on identity retention.\"",
+        "voice": "af_bella",
+        "response_format": "mp3",
+        "speed": 0.9
+    },
+    "url": "https://api.venice.ai/api/v1/audio/speech"
+}

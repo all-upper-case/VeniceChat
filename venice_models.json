@@ -1,7 +1,7 @@
 {
     "Flagship & Uncensored (Private)": [
         {
-            "id": "venice-role-play-uncensored",
+            "id": "venice-uncensored-role-play",
             "name": "Venice Role Play Uncensored (128K)",
             "traits": "Private, Uncensored, Vision",
             "pricing": "$0.50 / $2.00",
@@ -40,6 +40,15 @@
             "tags": ["PRIVATE", "UNCENSORED", "CREATIVE"]
         },
         {
+            "id": "e2ee-venice-uncensored-24b-p",
+            "name": "E2EE Venice Uncensored 1.1 (32K)",
+            "traits": "Private, Uncensored",
+            "pricing": "$0.25 / $1.15",
+            "context": "32,000",
+            "description": "Venice's crown jewel for unrestricted AI. Custom fine-tune of Mistral-Small-24B. Zero alignment tax or refusal mechanisms.",
+            "tags": ["PRIVATE", "UNCENSORED", "CREATIVE"]
+        },
+        {
             "id": "hermes-3-llama-3.1-405b",
             "name": "Hermes 3 Llama 3.1 405b (128K)",
             "traits": "Private, Large",
@@ -54,20 +63,20 @@
             "id": "zai-org-glm-5",
             "name": "GLM 5 (198K)",
             "traits": "Private, Reasoning, Vision",
-            "pricing": "$1.00 / $3.20",
+            "pricing": "$1.00 / $3.20 ($0.20 Cache)",
             "context": "198,000",
             "vision": true,
             "description": "Advanced reasoning model with strong vision capabilities for complex logic and system design.",
             "tags": ["REASONING", "VISION"]
         },
         {
-            "id": "zai-org-glm-4.7",
-            "name": "GLM 4.7 (198K)",
+            "id": "olafangensan-glm-4.7-flash-heretic",
+            "name": "GLM 4.7 Flash Heretic (198K)",
             "traits": "Private, Reasoning, Tool-Use",
-            "pricing": "$0.55 / $2.65",
+            "pricing": "$0.14 / $0.80",
             "context": "198,000",
-            "description": "Strongest open-weights model for complex system design, agentic planning, and long-horizon coding.",
-            "tags": ["REASONING", "TOOLS"]
+            "description": "De-censored version of GLM 4.7 Flash.",
+            "tags": ["REASONING", "UNCENSORED", "TOOLS"]
         },
         {
             "id": "qwen3-coder-480b-a35b-instruct",
@@ -82,17 +91,17 @@
             "id": "kimi-k2-5",
             "name": "Kimi K2.5 (256K)",
             "traits": "Private, Reasoning, Vision",
-            "pricing": "$0.75 / $3.75",
+            "pricing": "$0.56 / $3.50 ($0.11 Cache)",
             "context": "256,000",
             "vision": true,
             "description": "Optimized for complex logic and chain-of-thought tasks with native vision support.",
             "tags": ["VISION", "SMART"]
         },
         {
-            "id": "deepseek-ai-DeepSeek-R1",
-            "name": "DeepSeek R1 (64K)",
+            "id": "deepseek-v3.2",
+            "name": "DeepSeek V3.2 (160K)",
             "traits": "Private, Reasoning",
-            "pricing": "$0.40 / $1.00 ($0.20 Cache)",
+            "pricing": "$0.33 / $0.48 ($0.16 Cache)",
             "context": "64,000",
             "description": "World-class math and coding model. Generates deep internal chain-of-thought thoughts.",
             "tags": ["MATH", "CODE"]

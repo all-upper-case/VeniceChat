@@ -1,0 +1,11 @@
+{
+    "chunk_id": "1/1",
+    "payload": {
+        "model": "tts-kokoro",
+        "input": "I keep watching the scene silently, content to let Vera do whatever she wants unless it seems like permanent damage will result.",
+        "voice": "af_bella",
+        "response_format": "mp3",
+        "speed": 0.9
+    },
+    "url": "https://api.venice.ai/api/v1/audio/speech"
+}

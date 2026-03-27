@@ -1,0 +1,11 @@
+{
+    "chunk_id": "1/1",
+    "payload": {
+        "model": "tts-kokoro",
+        "input": "Ethan\u2019s mouth finds Maya\u2019s, clumsy and desperate, their teeth clicking, their tongues tangling with the inexperience of adolescence. Julian and Vivian watch, the adults, their hands moving to their own bodies, touching themselves with the efficiency of long practice, their eyes dark with the specific, intoxicating pleasure of witnessing corruption in real time, of guiding the destruction of innocence with the gentle, insistent pressure of their thirty-something hands.",
+        "voice": "af_nova",
+        "response_format": "mp3",
+        "speed": 0.8
+    },
+    "url": "https://api.venice.ai/api/v1/audio/speech"
+}

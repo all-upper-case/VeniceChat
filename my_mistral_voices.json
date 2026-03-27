@@ -1,0 +1,19 @@
+[
+    {
+        "name": "EmmaWatson",
+        "slug": null,
+        "languages": [
+            "en"
+        ],
+        "gender": "female",
+        "age": 25,
+        "tags": [
+            "podcast"
+        ],
+        "color": "#C347C8",
+        "retention_notice": 30,
+        "id": "ebbd08a3-bd85-40a9-a77e-072dbd0e35b8",
+        "created_at": "2026-03-26T20:58:22.592973Z",
+        "user_id": "f1c16c80-0abf-4caf-bc41-bebba89d6e7a"
+    }
+]

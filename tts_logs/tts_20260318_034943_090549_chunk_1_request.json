@@ -1,0 +1,11 @@
+{
+    "chunk_id": "2/2",
+    "payload": {
+        "model": "tts-kokoro",
+        "input": "To be ruined by someone who knows exactly how to break you without leaving marks your parents will see.\"  Ethan stumbles forward, his pants around his ankles, his cock bobbing with each step, his face a mask of terrified arousal. Julian pulls Maya upright, spinning her to face the boy, and pushes them together, Maya\u2019s bare stomach pressing against Ethan\u2019s erection, the heat of him branding her skin. \"Kiss her,\" Julian orders Ethan, his hand fisting in the boy\u2019s pomaded hair, pulling his head back to expose his throat. \"Kiss your sister like you mean it. Show us what you\u2019ve been practicing in your bedroom when you thought no one was watching.\"",
+        "voice": "af_nova",
+        "response_format": "mp3",
+        "speed": 0.8
+    },
+    "url": "https://api.venice.ai/api/v1/audio/speech"
+}

@@ -1,10 +1,10 @@
 {
-    "model": "z-image-turbo",
-    "steps": 8,
-    "cfg_scale": 1,
-    "width": 864,
-    "height": 1152,
+    "num_inference_steps": 8,
+    "width": 1216,
+    "height": 1600,
+    "res_tier": "hd",
+    "aspect_ratio": "3:4",
     "guided_mode": false,
-    "art_style": "None",
-    "negative_styles": "low quality, blurry, cartoon, ugly, deformed, glossy, plastic"
+    "art_style": "Watercolor",
+    "negative_styles": ""
 }

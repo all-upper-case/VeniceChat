@@ -1,4 +1,9 @@
 [
+    "google-gemma-3-27b-it",
+    "mistral-31-24b",
+    "e2ee-venice-uncensored-24b-p",
+    "olafangensan-glm-4.7-flash-heretic",
+    "deepseek-v3.2",
     "zai-org-glm-5",
     "deepseek-ai-DeepSeek-R1",
     "kimi-k2-5",
@@ -8,10 +13,5 @@
     "",
     "creative",
     "venice-uncensored-role-play",
-    "venice-uncensored",
-    "uncensored",
-    "zai-org-glm-4.7",
-    "qwen3-4b",
-    "fastest",
-    "mistral-31-24b"
+    "venice-uncensored"
 ]

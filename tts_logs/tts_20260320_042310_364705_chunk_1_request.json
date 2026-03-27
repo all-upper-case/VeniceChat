@@ -1,0 +1,11 @@
+{
+    "chunk_id": "2/2",
+    "payload": {
+        "model": "tts-kokoro",
+        "input": "She's been begging to meet you, actually. Wants to see what a fully trained sow looks like. Thinks you're inspirational.\"  Maya makes a small sound, a whimper that vibrates through her chest, causing the baby to detach from her breast with a wet pop. Milk sprays in a thin arc, coating the infant's cheek. Vera notices and crouches, scooping the fluid on her thumb and feeding it to Maya, pressing the digit past her lips. \"Tastes good, doesn't it?\" Vera whispers. \"That's what Beta will taste like soon. Fresh and seventeen and stupid enough to think this is love. Maybe I'll bring her by next week. Let her see the nursery. Let her hold your baby while the calf fucks her ass for the first time. Break her in proper.\"  She stands and wipes her thumb on Maya's forehead, marking her like ash on Ash Wednesday. \"What do you think, Bella? Want to start a real herd? I've got the junior livestock ready for branding.\"",
+        "voice": "af_bella",
+        "response_format": "mp3",
+        "speed": 0.9
+    },
+    "url": "https://api.venice.ai/api/v1/audio/speech"
+}

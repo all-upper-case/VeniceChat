@@ -1,0 +1,11 @@
+{
+    "chunk_id": "2/2",
+    "payload": {
+        "model": "tts-kokoro",
+        "input": "He keeps looking at the door, then at Maya, then at the camera, his hands opening and closing at his sides like he can\u2019t decide whether to cover himself or reach out. \"I\u2019m not going to faint,\" Ethan mutters, but his voice cracks on the second word. He takes a shaky step toward the bed. \"I just... I need a second.\"  \"Come here,\" Maya says, patting the mattress beside her. She\u2019s kicked off the floral dress entirely now, sitting in just her cotton bra\u2014the cheap one from Target, white with a small bow between the cups. She looks small on the king-sized bed, but she sits with her legs crossed at the ankle, posture straight, like she\u2019s conducting an interview. \"Sit down. You don\u2019t have to do anything yet.\"  Ethan sits heavily, the springs complaining. The mattress dips toward Maya, their thighs touching. He\u2019s sweating through his shirt, the pomade in his hair starting to melt at the temples, giving him a disheveled, desperate look.",
+        "voice": "af_nova",
+        "response_format": "mp3",
+        "speed": 0.8
+    },
+    "url": "https://api.venice.ai/api/v1/audio/speech"
+}

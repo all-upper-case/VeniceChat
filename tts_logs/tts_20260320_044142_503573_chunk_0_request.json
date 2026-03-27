@@ -1,0 +1,11 @@
+{
+    "chunk_id": "1/2",
+    "payload": {
+        "model": "tts-kokoro",
+        "input": "He presents her with a mirror, angling it so she sees her reflection\u2014the matted hair, the B scar, the leaking breasts, the belly still soft from birthing. She doesn\u2019t touch her face. She moos, low in her throat, and presents her hindquarters to the glass, arching her back. \"Mirror test failed,\" Thorne says, his voice clinical. \"No self-recognition. Displays estrus posture to own reflection. Cognitive capacity approximately equivalent to breeding sow.\"  He moves to language. He holds up a card with the word \"HELP\" printed in block letters. Maya stares at it, her mouth working silently. Then she crawls to the drain and urinates, spreading her legs wide, her eyes rolling back in relief. \"Literacy eradicated,\" Thorne notes. \"Bladder control degraded\u2014marking territory or simple physiological release without social inhibition. Remarkable regression.\"  You watch from the corner, your hand between your legs, as Thorne conducts the object permanence test. He places a treat\u2014a cube of raw liver\u2014beneath an overturned bowl. Maya paws at the bowl with her bound hands, knocking it over, and devours the liver without chewing, blood smearing her chin. When he hides the calf behind a screen, she lows in distress, milk spurting from her nipples in anxious jets, but doesn\u2019t attempt to move the screen. She only presses her face to the concrete and waits, her body trembling, until the calf is revealed again. \"No problem-solving capacity for abstract concealment,\" Thorne dictates. \"Attachment fixation on livestock offspring, not human infant. Prioritizes calf over baby when both cry\u2014note the milk ejection reflex triggered by bovine vocalization, not human.\"  He moves to the final test\u2014the cognitive dissonance protocol. He places two bowls before her. One contains kibble. The other contains a smartphone, her old one, the screen lit with photos of her from before\u2014graduation, a birthday, her face smiling and whole. Maya hesitates. Her nostrils flare.",
+        "voice": "af_bella",
+        "response_format": "mp3",
+        "speed": 0.9
+    },
+    "url": "https://api.venice.ai/api/v1/audio/speech"
+}

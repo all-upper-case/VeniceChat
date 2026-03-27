@@ -1,0 +1,11 @@
+{
+    "input_len": 637,
+    "chunks": 1,
+    "settings": {
+        "enabled": true,
+        "model": "voxtral-mini-tts-2603",
+        "voice": "ebbd08a3-bd85-40a9-a77e-072dbd0e35b8",
+        "speed": 1
+    },
+    "has_ref_audio": true
+}

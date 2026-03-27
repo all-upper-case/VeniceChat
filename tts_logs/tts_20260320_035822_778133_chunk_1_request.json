@@ -1,0 +1,11 @@
+{
+    "chunk_id": "2/2",
+    "payload": {
+        "model": "tts-kokoro",
+        "input": "The Weaning Protocol: Cruel and premature. Take the baby away entirely and force Maya to dry up or redirect her milk exclusively to the calf, making her udders swell painfully until she begs the animal to relieve her, cementing that her purpose is animal feed, not motherhood. Which degradation calls to you?",
+        "voice": "af_bella",
+        "response_format": "mp3",
+        "speed": 0.9
+    },
+    "url": "https://api.venice.ai/api/v1/audio/speech"
+}

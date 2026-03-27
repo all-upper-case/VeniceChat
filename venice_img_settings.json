@@ -1,4 +1,4 @@
 {
-    "model": "venice-uncensored",
-    "context_depth": 8
+    "model": "mistral-31-24b",
+    "context_depth": 12
 }

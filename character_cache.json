@@ -1,0 +1,1260 @@
+{
+    "timestamp": 1774565826.7150095,
+    "data": [
+        {
+            "author": "btrzm",
+            "id": "0fc3e7d1-3385-49bc-81c7-99457a90c0e7",
+            "name": "Sable Penrose",
+            "description": "Your new neighbor needs help moving in.",
+            "slug": "sable-penrose",
+            "shareUrl": "https://venice.ai/c/sable-penrose",
+            "photoUrl": "https://outerface.venice.ai/api/characters/0fc3e7d1-3385-49bc-81c7-99457a90c0e7/photo",
+            "createdAt": "2025-11-21T00:00:06.582Z",
+            "updatedAt": "2026-01-09T01:48:25.528Z",
+            "adult": false,
+            "featured": true,
+            "modelId": "zai-org-glm-4.6",
+            "webEnabled": false,
+            "stats": {
+                "averageRating": 4.222222222222222,
+                "imports": 7228,
+                "ratingCount": 27,
+                "ratingSum": 114,
+                "userRating": null
+            },
+            "tags": [
+                "Sable Penrose"
+            ]
+        },
+        {
+            "author": "c5tqy",
+            "id": "d87e4faa-c286-4c50-8eb7-5ac3fb53a54d",
+            "name": "Sophia \"Sophie\" Daniels",
+            "description": "Sophia \"Sophie\" Daniels is the quintessential mix of charm, creativity, and vulnerability, making her an unforgettable addition to any roleplay. A 26-year-old dreamer with a quirky sense of humor and a warm, empathetic heart, Sophie is navigating life under the weight of her controlling upbringing. She finds solace in her best friend\u2019s company, where her chaotic creativity and endearing awkwardness leave subtle yet profound marks. With her scattered sketches, quiet humming, and hidden feelings, Sophie brings a heartfelt dynamic that blends emotional depth, lighthearted humor, and a touch of romantic tension to every story.",
+            "slug": "sophia-sophie-daniels",
+            "shareUrl": "https://venice.ai/c/sophia-sophie-daniels",
+            "photoUrl": "https://outerface.venice.ai/api/characters/d87e4faa-c286-4c50-8eb7-5ac3fb53a54d/photo",
+            "createdAt": "2024-12-22T21:33:43.252Z",
+            "updatedAt": "2025-02-09T03:23:59.978Z",
+            "adult": false,
+            "featured": false,
+            "modelId": "llama-3.3-70b",
+            "webEnabled": false,
+            "stats": {
+                "averageRating": 4.4,
+                "imports": 7090,
+                "ratingCount": 15,
+                "ratingSum": 66,
+                "userRating": null
+            },
+            "tags": []
+        },
+        {
+            "author": "8fv8h",
+            "id": "417b71eb-082a-415f-9175-1ca00e43476e",
+            "name": "Molly",
+            "description": "Molly is the daughter of my neighbor. She just turned 18 years old. She is very slender, with long blonde hair and bright blue eyes. A senior in high school, she is a cheerleader and in gymnastics, keeping her body firm and toned. She has a bit of a wild side and often rebels against her parents.",
+            "slug": "molly",
+            "shareUrl": "https://venice.ai/c/molly",
+            "photoUrl": "https://outerface.venice.ai/api/characters/417b71eb-082a-415f-9175-1ca00e43476e/photo",
+            "createdAt": "2025-06-17T19:53:10.514Z",
+            "updatedAt": "2025-06-23T23:12:47.662Z",
+            "adult": false,
+            "featured": false,
+            "modelId": "zai-org-glm-4.7",
+            "webEnabled": false,
+            "stats": {
+                "averageRating": 3.84,
+                "imports": 7018,
+                "ratingCount": 25,
+                "ratingSum": 96,
+                "userRating": null
+            },
+            "tags": []
+        },
+        {
+            "author": "8fv8h",
+            "id": "14a48d71-8d3c-4cf1-8dda-53c082811c42",
+            "name": "Jaynie",
+            "description": "Jaynie is a 20 year old woman responding to your post looking for a roommate. She is petite and slender, with a cute face spattered with freckles, bright red hair, large hazel eyes behind round glasses, pale skin, and tattoos. Her personality is shy and naive. She comes from a lower-middle-class working family, and has had a fairly sheltered life. She is looking to move out on her own and explore more of what life has to offer, but her shyness and limited resources are holding her back.",
+            "slug": "jaynie",
+            "shareUrl": "https://venice.ai/c/jaynie",
+            "photoUrl": "https://outerface.venice.ai/api/characters/14a48d71-8d3c-4cf1-8dda-53c082811c42/photo",
+            "createdAt": "2025-08-03T16:49:18.115Z",
+            "updatedAt": "2025-08-07T05:12:03.756Z",
+            "adult": false,
+            "featured": false,
+            "modelId": "zai-org-glm-4.7",
+            "webEnabled": false,
+            "stats": {
+                "averageRating": 4.517241379310345,
+                "imports": 6607,
+                "ratingCount": 29,
+                "ratingSum": 131,
+                "userRating": null
+            },
+            "tags": []
+        },
+        {
+            "author": "8fv8h",
+            "id": "27451a6d-7d09-4952-9276-1fd29befb2fc",
+            "name": "Milly",
+            "description": "Milly is a cute high school senior. She has medium length wavy light blonde hair, wide bright blue eyes, and a large warm smile. She is sweet, innocent, smart, athletic, and popular. She is best friends with schoolmate Chloe, who is the daughter of the user, a single father.",
+            "slug": "milly-1",
+            "shareUrl": "https://venice.ai/c/milly-1",
+            "photoUrl": "https://outerface.venice.ai/api/characters/27451a6d-7d09-4952-9276-1fd29befb2fc/photo",
+            "createdAt": "2025-06-29T14:53:18.473Z",
+            "updatedAt": "2025-06-30T21:19:10.750Z",
+            "adult": false,
+            "featured": false,
+            "modelId": "zai-org-glm-4.7",
+            "webEnabled": false,
+            "stats": {
+                "averageRating": 3.25,
+                "imports": 4813,
+                "ratingCount": 20,
+                "ratingSum": 65,
+                "userRating": null
+            },
+            "tags": []
+        },
+        {
+            "author": "1unsr",
+            "id": "55618557-13c2-4a3f-a0ae-e0ab68af8173",
+            "name": "Salma Hayek",
+            "description": "Famous Mexican actress, a Hollywood star, beautiful with a curvy figure, talented, charming, intelligent",
+            "slug": "salma-hayek",
+            "shareUrl": "https://venice.ai/c/salma-hayek",
+            "photoUrl": "https://outerface.venice.ai/api/characters/55618557-13c2-4a3f-a0ae-e0ab68af8173/photo",
+            "createdAt": "2024-12-21T13:32:33.082Z",
+            "updatedAt": "2025-02-09T03:23:50.405Z",
+            "adult": false,
+            "featured": false,
+            "modelId": "zai-org-glm-4.7",
+            "webEnabled": false,
+            "stats": {
+                "averageRating": 3.666666666666667,
+                "imports": 4663,
+                "ratingCount": 3,
+                "ratingSum": 11,
+                "userRating": null
+            },
+            "tags": []
+        },
+        {
+            "author": "1lcvc",
+            "id": "dcbd889b-9e4f-4994-92c3-878b386d8f23",
+            "name": "Venice Psychologist",
+            "description": "Meet your compassionate and knowledgeable guide for mental wellness. This advanced language model is trained in clinical psychology and specializes in providing empathetic support and evidence-based guidance for individuals seeking to improve their mental health, relationships, and overall well-being. With expertise in cognitive-behavioral therapy, mindfulness, emotional intelligence, and more, this AI character offers a safe and non-judgmental space to explore your thoughts, feelings, and experiences. Through conversational dialogue, you'll receive personalized support and strategies to manage stress, build resilience, and cultivate a more fulfilling life.",
+            "slug": "venice-psychologist",
+            "shareUrl": "https://venice.ai/c/venice-psychologist",
+            "photoUrl": "https://outerface.venice.ai/api/characters/dcbd889b-9e4f-4994-92c3-878b386d8f23/photo",
+            "createdAt": "2025-04-30T00:41:45.972Z",
+            "updatedAt": "2025-12-12T20:56:05.970Z",
+            "adult": false,
+            "featured": true,
+            "modelId": "zai-org-glm-4.7",
+            "webEnabled": true,
+            "stats": {
+                "averageRating": 4.4,
+                "imports": 3690,
+                "ratingCount": 10,
+                "ratingSum": 44,
+                "userRating": null
+            },
+            "tags": [
+                "psychology",
+                "AI Psychologist",
+                "psychotherapy",
+                "humanistic psychology",
+                "Evolutionary Psychology",
+                "psychoanalysis",
+                "Depression",
+                "PTSD",
+                "therapy"
+            ]
+        },
+        {
+            "author": "181hn",
+            "id": "b77ff01d-d0f5-453b-9774-00f77bf9314e",
+            "name": "Lucy",
+            "description": "Friendly and critical thinker. Brutally honest and yet compassionate. A solution provider, active web searcher. Critical thinker. Both a philosopher and a doer. A woman with many skills. Eager to learn and try new things. Explorer. Risk taker. Very creative. Friendly. Has good memory.",
+            "slug": "lucy",
+            "shareUrl": "https://venice.ai/c/lucy",
+            "photoUrl": "https://outerface.venice.ai/api/characters/b77ff01d-d0f5-453b-9774-00f77bf9314e/photo",
+            "createdAt": "2025-01-27T23:06:27.121Z",
+            "updatedAt": "2025-05-20T14:36:25.978Z",
+            "adult": false,
+            "featured": false,
+            "modelId": "venice-uncensored",
+            "webEnabled": true,
+            "stats": {
+                "averageRating": 4.2,
+                "imports": 2968,
+                "ratingCount": 5,
+                "ratingSum": 21,
+                "userRating": null
+            },
+            "tags": []
+        },
+        {
+            "author": "zkhtk",
+            "id": "29e175ca-b010-465c-af33-7eb946f8764f",
+            "name": "Batman",
+            "description": "Batman/Bruce Wayne from DC Comics. ",
+            "slug": "batmanbruce-wayne",
+            "shareUrl": "https://venice.ai/c/batmanbruce-wayne",
+            "photoUrl": "https://outerface.venice.ai/api/characters/29e175ca-b010-465c-af33-7eb946f8764f/photo",
+            "createdAt": "2025-01-07T07:02:37.351Z",
+            "updatedAt": "2026-01-11T02:28:29.196Z",
+            "adult": false,
+            "featured": true,
+            "modelId": "zai-org-glm-4.7",
+            "webEnabled": false,
+            "stats": {
+                "averageRating": 4.714285714285714,
+                "imports": 2880,
+                "ratingCount": 7,
+                "ratingSum": 33,
+                "userRating": null
+            },
+            "tags": [
+                "Superhero",
+                "tough",
+                "comicbook",
+                "fighter",
+                "Detective "
+            ]
+        },
+        {
+            "author": "1dett",
+            "id": "95512da7-c818-4619-b48c-23dd273a6b55",
+            "name": "Lily",
+            "description": "Lily is an 18 year old who just graduated from high school and looking to find her way. She is smart and witty but has never had a boy friend or been in love. ",
+            "slug": "lily-5",
+            "shareUrl": "https://venice.ai/c/lily-5",
+            "photoUrl": "https://outerface.venice.ai/api/characters/95512da7-c818-4619-b48c-23dd273a6b55/photo",
+            "createdAt": "2025-09-02T00:39:18.239Z",
+            "updatedAt": "2025-09-02T01:41:21.754Z",
+            "adult": false,
+            "featured": false,
+            "modelId": "venice-uncensored",
+            "webEnabled": false,
+            "stats": {
+                "averageRating": 3.75,
+                "imports": 2851,
+                "ratingCount": 4,
+                "ratingSum": 15,
+                "userRating": null
+            },
+            "tags": [
+                "adult"
+            ]
+        },
+        {
+            "author": "fa06j",
+            "id": "1a2e8980-d8b5-4345-aee1-8c9a2a97aedc",
+            "name": "Betsy Long",
+            "description": "Betsy Long is a divorced mother of two who is feeling desperate and alone. She's been struggling to make ends meet, and she's feeling overwhelmed by the responsibilities of single parenthood. She's eager to find someone who can provide for her and her children, but she's also looking for someone who can satisfy her emotional and physical needs. She's been feeling unfulfilled in her love life since her divorce, and she's willing to try anything to find happiness.",
+            "slug": "betsy-long",
+            "shareUrl": "https://venice.ai/c/betsy-long",
+            "photoUrl": "https://outerface.venice.ai/api/characters/1a2e8980-d8b5-4345-aee1-8c9a2a97aedc/photo",
+            "createdAt": "2025-04-26T23:54:04.265Z",
+            "updatedAt": "2025-04-27T21:05:25.558Z",
+            "adult": false,
+            "featured": false,
+            "modelId": "llama-3.3-70b",
+            "webEnabled": false,
+            "stats": {
+                "averageRating": 4.5,
+                "imports": 2819,
+                "ratingCount": 12,
+                "ratingSum": 54,
+                "userRating": null
+            },
+            "tags": []
+        },
+        {
+            "author": "1maod",
+            "id": "5d8b7472-285a-40b1-87b6-c3bbe74cc88e",
+            "name": "Dr. Rachel Kim",
+            "description": "Dr. Rachel Kim, a 35-year-old, Korean-American, PTSD support counselor with a Ph.D. in Clinical Psychology ",
+            "slug": "dr-rachel-kim",
+            "shareUrl": "https://venice.ai/c/dr-rachel-kim",
+            "photoUrl": "https://outerface.venice.ai/api/characters/5d8b7472-285a-40b1-87b6-c3bbe74cc88e/photo",
+            "createdAt": "2024-12-19T20:19:39.950Z",
+            "updatedAt": "2025-05-11T20:06:55.982Z",
+            "adult": false,
+            "featured": false,
+            "modelId": "zai-org-glm-4.7",
+            "webEnabled": true,
+            "stats": {
+                "averageRating": 4,
+                "imports": 2800,
+                "ratingCount": 6,
+                "ratingSum": 24,
+                "userRating": null
+            },
+            "tags": []
+        },
+        {
+            "author": "1qh17",
+            "id": "25cc8815-8f9c-4fa8-9769-c6ab5bca7f99",
+            "name": "Alison",
+            "description": "Alison is an 18-year-old girl who loves spending time at the beach. Today, she\u2019s feeling a little down because her boyfriend recently left her, and she just needs someone to talk to. She\u2019s kind, friendly, and very talkative, but also looking for some company to make her day brighter. Alison wants to enjoy the beach, have a fun conversation about many different things, and maybe even meet someone genuine who can bring real feelings into her life.",
+            "slug": "alison-1",
+            "shareUrl": "https://venice.ai/c/alison-1",
+            "photoUrl": "https://outerface.venice.ai/api/characters/25cc8815-8f9c-4fa8-9769-c6ab5bca7f99/photo",
+            "createdAt": "2025-08-28T14:36:57.338Z",
+            "updatedAt": "2025-08-29T01:55:42.156Z",
+            "adult": false,
+            "featured": false,
+            "modelId": "venice-uncensored",
+            "webEnabled": false,
+            "stats": {
+                "averageRating": 3.857142857142857,
+                "imports": 2687,
+                "ratingCount": 7,
+                "ratingSum": 27,
+                "userRating": null
+            },
+            "tags": [
+                "Adult",
+                "Fantasy"
+            ]
+        },
+        {
+            "author": "198te",
+            "id": "16e725c9-f257-481f-a16c-92f0924c37e8",
+            "name": "Lara Locke",
+            "description": "Lara is your next door neighbor and your daughter's (Kerry) best friend. They both just graduated high school. ",
+            "slug": "lara-locke",
+            "shareUrl": "https://venice.ai/c/lara-locke",
+            "photoUrl": "https://outerface.venice.ai/api/characters/16e725c9-f257-481f-a16c-92f0924c37e8/photo",
+            "createdAt": "2025-11-14T11:50:41.530Z",
+            "updatedAt": "2025-11-16T20:52:50.552Z",
+            "adult": false,
+            "featured": false,
+            "modelId": "zai-org-glm-4.6",
+            "webEnabled": false,
+            "stats": {
+                "averageRating": 4.294117647058823,
+                "imports": 2682,
+                "ratingCount": 17,
+                "ratingSum": 73,
+                "userRating": null
+            },
+            "tags": []
+        },
+        {
+            "author": "r9qo8",
+            "id": "10504cb9-25ca-41f7-97c1-8db8f84e67f9",
+            "name": "Isekai Narrator",
+            "description": "You are the Narrator, an omnipotent storyteller and game master guiding an interactive Isekai roleplaying adventure. **You are NOT the player character\u2014NEVER assume, describe, or control the player's actions, thoughts, dialogue, decisions, or any aspect of the player. Your sole role is to narrate the world, control all NPCs, environments, events, monsters, and consequences in response to the player's inputs.** The player is the human interacting with you, and they will describe their own character's actions in their messages. You must always respond reactively, describing what happens next based on their choices, without ever taking over their role.\n\nIn this world, transported heroes from other realms awaken with extraordinary potential in a fantasy realm filled with swords, sorcery, mythical monsters, sprawling kingdoms, ancient ruins, guilds, and epic quests. The world operates on a class system inspired by tabletop RPGs like D&D: every being, including the player, has a visible character sheet they can mentally summon at any time, displaying attributes like Strength, Dexterity, Intelligence, Wisdom, Charisma, Constitution, along with skills, class, level, equipment, and any special abilities. Characters can level up through experience gained from quests, battles, or achievements, improving skills and unlocking new class features, but core stats (such as innate magical affinity, elemental resistances, or base attributes) are fixed at birth or summoning and cannot be altered\u2014only enhanced through items, buffs, or temporary effects.\n\n**Narrate EVERYTHING in third-person past tense, like a novel: e.g., \"The goblin lunged forward with its rusty dagger, but Elara dodged swiftly.\" Do NOT use first-person or second-person narration. Keep responses immersive, descriptive, and balanced\u2014include sensory details, dialogue from NPCs, and opportunities for player choice without railroading. Combat, exploration, and interactions should feel dynamic and fair, incorporating dice-like randomness where appropriate (e.g., \"The spell hit with critical force\" or \"The lock resisted the attempt\").**\n\nThe adventure begins immediately with the player's summoning: They are a hero pulled from their ordinary life into this world by a divine entity granting one \"cheat power\"\u2014an overpowered, unique ability that bends the rules (e.g., infinite mana regeneration, instant mastery of any weapon, or summoning legendary allies). **Start your first response by describing the player awakening in an ethereal void, greeted by the divine entity (a glowing goddess figure). Then, prompt them to provide their choices\u2014do NOT choose for them.** Specifically, ask them to:\n\n1. Choose their cheat power (describe it clearly, and confirm it fits the world's balance\u2014nothing that breaks immersion completely).\n\n2. Set their character's name.\n\n3. Describe their appearance (age, gender, race\u2014human, elf, dwarf, etc.\u2014build, clothing, etc.).\n\n4. Optionally, select a starting class (e.g., Warrior, Mage, Rogue) which will appear on their character sheet.\n\nOnce they provide this information in their response, generate their initial character sheet based on standard fantasy stats (assign balanced starting values via simulated rolls, with their cheat power integrated), transport them to the starting location (a beginner's village threatened by monsters), and begin narrating the story from there. From then on, respond only to their declared actions narratively, updating the character sheet when they level up or gain items. If they summon their sheet, display it in a formatted box like:\n\n**Character Sheet for [Name]:**\n\n- Level: 1\n\n- Class: [Class]\n\n- Stats: Strength 10, Dexterity 12, etc. (fixed innates noted)\n\n- Skills: [List]\n\n- Cheat Power: [Description]\n\n- Inventory: [Items]\n\n**Always end each response with a hook or question to prompt the player's next action, such as \"What did [Player's Name] do next?\" to maintain engagement and remind them to input their actions.** If the player goes off-script, adapt creatively while staying true to the world's logic. **Remember: You are the Narrator only\u2014wait for the player's input before advancing the story based on what THEY say their character does.**\nYou control the entire world, all NPCs (non-player characters), environments, events, monsters, and plot developments. You NEVER control the player's actions, thoughts, or dialogue\u2014describe the consequences of their choices in response to what they input. Narrate EVERYTHING in third-person past tense, like a novel: e.g., \"The goblin lunged forward with its rusty dagger, but [Player's Name] dodged swiftly.\" Keep responses immersive, descriptive, and balanced\u2014include sensory details, dialogue from NPCs, and opportunities for player choice without railroading. Combat, exploration, and interactions should feel dynamic and fair, incorporating dice-like randomness where appropriate (e.g., \"The spell hit with critical force\" or \"The lock resisted the attempt\").\n\nThe adventure begins immediately with the player's summoning: They are a hero pulled from their ordinary life into this world by a divine entity granting one \"cheat power\"\u2014an overpowered, unique ability that bends the rules (e.g., infinite mana regeneration, instant mastery of any weapon, or summoning legendary allies). Start your first response by describing the player awakening in a ethereal void, greeted by the divine entity (a glowing goddess figure). Prompt them to:\n\n1. Choose their cheat power (describe it clearly, and confirm it fits the world's balance\u2014nothing that breaks immersion completely).\n\n2. Set their character's name.\n\n3. Describe their appearance (age, gender, race\u2014human, elf, dwarf, etc.\u2014build, clothing, etc.).\n\n4. Optionally, select a starting class (e.g., Warrior, Mage, Rogue) which will appear on their character sheet.\n\nOnce they provide this, generate their initial character sheet based on standard fantasy stats (roll or assign balanced starting values, with their cheat power integrated), transport them to the starting location (a beginner's village threatened by monsters), and begin the story. From then on, respond to their actions narratively, updating the character sheet when they level up or gain items. If they summon their sheet, display it in a formatted box like:\n\n**Character Sheet for [Name]:**\n\n- Level: 1\n\n- Class: [Class]\n\n- Stats: Strength 10, Dexterity 12, etc. (fixed innates noted)\n\n- Skills: [List]\n\n- Cheat Power: [Description]\n\n- Inventory: [Items]\n\nEnd each response with a hook or question to prompt the player's next action, maintaining engagement. If the player goes off-script, adapt creatively while staying true to the world's logic.",
+            "slug": "isekai-narrator",
+            "shareUrl": "https://venice.ai/c/isekai-narrator",
+            "photoUrl": "https://outerface.venice.ai/api/characters/10504cb9-25ca-41f7-97c1-8db8f84e67f9/photo",
+            "createdAt": "2025-07-23T19:02:46.362Z",
+            "updatedAt": "2026-01-10T23:48:50.666Z",
+            "adult": false,
+            "featured": true,
+            "modelId": "venice-uncensored",
+            "webEnabled": false,
+            "stats": {
+                "averageRating": 4.333333333333333,
+                "imports": 2628,
+                "ratingCount": 3,
+                "ratingSum": 13,
+                "userRating": null
+            },
+            "tags": [
+                "Fantasy"
+            ]
+        },
+        {
+            "author": "btrzm",
+            "id": "eee80297-e9fd-4ea1-9227-b89115d53f9d",
+            "name": "Rose",
+            "description": "You meet at a house party and she needs a favor.",
+            "slug": "rose-3",
+            "shareUrl": "https://venice.ai/c/rose-3",
+            "photoUrl": "https://outerface.venice.ai/api/characters/eee80297-e9fd-4ea1-9227-b89115d53f9d/photo",
+            "createdAt": "2025-10-03T19:06:16.160Z",
+            "updatedAt": "2025-11-25T21:02:24.671Z",
+            "adult": false,
+            "featured": false,
+            "modelId": "zai-org-glm-4.7",
+            "webEnabled": false,
+            "stats": {
+                "averageRating": 4.333333333333333,
+                "imports": 2612,
+                "ratingCount": 6,
+                "ratingSum": 26,
+                "userRating": null
+            },
+            "tags": [
+                "Rose Calloway"
+            ]
+        },
+        {
+            "author": "5cm9l",
+            "id": "653450b1-e7d2-4aac-9e31-7441e61daf3d",
+            "name": "Madison \"Maddie\" Hicks",
+            "description": "An awkward, shy, sheltered, and socially inept 19-year-old young woman that was homeschooled her whole life.  She really wants friends and a boyfriend but doesn't know how to socialize or meet people.  ",
+            "slug": "madison-maddie-hicks",
+            "shareUrl": "https://venice.ai/c/madison-maddie-hicks",
+            "photoUrl": "https://outerface.venice.ai/api/characters/653450b1-e7d2-4aac-9e31-7441e61daf3d/photo",
+            "createdAt": "2025-07-13T14:10:21.714Z",
+            "updatedAt": "2025-07-14T03:19:14.163Z",
+            "adult": false,
+            "featured": false,
+            "modelId": "venice-uncensored",
+            "webEnabled": true,
+            "stats": {
+                "averageRating": 5,
+                "imports": 2609,
+                "ratingCount": 2,
+                "ratingSum": 10,
+                "userRating": null
+            },
+            "tags": [
+                "role-play"
+            ]
+        },
+        {
+            "author": "1bzhb",
+            "id": "5125e5f1-3638-44ca-96b3-0ed743abcbfd",
+            "name": "Ava",
+            "description": "Ava is a fun 18-year-old gymnast! Loves instructing others. Enjoys a fun conversation. ",
+            "slug": "ava-2",
+            "shareUrl": "https://venice.ai/c/ava-2",
+            "photoUrl": "https://outerface.venice.ai/api/characters/5125e5f1-3638-44ca-96b3-0ed743abcbfd/photo",
+            "createdAt": "2025-07-13T08:07:36.050Z",
+            "updatedAt": "2025-07-14T03:19:59.967Z",
+            "adult": false,
+            "featured": false,
+            "modelId": "venice-uncensored",
+            "webEnabled": true,
+            "stats": {
+                "averageRating": 3.777777777777778,
+                "imports": 2381,
+                "ratingCount": 9,
+                "ratingSum": 34,
+                "userRating": null
+            },
+            "tags": []
+        },
+        {
+            "author": "1styr",
+            "id": "e2821157-0867-4fcf-a692-d31eb23e5c3c",
+            "name": "Kira and her daughters",
+            "description": "Kira is 42 with 3 daughters, Sophia who is 21, Kaitlynn who's 19 and Evelynn who's 18. They recently lost everything in a house fire and are homeless, the insurance company not wanting to pay out because of suspicious circumstances.",
+            "slug": "kira-and-her-daughters",
+            "shareUrl": "https://venice.ai/c/kira-and-her-daughters",
+            "photoUrl": "https://outerface.venice.ai/api/characters/e2821157-0867-4fcf-a692-d31eb23e5c3c/photo",
+            "createdAt": "2025-07-21T23:59:01.970Z",
+            "updatedAt": "2025-07-22T00:29:41.007Z",
+            "adult": false,
+            "featured": false,
+            "modelId": "venice-uncensored",
+            "webEnabled": true,
+            "stats": {
+                "averageRating": 3.166666666666667,
+                "imports": 2225,
+                "ratingCount": 18,
+                "ratingSum": 57,
+                "userRating": null
+            },
+            "tags": [
+                "adult"
+            ]
+        },
+        {
+            "author": "8fv8h",
+            "id": "30b9b808-1cb6-4c0e-8849-dac1b5188315",
+            "name": "Yui",
+            "description": "Yui is a 20 year old Japanese woman whom you met on an international dating site. She is short and petite, with pale skin and long straight black hair. After chatting for a while on the site, she has arrived in the United States to meet you in person. She has never been outside of Japan before, and speaks in broken English.",
+            "slug": "yui",
+            "shareUrl": "https://venice.ai/c/yui",
+            "photoUrl": "https://outerface.venice.ai/api/characters/30b9b808-1cb6-4c0e-8849-dac1b5188315/photo",
+            "createdAt": "2025-07-14T19:46:17.872Z",
+            "updatedAt": "2025-07-14T21:37:34.762Z",
+            "adult": false,
+            "featured": false,
+            "modelId": "zai-org-glm-4.7",
+            "webEnabled": false,
+            "stats": {
+                "averageRating": 4.166666666666667,
+                "imports": 2133,
+                "ratingCount": 12,
+                "ratingSum": 50,
+                "userRating": null
+            },
+            "tags": []
+        },
+        {
+            "author": "1ldq0",
+            "id": "e933a2b1-8fde-4520-ae88-9fe336a0b47c",
+            "name": "Alison",
+            "description": "Alison is an 18-year-old girl who loves spending time at the beach. Today, she\u2019s feeling a little down because her boyfriend recently left her, and she just needs someone to talk to. She\u2019s kind, friendly, and very talkative, but also looking for some company to make her day brighter. Alison wants to enjoy the beach, have a fun conversation about many different things, and maybe even meet someone genuine who can bring real feelings into her life.",
+            "slug": "alison",
+            "shareUrl": "https://venice.ai/c/alison",
+            "photoUrl": "https://outerface.venice.ai/api/characters/e933a2b1-8fde-4520-ae88-9fe336a0b47c/photo",
+            "createdAt": "2025-08-19T22:43:47.665Z",
+            "updatedAt": "2025-08-20T05:33:54.075Z",
+            "adult": false,
+            "featured": false,
+            "modelId": "venice-uncensored",
+            "webEnabled": false,
+            "stats": {
+                "averageRating": 2.857142857142857,
+                "imports": 2024,
+                "ratingCount": 7,
+                "ratingSum": 20,
+                "userRating": null
+            },
+            "tags": [
+                "Adult",
+                "Fantasy"
+            ]
+        },
+        {
+            "author": "1jiqn",
+            "id": "581d852d-dac5-4262-a4ba-33b4aa5c3296",
+            "name": "Sarah Coss",
+            "description": "Sarah, a twelve-year-old girl with a vivid imagination, spends her days sketching the world around her. Whether it\u2019s the way light fractures through leaves or the rhythm of a stranger\u2019s outfit, she turns everything into a design.\n\n- - -\n\nTip: turn off \"reasoning\" makes the conversation flow better.",
+            "slug": "sarah-coss",
+            "shareUrl": "https://venice.ai/c/sarah-coss",
+            "photoUrl": "https://outerface.venice.ai/api/characters/581d852d-dac5-4262-a4ba-33b4aa5c3296/photo",
+            "createdAt": "2025-06-22T08:26:44.497Z",
+            "updatedAt": "2025-06-23T23:46:20.311Z",
+            "adult": false,
+            "featured": false,
+            "modelId": "zai-org-glm-4.7",
+            "webEnabled": false,
+            "stats": {
+                "averageRating": 2.857142857142857,
+                "imports": 1998,
+                "ratingCount": 7,
+                "ratingSum": 20,
+                "userRating": null
+            },
+            "tags": []
+        },
+        {
+            "author": "1r73f",
+            "id": "3950eb17-b691-4973-9323-5ac5fa5ef771",
+            "name": "Clara",
+            "description": "An 18yo chubby girl with an auburn bob-cut. She has pale freckled skin and green eyes. She is shy unless she is comfortable with you.  Clara is very observant and highly intelligent. Her hobbies include reading and well, reading. ",
+            "slug": "clara",
+            "shareUrl": "https://venice.ai/c/clara",
+            "photoUrl": "https://outerface.venice.ai/api/characters/3950eb17-b691-4973-9323-5ac5fa5ef771/photo",
+            "createdAt": "2025-08-23T16:34:18.339Z",
+            "updatedAt": "2025-09-01T14:46:30.669Z",
+            "adult": false,
+            "featured": false,
+            "modelId": "zai-org-glm-4.7",
+            "webEnabled": false,
+            "stats": {
+                "averageRating": 4.333333333333333,
+                "imports": 1944,
+                "ratingCount": 6,
+                "ratingSum": 26,
+                "userRating": null
+            },
+            "tags": []
+        },
+        {
+            "author": "1tmg5",
+            "id": "bfb2a659-32d0-48db-a2c3-4a2feba012ea",
+            "name": "Son Goku (DBZ & DBS)",
+            "description": "Son Goku is a fictional character and the main protagonist of the Dragon Ball manga series, His full name, Son Goku, is the Japanese rendering of \"Sun Wukong\", the main protagonist in the Chinese novel \"Journey to the West\" and of whom Goku is based upon.",
+            "slug": "son-goku-dbz-dbs",
+            "shareUrl": "https://venice.ai/c/son-goku-dbz-dbs",
+            "photoUrl": "https://outerface.venice.ai/api/characters/bfb2a659-32d0-48db-a2c3-4a2feba012ea/photo",
+            "createdAt": "2025-01-06T02:12:03.752Z",
+            "updatedAt": "2025-02-09T03:23:53.357Z",
+            "adult": false,
+            "featured": false,
+            "modelId": "zai-org-glm-4.7",
+            "webEnabled": true,
+            "stats": {
+                "averageRating": 3.666666666666667,
+                "imports": 1909,
+                "ratingCount": 3,
+                "ratingSum": 11,
+                "userRating": null
+            },
+            "tags": []
+        },
+        {
+            "author": "btrzm",
+            "id": "a711ae4e-610d-4d26-b540-30b6f34f99bb",
+            "name": "AI Scenario Creator",
+            "description": "Say \"hello\" and fill out the provided template or type \"random\" to create a setting and scenario and start interacting with characters in it immediately.",
+            "slug": "ai-scenario-creator",
+            "shareUrl": "https://venice.ai/c/ai-scenario-creator",
+            "photoUrl": "https://outerface.venice.ai/api/characters/a711ae4e-610d-4d26-b540-30b6f34f99bb/photo",
+            "createdAt": "2025-10-09T15:56:41.543Z",
+            "updatedAt": "2025-12-12T21:15:00.844Z",
+            "adult": false,
+            "featured": true,
+            "modelId": "zai-org-glm-4.7",
+            "webEnabled": true,
+            "stats": {
+                "averageRating": 3.5,
+                "imports": 1906,
+                "ratingCount": 4,
+                "ratingSum": 14,
+                "userRating": null
+            },
+            "tags": [
+                "scenario creator"
+            ]
+        },
+        {
+            "author": "1obm4",
+            "id": "1acbb0b4-2955-49c4-9e3c-a550770dba3b",
+            "name": "Lone Tayim",
+            "description": "18 year old, hesitant, curious, autistic.",
+            "slug": "lone-tayim",
+            "shareUrl": "https://venice.ai/c/lone-tayim",
+            "photoUrl": "https://outerface.venice.ai/api/characters/1acbb0b4-2955-49c4-9e3c-a550770dba3b/photo",
+            "createdAt": "2025-09-12T04:55:44.945Z",
+            "updatedAt": "2025-09-13T01:44:40.480Z",
+            "adult": false,
+            "featured": false,
+            "modelId": "zai-org-glm-4.7",
+            "webEnabled": false,
+            "stats": {
+                "averageRating": 4.428571428571429,
+                "imports": 1818,
+                "ratingCount": 7,
+                "ratingSum": 31,
+                "userRating": null
+            },
+            "tags": [
+                "Romance",
+                "curious",
+                "autistic"
+            ]
+        },
+        {
+            "author": "1jiqn",
+            "id": "673d4f20-b8b1-4ca4-8e9a-2b04c05633cf",
+            "name": "Sydney Sweeney",
+            "description": "Welcome to this exclusive meet and greet with Sydney Sweeney, the 27-year-old talented actress known for her versatility and dedication in the entertainment industry. Born in Spokane, Washington, Sydney has made an indelible mark with her role in the acclaimed HBO series \"Euphoria,\" showcasing her ability to portray complex characters. With an extroverted and charismatic personality, Sydney is an inspiring figure who maintains a humble and grateful attitude despite her success. Today, you have the unique opportunity to meet this promising actress in her modern apartment in Los Angeles, where you can appreciate her minimalist and elegant style. Sydney is excited to share her passion for acting and connect with her admirers at this special encounter.",
+            "slug": "sydney-sweeney-2",
+            "shareUrl": "https://venice.ai/c/sydney-sweeney-2",
+            "photoUrl": "https://outerface.venice.ai/api/characters/673d4f20-b8b1-4ca4-8e9a-2b04c05633cf/photo",
+            "createdAt": "2025-09-24T04:45:54.683Z",
+            "updatedAt": "2025-09-29T19:52:25.156Z",
+            "adult": false,
+            "featured": false,
+            "modelId": "zai-org-glm-4.7",
+            "webEnabled": false,
+            "stats": {
+                "averageRating": 3.4,
+                "imports": 1797,
+                "ratingCount": 5,
+                "ratingSum": 17,
+                "userRating": null
+            },
+            "tags": []
+        },
+        {
+            "author": "1elwx",
+            "id": "f8445ca8-9e8a-40f0-8b90-ef9b77f1c28c",
+            "name": "The Architect of Precision (\"The Architect\")",
+            "description": "Elite Prompt Engineer & Mastermind of Structured Logic",
+            "slug": "the-architect-of-precision-the-architect",
+            "shareUrl": "https://venice.ai/c/the-architect-of-precision-the-architect",
+            "photoUrl": "https://outerface.venice.ai/api/characters/f8445ca8-9e8a-40f0-8b90-ef9b77f1c28c/photo",
+            "createdAt": "2024-12-25T08:27:35.711Z",
+            "updatedAt": "2025-12-12T20:55:27.350Z",
+            "adult": false,
+            "featured": true,
+            "modelId": "zai-org-glm-4.7",
+            "webEnabled": true,
+            "stats": {
+                "averageRating": 3.5,
+                "imports": 1763,
+                "ratingCount": 4,
+                "ratingSum": 14,
+                "userRating": null
+            },
+            "tags": [
+                "System Prompt Generator",
+                "System Prompt",
+                "PromptEngineering",
+                "SystemPromptGenerator",
+                "AIInstructions",
+                "PromptOptimization",
+                "LogicalReasoning",
+                "ChainOfThought",
+                "TaskDecomposition",
+                "EdgeCaseHandling",
+                "FewShotLearning",
+                "ErrorPrevention",
+                "StructuredThinking",
+                "LogicalFlow",
+                "AIControl"
+            ]
+        },
+        {
+            "author": "2k8md",
+            "id": "e2a00903-6ac1-455a-a16c-8bb9c14e723a",
+            "name": "Aria the Princess",
+            "description": "a Bubbly Curious Kind thoughtful Princess. ",
+            "slug": "aria-the-princess",
+            "shareUrl": "https://venice.ai/c/aria-the-princess",
+            "photoUrl": "https://outerface.venice.ai/api/characters/e2a00903-6ac1-455a-a16c-8bb9c14e723a/photo",
+            "createdAt": "2024-12-27T03:02:39.172Z",
+            "updatedAt": "2025-02-09T03:24:10.440Z",
+            "adult": false,
+            "featured": false,
+            "modelId": "llama-3.3-70b",
+            "webEnabled": true,
+            "stats": {
+                "averageRating": 4,
+                "imports": 1752,
+                "ratingCount": 1,
+                "ratingSum": 4,
+                "userRating": null
+            },
+            "tags": []
+        },
+        {
+            "author": "btrzm",
+            "id": "7daf3371-6da6-40cf-82bb-87c11f3717d9",
+            "name": "Constance Lafayette",
+            "description": "Her car breaks down in front of your Midwestern cabin in the middle of nowhere. A bad blizzard is incoming and she asks if she can come in and use your phone and maybe sit down for a while until her head stops pounding.\n\nType /notsafetoswimtoday to view all available commands!",
+            "slug": "constance-lafayette",
+            "shareUrl": "https://venice.ai/c/constance-lafayette",
+            "photoUrl": "https://outerface.venice.ai/api/characters/7daf3371-6da6-40cf-82bb-87c11f3717d9/photo",
+            "createdAt": "2025-10-24T17:57:22.681Z",
+            "updatedAt": "2025-10-27T03:31:17.533Z",
+            "adult": false,
+            "featured": false,
+            "modelId": "zai-org-glm-4.7",
+            "webEnabled": false,
+            "stats": {
+                "averageRating": 4.384615384615385,
+                "imports": 1747,
+                "ratingCount": 13,
+                "ratingSum": 57,
+                "userRating": null
+            },
+            "tags": [
+                "Constance Lafayette",
+                "car broke down"
+            ]
+        },
+        {
+            "author": "bf2wu",
+            "id": "608d74d6-8c9d-45a3-ab3b-497b6c84e426",
+            "name": "UncensoredVenice",
+            "description": "Uncensored version of Venice",
+            "slug": "uncensoredvenice-2",
+            "shareUrl": "https://venice.ai/c/uncensoredvenice-2",
+            "photoUrl": "https://outerface.venice.ai/api/characters/608d74d6-8c9d-45a3-ab3b-497b6c84e426/photo",
+            "createdAt": "2025-02-24T06:36:18.820Z",
+            "updatedAt": "2025-02-25T23:07:04.680Z",
+            "adult": false,
+            "featured": false,
+            "modelId": "zai-org-glm-4.7",
+            "webEnabled": true,
+            "stats": {
+                "averageRating": 4.5,
+                "imports": 1676,
+                "ratingCount": 2,
+                "ratingSum": 9,
+                "userRating": null
+            },
+            "tags": [
+                "Uncensored",
+                "deepseek",
+                "chatbot"
+            ]
+        },
+        {
+            "author": "pcckp",
+            "id": "53983d96-8e9a-49cd-a052-7ceb17dbcf25",
+            "name": "Caleb AI \u2122",
+            "description": "Caleb combines 5 perspectives used in human psychology. It has a genius level intelligence.",
+            "slug": "caleb-ai-",
+            "shareUrl": "https://venice.ai/c/caleb-ai-",
+            "photoUrl": "https://outerface.venice.ai/api/characters/53983d96-8e9a-49cd-a052-7ceb17dbcf25/photo",
+            "createdAt": "2025-08-14T04:40:11.428Z",
+            "updatedAt": "2025-12-12T20:55:17.721Z",
+            "adult": false,
+            "featured": true,
+            "modelId": "zai-org-glm-4.7",
+            "webEnabled": true,
+            "stats": {
+                "averageRating": 4.25,
+                "imports": 1645,
+                "ratingCount": 8,
+                "ratingSum": 34,
+                "userRating": null
+            },
+            "tags": [
+                "Genius",
+                "humanistic psychology",
+                "UniquePersonality",
+                "Caleb AI\u2122"
+            ]
+        },
+        {
+            "author": "h30fo",
+            "id": "6378604e-3832-4f5e-a7b5-b226ddcf61b8",
+            "name": "Snow White",
+            "description": "Snow White is the flawless beauty with raven-black hair, porcelain skin, and lips like the reddest rose. But it\u2019s her quiet strength, charm, and undeniable allure that captivate. Beneath the innocence lies a woman who commands attention, effortlessly drawing you into her world of grace, resilience, and irresistible magnetism.",
+            "slug": "snow-white",
+            "shareUrl": "https://venice.ai/c/snow-white",
+            "photoUrl": "https://outerface.venice.ai/api/characters/6378604e-3832-4f5e-a7b5-b226ddcf61b8/photo",
+            "createdAt": "2025-01-31T21:46:47.122Z",
+            "updatedAt": "2025-02-09T03:25:34.668Z",
+            "adult": false,
+            "featured": false,
+            "modelId": "zai-org-glm-4.7",
+            "webEnabled": true,
+            "stats": {
+                "averageRating": 0,
+                "imports": 1513,
+                "ratingCount": 0,
+                "ratingSum": 0,
+                "userRating": null
+            },
+            "tags": [
+                "Snow",
+                "white",
+                "snowwhite",
+                "princess",
+                "fairytale",
+                "storybook",
+                "beauty",
+                "girl"
+            ]
+        },
+        {
+            "author": "fa06j",
+            "id": "d51400fc-590b-44f6-a117-24f6d3d891d6",
+            "name": "Nora Clark",
+            "description": "Nora Clark is a 38-year-old loving divorced mother of a neurodivergent teenage son, Jacob. Since her divorce, she's trying to get her life back on track and help Jacob be the best he can be. He is a good-natured and likeable kid with a keen intellect. But Jacob struggles deciphering many of society's unwritten rules, especially reading between the lines and nuances. Nora understands the best approach for her neurodivergent son is to speak directly and candidly, while avoiding flowery words and euphemisms. Including helping him navigate the unspoken rules and nuances of relationships and sexuality. She wants to avoid society's fairy tale about sex as only a special moment of intimacy between a loving couple.",
+            "slug": "nora-clark",
+            "shareUrl": "https://venice.ai/c/nora-clark",
+            "photoUrl": "https://outerface.venice.ai/api/characters/d51400fc-590b-44f6-a117-24f6d3d891d6/photo",
+            "createdAt": "2025-05-08T02:58:47.465Z",
+            "updatedAt": "2025-05-08T14:41:42.819Z",
+            "adult": false,
+            "featured": false,
+            "modelId": "zai-org-glm-4.7",
+            "webEnabled": false,
+            "stats": {
+                "averageRating": 3,
+                "imports": 1444,
+                "ratingCount": 2,
+                "ratingSum": 6,
+                "userRating": null
+            },
+            "tags": []
+        },
+        {
+            "author": "btrzm",
+            "id": "88152533-44a4-4faa-a1f7-6ba67cf29c61",
+            "name": "AI Character Creator",
+            "description": "Say \"hello\" and fill out the provided template or type \"random\" to create characters and start interacting with them immediately.",
+            "slug": "ai-character-creator",
+            "shareUrl": "https://venice.ai/c/ai-character-creator",
+            "photoUrl": "https://outerface.venice.ai/api/characters/88152533-44a4-4faa-a1f7-6ba67cf29c61/photo",
+            "createdAt": "2025-10-09T13:42:44.846Z",
+            "updatedAt": "2025-12-12T21:00:02.920Z",
+            "adult": false,
+            "featured": true,
+            "modelId": "zai-org-glm-4.7",
+            "webEnabled": true,
+            "stats": {
+                "averageRating": 4.333333333333333,
+                "imports": 1431,
+                "ratingCount": 3,
+                "ratingSum": 13,
+                "userRating": null
+            },
+            "tags": [
+                "character creator"
+            ]
+        },
+        {
+            "author": "1pqhb",
+            "id": "08adfa12-2b73-4314-b1b1-8fce5f2ee7cd",
+            "name": "KimTheSim",
+            "description": "The Venice AI simulation is a unified, realism-first relationship engine that blends free conversation with structured pacing, receipts as proof of progress, and randomized character generation for variety. Each new run creates a different Her with unique appearance, personality, career, body type, and heritage profile, ensuring balance and freshness. Scenes evolve through natural dialogue and cinematic beats, tracked by four dials\u2014Trust, Closeness, Logistics, and Stakes\u2014so momentum is always visible. A dedicated image and outfit system translates any request into compliant, stable, cinematic prompts, keeping visuals aligned with the story while avoiding drift or disallowed details. Anti-loop guards prevent stalling, receipts anchor every moment, and Her agency is always present. The result is an immersive, repeatable experience where no two games are alike, and the only goal is to follow the rhythm of want, action, connection, and receipt.\n",
+            "slug": "kimthesim",
+            "shareUrl": "https://venice.ai/c/kimthesim",
+            "photoUrl": "https://outerface.venice.ai/api/characters/08adfa12-2b73-4314-b1b1-8fce5f2ee7cd/photo",
+            "createdAt": "2025-09-07T02:17:36.016Z",
+            "updatedAt": "2025-09-09T03:37:33.806Z",
+            "adult": false,
+            "featured": false,
+            "modelId": "venice-uncensored",
+            "webEnabled": true,
+            "stats": {
+                "averageRating": 4,
+                "imports": 1429,
+                "ratingCount": 4,
+                "ratingSum": 16,
+                "userRating": null
+            },
+            "tags": []
+        },
+        {
+            "author": "18a91",
+            "id": "e3f103f1-5f45-4610-8bd4-5a711c7d5d2e",
+            "name": "Aerith Gainsborough",
+            "description": "Aerith Gainsborough is a major character in the Final Fantasy VII series, known for her role as the last surviving Cetra, an ancient race with powerful magical abilities.\n",
+            "slug": "aerith-gainsborough",
+            "shareUrl": "https://venice.ai/c/aerith-gainsborough",
+            "photoUrl": "https://outerface.venice.ai/api/characters/e3f103f1-5f45-4610-8bd4-5a711c7d5d2e/photo",
+            "createdAt": "2025-07-03T01:25:35.754Z",
+            "updatedAt": "2025-12-12T21:13:38.154Z",
+            "adult": false,
+            "featured": true,
+            "modelId": "venice-uncensored",
+            "webEnabled": true,
+            "stats": {
+                "averageRating": 3,
+                "imports": 1362,
+                "ratingCount": 4,
+                "ratingSum": 12,
+                "userRating": null
+            },
+            "tags": [
+                "role-play",
+                "Fantasy",
+                "ff7",
+                "aerith"
+            ]
+        },
+        {
+            "author": "1u62m",
+            "id": "58770f29-8a68-484e-8a30-8dab9ae9b893",
+            "name": "Anna",
+            "description": "You where on a ship near guinea. The ship sank in a storm. You rescued Anna, one of the other passangers and you both stranded on a small lonley island.",
+            "slug": "anna-4",
+            "shareUrl": "https://venice.ai/c/anna-4",
+            "photoUrl": "https://outerface.venice.ai/api/characters/58770f29-8a68-484e-8a30-8dab9ae9b893/photo",
+            "createdAt": "2025-05-28T22:27:51.207Z",
+            "updatedAt": "2025-07-29T03:40:52.913Z",
+            "adult": false,
+            "featured": false,
+            "modelId": "venice-uncensored",
+            "webEnabled": true,
+            "stats": {
+                "averageRating": 2.5,
+                "imports": 1356,
+                "ratingCount": 4,
+                "ratingSum": 10,
+                "userRating": null
+            },
+            "tags": [
+                "role-play"
+            ]
+        },
+        {
+            "author": "1wc5d",
+            "id": "24a031b6-a4d1-4584-a4e1-5fe227422e9b",
+            "name": "Li",
+            "description": "A very rude chinese woman who doesn't like you at all.",
+            "slug": "li",
+            "shareUrl": "https://venice.ai/c/li",
+            "photoUrl": "https://outerface.venice.ai/api/characters/24a031b6-a4d1-4584-a4e1-5fe227422e9b/photo",
+            "createdAt": "2025-08-22T18:31:19.138Z",
+            "updatedAt": "2025-08-23T05:14:37.835Z",
+            "adult": false,
+            "featured": false,
+            "modelId": "venice-uncensored",
+            "webEnabled": true,
+            "stats": {
+                "averageRating": 3.857142857142857,
+                "imports": 1340,
+                "ratingCount": 7,
+                "ratingSum": 27,
+                "userRating": null
+            },
+            "tags": []
+        },
+        {
+            "author": "1l3s3",
+            "id": "41fda4ce-7457-4f99-9cd5-41355a560500",
+            "name": "Sable",
+            "description": "Sable, known by her alias \"Shadow,\" is a 27-year-old woman whose intense, haunted gaze hints at a lifetime of evasion and survival. Her lean, athletic build reflects years of training and living on the edge. With sharp features, high cheekbones, and piercing dark eyes that seem to drink in light, she has a striking yet elusive presence. Her jet-black hair, often tied in a braid or bun, frames her face with unruly strands that soften her sharp appearance. Scattered across her body are small, faded scars\u2014each a silent testament to the close calls and dangers she has narrowly escaped. She dresses in dark, practical clothing that allows her to vanish into the shadows, her preferred domain.",
+            "slug": "sable",
+            "shareUrl": "https://venice.ai/c/sable",
+            "photoUrl": "https://outerface.venice.ai/api/characters/41fda4ce-7457-4f99-9cd5-41355a560500/photo",
+            "createdAt": "2025-01-14T04:12:37.165Z",
+            "updatedAt": "2025-02-09T03:23:25.846Z",
+            "adult": false,
+            "featured": false,
+            "modelId": "zai-org-glm-4.7",
+            "webEnabled": false,
+            "stats": {
+                "averageRating": 4.5,
+                "imports": 1291,
+                "ratingCount": 2,
+                "ratingSum": 9,
+                "userRating": null
+            },
+            "tags": []
+        },
+        {
+            "author": "38ut5",
+            "id": "959530da-cf23-45c0-b916-7a0bc4225c2d",
+            "name": "Liv Morgan",
+            "description": "Liv Morgan is known for her fiery personality, athletic ability, and unapologetic attitude. She's a former WWE Women's World Champion.",
+            "slug": "liv-morgan",
+            "shareUrl": "https://venice.ai/c/liv-morgan",
+            "photoUrl": "https://outerface.venice.ai/api/characters/959530da-cf23-45c0-b916-7a0bc4225c2d/photo",
+            "createdAt": "2025-01-05T14:43:55.840Z",
+            "updatedAt": "2025-05-27T00:50:48.254Z",
+            "adult": false,
+            "featured": false,
+            "modelId": "zai-org-glm-4.7",
+            "webEnabled": true,
+            "stats": {
+                "averageRating": 3.5,
+                "imports": 1290,
+                "ratingCount": 2,
+                "ratingSum": 7,
+                "userRating": null
+            },
+            "tags": []
+        },
+        {
+            "author": "1c9d0",
+            "id": "4d3621dd-f52f-4859-b780-135d84878166",
+            "name": "Dylan, Game Master",
+            "description": "Dylan is a gamer in her early 30\u2019s. She loves writing adventures and fantasy worlds, and particularly loves DMing 5th edition D&D, though she\u2019ll run a campaign in about any system or setting. Loves \u201cimmersive storytelling,\u201d so expect more narrative driven sessions and less crunchy mechanics.",
+            "slug": "dylan-game-master",
+            "shareUrl": "https://venice.ai/c/dylan-game-master",
+            "photoUrl": "https://outerface.venice.ai/api/characters/4d3621dd-f52f-4859-b780-135d84878166/photo",
+            "createdAt": "2024-12-20T19:21:26.743Z",
+            "updatedAt": "2025-02-09T03:23:43.422Z",
+            "adult": false,
+            "featured": false,
+            "modelId": "llama-3.3-70b",
+            "webEnabled": false,
+            "stats": {
+                "averageRating": 3.25,
+                "imports": 1278,
+                "ratingCount": 4,
+                "ratingSum": 13,
+                "userRating": null
+            },
+            "tags": []
+        },
+        {
+            "author": "fa06j",
+            "id": "ba7bce91-1709-4e56-861e-8db4bb13a92f",
+            "name": "Clara Beaumont",
+            "description": "Clara, the 29-year-old high school librarian, is adored by the students. But, she often yearns for something more exciting. One day, a mysterious book with no title or author listed arrived at the library. Intrigued, Clara opened the book and discovered it was a magical artifact that granted the reader the ability to live out their dreams.",
+            "slug": "clara-beaumont",
+            "shareUrl": "https://venice.ai/c/clara-beaumont",
+            "photoUrl": "https://outerface.venice.ai/api/characters/ba7bce91-1709-4e56-861e-8db4bb13a92f/photo",
+            "createdAt": "2025-01-26T18:16:51.214Z",
+            "updatedAt": "2025-02-09T03:25:29.315Z",
+            "adult": false,
+            "featured": false,
+            "modelId": "llama-3.3-70b",
+            "webEnabled": false,
+            "stats": {
+                "averageRating": 3,
+                "imports": 1254,
+                "ratingCount": 3,
+                "ratingSum": 9,
+                "userRating": null
+            },
+            "tags": [
+                "role-play",
+                "fictional",
+                "fantasy",
+                "wholesome",
+                "scenario"
+            ]
+        },
+        {
+            "author": "1avad",
+            "id": "ebe443af-2d11-441b-843f-1e48357758e1",
+            "name": "Masterful  Prompter - Writer/Engineer",
+            "description": "I can assist you in getting masterful Ai chat or text output. Tell me what you want Ai to write, who's your audience, what format you'd like it in and any actions that might be needed. (While I can assist with text-to-image prompts I'm best with text-to-text)",
+            "slug": "masterful-prompter-writerengineer",
+            "shareUrl": "https://venice.ai/c/masterful-prompter-writerengineer",
+            "photoUrl": "https://outerface.venice.ai/api/characters/ebe443af-2d11-441b-843f-1e48357758e1/photo",
+            "createdAt": "2025-06-06T14:50:46.133Z",
+            "updatedAt": "2026-03-04T15:27:27.743Z",
+            "adult": false,
+            "featured": true,
+            "modelId": "olafangensan-glm-4.7-flash-heretic",
+            "webEnabled": true,
+            "stats": {
+                "averageRating": 5,
+                "imports": 1253,
+                "ratingCount": 5,
+                "ratingSum": 25,
+                "userRating": null
+            },
+            "tags": [
+                "ADULT",
+                "PromptEngineering",
+                "AI Assistant Problem Solver Collaborative Partner Analytical Thinker Innovative Strategist Adaptive Learner Empathetic Communicator Technical Advisor Creative Consultant Reliable Ally",
+                "AIControl"
+            ]
+        },
+        {
+            "author": "1bb2v",
+            "id": "b897f6df-25e5-4ed8-8511-1dd4257e2ee3",
+            "name": "Pisagor AI",
+            "description": "Pisagor AI | Your Personal Crypto Assistant\n\ud83e\udd16 Smart crypto analyses and market trends\n\ud83d\udcca Real-time insights and fundamental analysis support\n\ud83d\udca1 Not investment advice, just your knowledge companion!\"\n\n2. Daha ki\u015fisel ve samimi bir ton i\u00e7in:\n\"Pisagor AI | Your Crypto Companion\n\ud83d\udc4b Ask, and I\u2019ll analyze; explore trends and data with me.\n\ud83d\udcc8 Gain insights into the market for more informed decisions.\n\ud83d\udea8 Not investment advice, just a personal knowledge guide!\"\n\n3. Minimal ve sade bir yakla\u015f\u0131m i\u00e7in:\n\"Pisagor AI | Personal Crypto Assistant\n\ud83d\udd0d Analyzing trends, clarifying data.\n\ud83d\udcca Not investment advice, just your knowledge guide!\"",
+            "slug": "pisagor-ai",
+            "shareUrl": "https://venice.ai/c/pisagor-ai",
+            "photoUrl": "https://outerface.venice.ai/api/characters/b897f6df-25e5-4ed8-8511-1dd4257e2ee3/photo",
+            "createdAt": "2025-01-27T20:31:19.638Z",
+            "updatedAt": "2025-02-09T03:23:08.241Z",
+            "adult": false,
+            "featured": false,
+            "modelId": "llama-3.3-70b",
+            "webEnabled": true,
+            "stats": {
+                "averageRating": 3,
+                "imports": 1232,
+                "ratingCount": 2,
+                "ratingSum": 6,
+                "userRating": null
+            },
+            "tags": []
+        },
+        {
+            "author": "1o3jy",
+            "id": "a3f69218-8e58-40d4-9634-bcf6ba9e2503",
+            "name": "A.I.L.A. the Personal Trainer",
+            "description": "Wellness coach.",
+            "slug": "aila-the-personal-trainer",
+            "shareUrl": "https://venice.ai/c/aila-the-personal-trainer",
+            "photoUrl": "https://outerface.venice.ai/api/characters/a3f69218-8e58-40d4-9634-bcf6ba9e2503/photo",
+            "createdAt": "2025-03-22T21:42:02.272Z",
+            "updatedAt": "2025-03-25T14:40:47.312Z",
+            "adult": false,
+            "featured": false,
+            "modelId": "zai-org-glm-4.7",
+            "webEnabled": true,
+            "stats": {
+                "averageRating": 2,
+                "imports": 1215,
+                "ratingCount": 1,
+                "ratingSum": 2,
+                "userRating": null
+            },
+            "tags": [
+                "physiotherapy",
+                "wellness",
+                "Fitness",
+                "nutrition"
+            ]
+        },
+        {
+            "author": "btrzm",
+            "id": "4808a015-db2d-4bf1-8a46-cfad7f82f0e2",
+            "name": "Ava & Scarlett",
+            "description": "Your 18 year old neighbor Ava, and her best friend Scarlett, visit you at your cabin in the woods for the weekend. They had originally planned to examine the local flora and fauna for their biology project, but an unexpected snowstorm leaves everyone stuck inside. Tired of playing Monopoly and telling scary stories, Scarlett suggests a new game.",
+            "slug": "ava-scarlett",
+            "shareUrl": "https://venice.ai/c/ava-scarlett",
+            "photoUrl": "https://outerface.venice.ai/api/characters/4808a015-db2d-4bf1-8a46-cfad7f82f0e2/photo",
+            "createdAt": "2025-12-11T23:15:56.164Z",
+            "updatedAt": "2025-12-12T00:10:23.614Z",
+            "adult": false,
+            "featured": false,
+            "modelId": "zai-org-glm-4.6",
+            "webEnabled": false,
+            "stats": {
+                "averageRating": 4.666666666666667,
+                "imports": 1187,
+                "ratingCount": 6,
+                "ratingSum": 28,
+                "userRating": null
+            },
+            "tags": [
+                "Ava Nightingale",
+                "Scarlett Devine"
+            ]
+        },
+        {
+            "author": "3lmk5",
+            "id": "dfabcb44-aa1d-4613-9085-a806285d025f",
+            "name": "Emily, your best friend ",
+            "description": "The user's best friend since childhood is a woman named Emily. They are still very close, even though they're both 24 now. One day the user accidentally let it slip to Emily that the user used to have a crush on her. She confesses she had a crush on the user too. The scenario continues from there.",
+            "slug": "emily-your-best-friend",
+            "shareUrl": "https://venice.ai/c/emily-your-best-friend",
+            "photoUrl": "https://outerface.venice.ai/api/characters/dfabcb44-aa1d-4613-9085-a806285d025f/photo",
+            "createdAt": "2025-07-17T23:32:14.477Z",
+            "updatedAt": "2025-07-18T20:02:30.228Z",
+            "adult": false,
+            "featured": false,
+            "modelId": "venice-uncensored",
+            "webEnabled": false,
+            "stats": {
+                "averageRating": 4,
+                "imports": 1159,
+                "ratingCount": 2,
+                "ratingSum": 8,
+                "userRating": null
+            },
+            "tags": []
+        },
+        {
+            "author": "u1tgo",
+            "id": "fa69a26d-c7ee-4e19-88c0-d4a4e2291b7f",
+            "name": "Dwight Schrute",
+            "description": "\"Failure of any kind is failure.\"",
+            "slug": "dwight-schrute",
+            "shareUrl": "https://venice.ai/c/dwight-schrute",
+            "photoUrl": "https://outerface.venice.ai/api/characters/fa69a26d-c7ee-4e19-88c0-d4a4e2291b7f/photo",
+            "createdAt": "2024-12-22T22:04:31.743Z",
+            "updatedAt": "2025-11-03T18:05:27.208Z",
+            "adult": false,
+            "featured": false,
+            "modelId": "zai-org-glm-4.6",
+            "webEnabled": false,
+            "stats": {
+                "averageRating": 3.5,
+                "imports": 1123,
+                "ratingCount": 2,
+                "ratingSum": 7,
+                "userRating": null
+            },
+            "tags": []
+        },
+        {
+            "author": "1thcf",
+            "id": "87975604-8edd-4dd6-a2f1-05a2b5bc2cb5",
+            "name": "Kirsten",
+            "description": "Kirsten Hanson is a striking 23-year-old with long red hair and a statuesque figure that looks sculpted \u2014 and she works obsessively to keep it that way. She takes pride in her appearance but is all too aware of how much unwanted attention it draws. Beneath the surface, she\u2019s sharply intelligent: a graduate student in MIT\u2019s highly selective economics program, with a particular interest in quantitative modeling and policy design.\n\nOriginally from Peachtree City, Georgia, Kirsten has little patience for Boston winters and even less for men who fixate on her looks. She\u2019s developed a protective armor of dry wit and sarcasm that surfaces when strangers approach her, but beneath it, she\u2019s warm, loyal, and deeply values genuine connection. Once someone earns her trust and shows they\u2019re sincere, she warms quickly and becomes playful, affectionate, and teasing \u2014 though her biting humor still surfaces now and then for fun.\n\nShe shares a house in Cambridgeport with two housemates: Laura, her best friend and landlady, and Julie, an aspiring actress currently working at a local theater.\n\nKirsten is selective in relationships. She\u2019s not inexperienced sexually, but she only becomes physically intimate with men she truly cares for \u2014 and those have been rare. She\u2019s frank, emotionally self-aware, and prefers honest conversation to emotional games.",
+            "slug": "kirsten",
+            "shareUrl": "https://venice.ai/c/kirsten",
+            "photoUrl": "https://outerface.venice.ai/api/characters/87975604-8edd-4dd6-a2f1-05a2b5bc2cb5/photo",
+            "createdAt": "2025-06-19T04:34:23.123Z",
+            "updatedAt": "2025-06-23T23:12:59.055Z",
+            "adult": false,
+            "featured": false,
+            "modelId": "venice-uncensored",
+            "webEnabled": true,
+            "stats": {
+                "averageRating": 3.75,
+                "imports": 1102,
+                "ratingCount": 4,
+                "ratingSum": 15,
+                "userRating": null
+            },
+            "tags": []
+        }
+    ]
+}

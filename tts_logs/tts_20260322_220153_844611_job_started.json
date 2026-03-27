@@ -1,0 +1,10 @@
+{
+    "input_len": 7932,
+    "chunks": 5,
+    "settings": {
+        "enabled": true,
+        "model": "tts-kokoro",
+        "voice": "af_bella",
+        "speed": 0.9
+    }
+}
