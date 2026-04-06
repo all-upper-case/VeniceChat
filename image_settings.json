@@ -1,10 +1,10 @@
 {
     "num_inference_steps": 8,
-    "width": 1216,
-    "height": 1600,
-    "res_tier": "hd",
+    "width": 1536,
+    "height": 2048,
+    "res_tier": "2k",
     "aspect_ratio": "3:4",
     "guided_mode": false,
-    "art_style": "Watercolor",
+    "art_style": "3D Render",
     "negative_styles": ""
 }

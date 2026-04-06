@@ -1,4 +1,4 @@
 {
-    "model": "mistral-31-24b",
-    "context_depth": 12
+    "model": "zai-org-glm-5",
+    "context_depth": 6
 }

@@ -2,7 +2,7 @@
     "model": "kimi-k2-5",
     "include_venice_system_prompt": false,
     "vision_high_res": true,
-    "temperature": 1,
+    "temperature": 0.9,
     "max_tokens": 6000,
     "reasoning_effort": "high",
     "frequency_penalty": 0,

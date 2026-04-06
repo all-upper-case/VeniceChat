@@ -1,4 +1,4 @@
-/* Last Updated: 2026-02-17 13:00:00 */
+/* Last Updated: 2026-03-27 18:00:00 */
 :root {
     --bg-dark: #121212;
     --bg-sidebar: #0a0a0a;
@@ -156,6 +156,29 @@ body {
     font-size: 0.7em; font-weight: bold; margin-left: 5px; vertical-align: middle;
 }
 
+/* COST CALCULATION DISPLAY */
+.cost-toggle {
+    display: inline-block;
+    margin-top: 4px;
+    padding: 2px 4px;
+    border-radius: 4px;
+    transition: background 0.2s, color 0.2s;
+}
+.cost-toggle:hover {
+    background: rgba(16, 185, 129, 0.15);
+    color: #fff !important;
+}
+.cost-details {
+    background: rgba(0, 0, 0, 0.3);
+    border-left: 2px solid var(--accent) !important;
+    padding: 8px !important;
+    margin-top: 6px !important;
+    border-radius: 0 4px 4px 0;
+    font-family: 'Cascadia Code', 'Source Code Pro', monospace;
+    font-size: 0.8em !important;
+    line-height: 1.4;
+}
+
 /* REASONING / THINKING BLOCK */
 .reasoning-block {
     background: rgba(0,0,0,0.15);
@@ -200,6 +223,63 @@ body {
     padding: 0 2px;
     text-decoration: line-through;
     opacity: 0.8;
+}
+
+/* NAVIGATION WIDGET */
+#chat-nav-widget {
+    position: fixed;
+    right: 20px;
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    z-index: 2000;
+    background: rgba(0, 0, 0, 0.4);
+    padding: 8px;
+    border-radius: 30px;
+    border: 1px solid var(--border);
+    backdrop-filter: blur(4px);
+    transition: opacity 0.3s;
+}
+
+@media (max-width: 700px) {
+    #chat-nav-widget {
+        right: 10px;
+        padding: 5px;
+    }
+    .nav-btn {
+        width: 35px !important;
+        height: 35px !important;
+        font-size: 1em !important;
+    }
+}
+
+.nav-btn {
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    border: 1px solid var(--border);
+    background: var(--bg-card);
+    color: var(--text-main);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2em;
+    transition: all 0.2s;
+    opacity: 0.8;
+}
+
+.nav-btn:hover {
+    background: var(--primary);
+    border-color: var(--primary);
+    opacity: 1;
+    transform: scale(1.1);
+}
+
+.nav-btn:active {
+    transform: scale(0.95);
 }
 
 /* IMAGES */
@@ -346,6 +426,23 @@ details[open] summary::after { content: "-"; }
 .ana-row:hover { border-color: var(--danger); }
 .ana-bar {
     position: absolute; top: 0; left: 0; height: 100%; background: rgba(59, 130, 246, 0.15); border-right: 2px solid rgba(59, 130, 246, 0.4); z-index: 1; transition: width 0.3s;
+}
+
+/* AUDIT WORKSPACE */
+.audit-tab-btn {
+    flex: 1; padding: 10px; background: #222; border: 1px solid #444; color: #888;
+    border-radius: 6px; cursor: pointer; font-size: 0.8em; transition: all 0.2s;
+}
+.audit-tab-btn.active {
+    background: var(--accent); color: white; border-color: var(--accent);
+}
+.audit-source-msg, .audit-archive-batch {
+    background: #1a1a1a; border: 1px solid #333; padding: 10px; border-radius: 8px;
+    margin-bottom: 10px; line-height: 1.4;
+}
+.audit-source-msg .meta, .audit-archive-batch .meta {
+    font-size: 0.75em; color: var(--accent); font-weight: bold; margin-bottom: 5px;
+    display: flex; justify-content: space-between;
 }
 
 /* COMPARISON MODE */

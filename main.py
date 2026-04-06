@@ -1078,6 +1078,54 @@ def undo_ai_refine():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+@app.route('/find_replace_message', methods=['POST'])
+def find_replace_message():
+    try:
+        req = request.json
+        idx = req.get('index')
+        find_str = req.get('find', '')
+        replace_str = req.get('replace', '')
+
+        if not find_str:
+            return jsonify({"error": "Nothing to find."}), 400
+
+        path = get_active_chat_path()
+        data = load_chat_data(path)
+
+        if idx < 0 or idx >= len(data["messages"]):
+            return jsonify({"error": "Invalid message index"}), 400
+
+        msg = data["messages"][idx]
+        content = msg.get("content", "")
+
+        if isinstance(content, str):
+            if find_str in content:
+                msg["original_content"] = content
+                msg["content"] = content.replace(find_str, replace_str)
+                save_chat_data(path, data)
+                return jsonify({"success": True, "new_content": msg["content"]})
+            else:
+                return jsonify({"error": f"'{find_str}' not found in message."}), 404
+        elif isinstance(content, list):
+            # Handle vision content lists
+            changed = False
+            for part in content:
+                if part.get("type") == "text" and find_str in part.get("text", ""):
+                    if not changed:
+                        msg["original_content"] = json.loads(json.dumps(content))
+                    part["text"] = part["text"].replace(find_str, replace_str)
+                    changed = True
+            
+            if changed:
+                save_chat_data(path, data)
+                return jsonify({"success": True, "new_content": content})
+            else:
+                return jsonify({"error": f"'{find_str}' not found in message text."}), 404
+
+        return jsonify({"error": "Unsupported message format."}), 400
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 @app.route('/get_banned_phrases', methods=['GET'])
 def get_banned_phrases():
     return jsonify({"banned_phrases": read_text(FILES["banned_phrases"])})
@@ -1573,10 +1621,8 @@ def generate_image():
     try:
         fh = {"Authorization": f"Key {FAL_KEY}", "Content-Type": "application/json"}
 
-        # Z-Image Turbo specific defaults and constraints
-        # Hard-coded to 8 as per Turbo optimization documentation
-        steps = 8
-
+        # Z-Image Turbo specific optimizations: 8 steps is mandatory for quality/speed ratio.
+        # It does not accept CFG or other standard SD parameters.
         payload = {
             "prompt": prompt, 
             "num_inference_steps": 8, 
@@ -1762,14 +1808,21 @@ def generate_chat_title():
     try:
         data = request.json
         model_id = data.get('model', 'venice-uncensored')
+        range_data = data.get('range', {"start": 1, "end": 15})
+        
         path = get_active_chat_path()
         chat_data = load_chat_data(path)
 
-        # Get first 15 messages for context
-        history = chat_data["messages"][1:16]
+        # Get text messages
+        all_text_msgs = [m for m in chat_data["messages"] if m["role"] != "system" and not (isinstance(m.get('content', ''), str) and m.get('content', '').startswith("__IMG_JSON__"))]
+        
+        start = max(0, range_data.get('start', 1) - 1)
+        end = min(len(all_text_msgs), range_data.get('end', 15))
+        
+        history = all_text_msgs[start:end]
         history_text = "\n".join([f"{m['role'].upper()}: {get_text_content(m)[:500]}" for m in history])
 
-        prompt = f"Based on the messages below, output a four-word description or summary that sums up the topic of the conversation. Output ONLY the four-word title. Do not include any formatting or additional text.\n\nCONVERSATION:\n{history_text}"
+        prompt = f"Based on the conversation snippet below (messages {start+1} to {end}), output a short, descriptive four-word title that summarizes the topic. Output ONLY the four-word title. Do not include any formatting, preamble, or additional text.\n\nCONVERSATION SNIPPET:\n{history_text}"
 
         headers = {"Authorization": f"Bearer {VENICE_API_KEY}"}
         payload = {
@@ -1783,8 +1836,9 @@ def generate_chat_title():
         resp = r.json()
 
         if 'choices' in resp:
-            title = resp['choices'][0]['message']['content'].strip().replace(" ", "_")
-            # Clean title for filename
+            title = resp['choices'][0]['message']['content'].strip()
+            # Basic cleanup for filename safety
+            title = title.replace(" ", "_")
             title = "".join([c for c in title if c.isalnum() or c == '_'])
             return jsonify({"success": True, "title": title, "old_filename": os.path.basename(path)})
         return jsonify({"error": "API Error"}), 500

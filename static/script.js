@@ -132,7 +132,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const mRes = await fetch('/venice_models');
             availableModels = await mRes.json();
 
-            // Populate Auto-Rename model selector
+            // Populate Rename modal model selector
             const renameSelect = document.getElementById('rename-model-select');
             if (renameSelect && availableModels) {
                 for (const group in availableModels) {
@@ -531,6 +531,63 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
     }
+
+    let activeFindReplaceIndex = -1;
+    function handleFindReplace(index) {
+        activeFindReplaceIndex = index;
+        const modal = document.getElementById('find-replace-modal');
+        if (modal) {
+            modal.style.display = 'block';
+            const findIn = document.getElementById('fr-find');
+            if (findIn) {
+                findIn.value = '';
+                findIn.focus();
+            }
+            const replaceIn = document.getElementById('fr-replace');
+            if (replaceIn) replaceIn.value = '';
+        }
+    }
+
+    safeBind('close-find-replace-x', 'click', () => {
+        const modal = document.getElementById('find-replace-modal');
+        if (modal) modal.style.display = 'none';
+        activeFindReplaceIndex = -1;
+    });
+
+    safeBind('fr-cancel', 'click', () => {
+        const modal = document.getElementById('find-replace-modal');
+        if (modal) modal.style.display = 'none';
+        activeFindReplaceIndex = -1;
+    });
+
+    safeBind('fr-submit', 'click', async () => {
+        const findStr = document.getElementById('fr-find').value;
+        const replaceStr = document.getElementById('fr-replace').value;
+        if (!findStr) return;
+
+        const index = activeFindReplaceIndex;
+        const modal = document.getElementById('find-replace-modal');
+
+        try {
+            const res = await fetch('/find_replace_message', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ index: index, find: findStr, replace: replaceStr })
+            });
+            const d = await res.json();
+            if (d.success) {
+                if (modal) modal.style.display = 'none';
+                activeFindReplaceIndex = -1;
+                // Treat it like a refined message to show diff if desired
+                diffModeMsgs.add(index);
+                await loadHistory();
+            } else {
+                alert("Error: " + d.error);
+            }
+        } catch (e) {
+            alert("Failed to perform replacement.");
+        }
+    });
 
     safeBind('refine-guidance-cancel', 'click', () => {
         if (refineGuidanceModal) refineGuidanceModal.style.display = 'none';
@@ -1016,8 +1073,33 @@ document.addEventListener('DOMContentLoaded', () => {
     let lastWfmText = "";
     let lastWfmUsage = null;
 
-    function renderChat() {
+    function getModelPricing(modelId) {
+        if (!availableModels) return null;
+        for (const group in availableModels) {
+            const found = availableModels[group].find(m => m.id === modelId);
+            if (found && found.pricing) {
+                const parts = found.pricing.split('(');
+                const basePrices = parts[0].replace(/[\$\s]/g, '').split('/');
+                const inputRate = parseFloat(basePrices[0]) || 0;
+                const outputRate = parseFloat(basePrices[1]) || 0;
+                
+                let cacheRate = inputRate * 0.5; // Default 50% for Venice
+                if (parts.length > 1) {
+                    const cachePart = parts[1].match(/\$?([0-9.]+)/);
+                    if (cachePart) cacheRate = parseFloat(cachePart[1]);
+                }
+                return { input: inputRate, output: outputRate, cache: cacheRate };
+            }
+        }
+        return null;
+    }
+
+    function renderChat(forceScroll = false) {
         if (!chatbox) return;
+        
+        // Save current scroll state
+        const isAtBottom = chatbox.scrollHeight - chatbox.scrollTop <= chatbox.clientHeight + 100;
+        
         chatbox.innerHTML = '';
         runningInput = 0;
         runningOutput = 0;
@@ -1197,6 +1279,11 @@ document.addEventListener('DOMContentLoaded', () => {
             const refineBtn = document.createElement('button'); refineBtn.className = 'msg-btn'; refineBtn.textContent = 'AI Refine';
             refineBtn.onclick = () => handleAIRefine(idx);
 
+            const findReplaceBtn = document.createElement('button'); 
+            findReplaceBtn.className = 'msg-btn'; 
+            findReplaceBtn.textContent = 'Find/Replace';
+            findReplaceBtn.onclick = () => handleFindReplace(idx);
+
             const delBtn = document.createElement('button'); 
             delBtn.className = 'msg-btn delete-msg-btn'; 
             delBtn.textContent = 'Delete';
@@ -1224,7 +1311,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 btnRow.append(ttsBtn);
             }
 
-            btnRow.append(branchBtn, refineBtn, delBtn);
+            btnRow.append(branchBtn, refineBtn, findReplaceBtn, delBtn);
             toolsPanel.appendChild(btnRow);
 
             // After appending everything to toolsPanel, update state if this was playing
@@ -1308,6 +1395,23 @@ document.addEventListener('DOMContentLoaded', () => {
                         if (cachedTokens > 0) {
                             statHtml += `<br><span style="font-size:0.85em; color:#10b981;">Cached: ${cachedTokens} (${Math.round((cachedTokens/u.prompt_tokens)*100)}%)</span>`;
                         }
+
+                        // COST CALCULATION
+                        const pricing = getModelPricing(msg.model);
+                        if (pricing) {
+                            const inputCost = ((u.prompt_tokens - cachedTokens) / 1000000) * pricing.input;
+                            const cacheCost = (cachedTokens / 1000000) * pricing.cache;
+                            const outputCost = (u.completion_tokens / 1000000) * pricing.output;
+                            const totalCost = inputCost + cacheCost + outputCost;
+
+                            statHtml += `<br><span class="cost-toggle" style="cursor:pointer; text-decoration:underline dashed; color:var(--accent);" onclick="this.nextElementSibling.style.display = (this.nextElementSibling.style.display === 'none' ? 'block' : 'none')">Cost: ${totalCost.toFixed(5)}</span>`;
+                            statHtml += `<div class="cost-details" style="display:none; font-size:0.85em; color:var(--text-dim); margin-top:4px; padding-left:10px; border-left:1px solid #444;">`;
+                            statHtml += `├ Input: ${inputCost.toFixed(5)}<br>`;
+                            if (cachedTokens > 0) statHtml += `├ Cache: ${cacheCost.toFixed(5)}<br>`;
+                            statHtml += `└ Output: ${outputCost.toFixed(5)}`;
+                            statHtml += `</div>`;
+                        }
+
                     } else if (msg.role === 'user') {
                         statHtml += `<br>WFM Usage: In:${u.prompt_tokens} Out:${u.completion_tokens}`;
                     }
@@ -1335,7 +1439,10 @@ document.addEventListener('DOMContentLoaded', () => {
             div.appendChild(toolsPanel);
             chatbox.appendChild(div);
         });
-        chatbox.scrollTop = chatbox.scrollHeight;
+
+        if (forceScroll || (isAtBottom && !isGenerating)) {
+            chatbox.scrollTop = chatbox.scrollHeight;
+        }
     }
 
     function formatSummaryText(text) {
@@ -2080,21 +2187,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const bEntry = {role: 'assistant', content: fullB, timestamp: new Date().toISOString()};
             if (finalUsageB) bEntry.usage = finalUsageB;
             compareHistoryB.push(bEntry);
-
-            const renderUsage = (usage, compUsage) => {
-                let html = `Session Tokens: <span style="color:inherit">${compUsage.prompt + compUsage.comp}</span> (In: ${compUsage.prompt} | Out: ${compUsage.comp})`;
-                if (usage && usage.prompt_tokens_details && usage.prompt_tokens_details.cached_tokens) {
-                    html += `<br><span style="color:#10b981;">Latest request cached: ${usage.prompt_tokens_details.cached_tokens}</span>`;
-                }
-                return html;
-            };
-
-            if (colA_stats) colA_stats.innerHTML = renderUsage(finalUsageA, compUsageA);
-            if (colB_stats) colB_stats.innerHTML = renderUsage(finalUsageB, compUsageB);
-
-            compareContainerEl.querySelector('#keep-btn-a').style.display = 'block';
-            compareContainerEl.querySelector('#keep-btn-b').style.display = 'block';
-
+            
+            // Note: Removed auto-scroll here to respect user position
         } catch(e) { 
             astDivA.textContent = "Error"; astDivB.textContent = "Error"; 
         } finally {
@@ -2165,6 +2259,38 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch(e) { alert("Failed to load models."); }
     }
 
+    // --- NAVIGATION WIDGET LOGIC ---
+    safeBind('nav-top', 'click', () => {
+        chatbox.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+
+    safeBind('nav-bottom', 'click', () => {
+        chatbox.scrollTo({ top: chatbox.scrollHeight, behavior: 'smooth' });
+    });
+
+    safeBind('nav-up', 'click', () => {
+        // Find current message in view and jump to previous
+        const msgs = document.querySelectorAll('.message');
+        for (let i = msgs.length - 1; i >= 0; i--) {
+            const rect = msgs[i].getBoundingClientRect();
+            if (rect.top < 0) {
+                msgs[i].scrollIntoView({ behavior: 'smooth' });
+                break;
+            }
+        }
+    });
+
+    safeBind('nav-down', 'click', () => {
+        const msgs = document.querySelectorAll('.message');
+        for (let i = 0; i < msgs.length; i++) {
+            const rect = msgs[i].getBoundingClientRect();
+            if (rect.top > chatbox.clientHeight) {
+                msgs[i].scrollIntoView({ behavior: 'smooth' });
+                break;
+            }
+        }
+    });
+
     async function triggerGen(msg, customModel = null, timestamp = null) {
         lastWfmText = "";
         lastWfmUsage = null;
@@ -2204,6 +2330,9 @@ document.addEventListener('DOMContentLoaded', () => {
                        try{ 
                            const d = JSON.parse(l.substring(6)); 
 
+                           // Check if user is at bottom before updating content to handle sticky scroll
+                           const isAtBottom = chatbox.scrollHeight - chatbox.scrollTop <= chatbox.clientHeight + 100;
+
                            if(d.status) {
                                if (statusMsg) {
                                    statusMsg.innerHTML = `<div class="spinner"></div> <span style="color:var(--purple)">${d.status}</span>`;
@@ -2227,6 +2356,8 @@ document.addEventListener('DOMContentLoaded', () => {
                                }
                                reasoning += d.reasoning;
                                rBlock.querySelector('.reasoning-content').textContent = reasoning;
+                               
+                               if (isAtBottom) chatbox.scrollTop = chatbox.scrollHeight;
                            }
 
                            if(d.content) {
@@ -2235,7 +2366,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                    contentDiv = document.createElement('div');
                                    contentDiv.style.cssText = "white-space:pre-wrap; font-family:inherit;";
                                    div.appendChild(contentDiv);
-                                   // Auto-collapse reasoning when content starts
+                                   
                                    if(rBlock) {
                                        rBlock.querySelector('.reasoning-content').style.display = 'none';
                                        rBlock.querySelector('.toggle-icon').textContent = '▼';
@@ -2250,6 +2381,8 @@ document.addEventListener('DOMContentLoaded', () => {
                                }
                                full += d.content;
                                contentDiv.innerHTML = typeof marked !== 'undefined' ? marked.parse(full) : full;
+                               
+                               if (isAtBottom) chatbox.scrollTop = chatbox.scrollHeight;
                            }
 
                            if(d.error) {
@@ -2266,7 +2399,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
 
                 if (isAtBottom) {
-                    chatbox.scrollTop = chatbox.scrollHeight;
+                    // We remove this to give user total control during stream
+                    // chatbox.scrollTop = chatbox.scrollHeight;
                 }
             }
             await loadHistory();
@@ -2347,10 +2481,136 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    window.renameChat = async (old) => {
-        const n = prompt("Rename:", old.replace('.json',''));
-        if(n) { await fetch('/rename_chat', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({old:old, new:n})}); loadSidebar(); }
+    let activeRenameFile = null;
+
+    window.renameChat = async (file) => {
+        activeRenameFile = file;
+        const modal = document.getElementById('rename-modal');
+        const input = document.getElementById('manual-rename-input');
+        const title = document.getElementById('rename-modal-title');
+        const stats = document.getElementById('rename-stats');
+        const startIn = document.getElementById('rename-start');
+        const endIn = document.getElementById('rename-end');
+
+        if (!modal || !input) return;
+
+        title.textContent = `Rename: ${file.replace('.json', '').replace(/_/g, ' ')}`;
+        input.value = file.replace('.json', '').replace(/_/g, ' ');
+
+        // If this is the active chat, we can show stats
+        const activeMeta = await fetch('/sidebar_data').then(r => r.json());
+        if (activeMeta.active_chat === file) {
+            const textMsgCount = chatHistory.filter(m => m.role !== 'system' && !(typeof m.content === 'string' && m.content.startsWith('__IMG_JSON__'))).length;
+            if (stats) stats.textContent = `${textMsgCount} messages total`;
+            if (startIn) { 
+                startIn.value = 1; 
+                startIn.max = textMsgCount; 
+            }
+            if (endIn) { 
+                endIn.value = Math.min(15, textMsgCount); 
+                endIn.max = textMsgCount; 
+            }
+        } else {
+            if (stats) stats.textContent = "";
+            if (startIn) startIn.value = 1;
+            if (endIn) endIn.value = 15;
+        }
+
+        modal.style.display = 'block';
+        input.focus();
     };
+
+    safeBind('close-rename-x', 'click', () => {
+        document.getElementById('rename-modal').style.display = 'none';
+        activeRenameFile = null;
+    });
+
+    safeBind('manual-rename-submit', 'click', async () => {
+        const newName = document.getElementById('manual-rename-input').value.trim();
+        if (!newName || !activeRenameFile) return;
+
+        try {
+            const res = await fetch('/rename_chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ old: activeRenameFile, new: newName })
+            });
+            const d = await res.json();
+            if (d.success) {
+                document.getElementById('rename-modal').style.display = 'none';
+                activeRenameFile = null;
+                await loadSidebar();
+            }
+        } catch (e) {
+            alert("Failed to rename chat.");
+        }
+    });
+
+    safeBind('ai-rename-submit', 'click', async () => {
+        const btn = document.getElementById('ai-rename-submit');
+        const modelSelect = document.getElementById('rename-model-select');
+        const startIn = document.getElementById('rename-start');
+        const endIn = document.getElementById('rename-end');
+
+        if (!btn || !modelSelect || !activeRenameFile) return;
+
+        // Ensure we are operating on the chat being renamed
+        const activeMeta = await fetch('/sidebar_data').then(r => r.json());
+        if (activeMeta.active_chat !== activeRenameFile) {
+            if (confirm("AI Renaming requires loading the chat first. Load this chat now?")) {
+                await loadChat(activeRenameFile);
+                // After loading, the range might need adjustment
+                const textMsgCount = chatHistory.filter(m => m.role !== 'system' && !(typeof m.content === 'string' && m.content.startsWith('__IMG_JSON__'))).length;
+                if (startIn) startIn.value = 1;
+                if (endIn) endIn.value = Math.min(15, textMsgCount);
+            } else {
+                return;
+            }
+        }
+
+        const ogText = btn.textContent;
+        btn.textContent = "AI is thinking..."; btn.disabled = true;
+
+        try {
+            // Calculate range indices based on msg count
+            const textMsgs = chatHistory.filter(m => m.role !== 'system' && !(typeof m.content === 'string' && m.content.startsWith('__IMG_JSON__')));
+            const startNum = parseInt(startIn.value) || 1;
+            const endNum = parseInt(endIn.value) || 15;
+            
+            // We'll pass the range to generate_chat_title (we need to update main.py for this)
+            const res = await fetch('/generate_chat_title', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    model: modelSelect.value,
+                    range: { start: startNum, end: endNum }
+                })
+            });
+            const d = await res.json();
+
+            if (d.success) {
+                const finalName = prompt("AI suggested title. Click OK to apply or edit it below:", d.title);
+                if (finalName) {
+                    const renRes = await fetch('/rename_chat', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ old: activeRenameFile, new: finalName })
+                    });
+                    if (renRes.ok) {
+                        document.getElementById('rename-modal').style.display = 'none';
+                        activeRenameFile = null;
+                        await loadSidebar();
+                    }
+                }
+            } else {
+                alert("Rename Error: " + d.error);
+            }
+        } catch (e) {
+            console.error(e);
+            alert("Failed to auto-rename.");
+        }
+        btn.textContent = ogText; btn.disabled = false;
+    });
     window.deleteChat = async (file) => {
         if(confirm("Delete?")) { await fetch('/delete_chat', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({filename:file})}); loadSidebar(); }
     };
@@ -2475,12 +2735,11 @@ document.addEventListener('DOMContentLoaded', () => {
             setVal('set-bg-color', bgColor);
             applyInterfaceSettings(fontSize, bgColor);
 
-            const w = d.image_gen.width || 1024; const h = d.image_gen.height || 1024;
+            setVal('set-ar', d.image_gen.aspect_ratio || "3:4");
             const resTier = d.image_gen.res_tier || "standard";
             const resRadio = document.querySelector(`input[name="res-tier"][value="${resTier}"]`);
             if (resRadio) resRadio.checked = true;
 
-            setVal('set-ar', d.image_gen.aspect_ratio || "3:4");
             guidedModeEnabled = d.image_gen.guided_mode || false;
             setCheck('set-guided', guidedModeEnabled);
 
@@ -2768,41 +3027,6 @@ document.addEventListener('DOMContentLoaded', () => {
         loadHistory(); 
         const sb = document.getElementById('sidebar');
         if (sb) sb.classList.add('hidden'); 
-    });
-
-    safeBind('auto-rename-btn', 'click', async () => {
-        const btn = document.getElementById('auto-rename-btn');
-        const modelSelect = document.getElementById('rename-model-select');
-        if (!btn || !modelSelect) return;
-
-        const ogText = btn.textContent;
-        btn.textContent = "⌛"; btn.disabled = true;
-
-        try {
-            const res = await fetch('/generate_chat_title', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ model: modelSelect.value })
-            });
-            const d = await res.json();
-
-            if (d.success) {
-                await fetch('/rename_chat', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ old: d.old_filename, new: d.title })
-                });
-                await loadSidebar();
-                // We don't need to reload history as the content hasn't changed, 
-                // but the sidebar needs to reflect the new name.
-            } else {
-                alert("Rename Error: " + d.error);
-            }
-        } catch(e) {
-            console.error(e);
-            alert("Failed to auto-rename.");
-        }
-        btn.textContent = ogText; btn.disabled = false;
     });
 
     safeBind('expand-main-prompt', 'click', () => { 
