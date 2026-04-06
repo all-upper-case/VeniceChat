@@ -607,6 +607,53 @@ def build_context(chat_data, user_query=None, current_model=None):
 
     return context
 
+# --- SECURITY KEY: Change this to something private ---
+SECRET_KEY = "JosieSecret123"
+
+@app.route('/update-files', methods=['POST'])
+def update_files():
+    # 1. Security Check
+    if request.headers.get('X-Secret-Key') != SECRET_KEY:
+        return "Unauthorized", 401
+
+    # 2. Get the raw text from the Shortcut
+    content = request.get_data(as_text=True)
+    if not content:
+        return jsonify({"status": "error", "message": "No data received"}), 400
+
+    updated_files = []
+    # 3. The 'Scissors' Logic: Split text by the filename tags
+    # regex matches ---FILE:path/to/file---
+    parts = re.split(r'---FILE:(.*?)---', content)
+
+    # parts[0] is everything before the first tag (usually empty)
+    # The rest alternates: [filename, code, filename, code...]
+    for i in range(1, len(parts), 2):
+        filepath = parts[i].strip()
+        code = parts[i+1].strip()
+
+        if not filepath:
+            continue
+
+        # Handle subdirectories (e.g., static/script.js)
+        folder = os.path.dirname(filepath)
+        if folder and not os.path.exists(folder):
+            os.makedirs(folder, exist_ok=True)
+
+        # 4. Overwrite the file
+        try:
+            with open(filepath, 'w', encoding='utf-8') as f:
+                f.write(code)
+            updated_files.append(filepath)
+        except Exception as e:
+            print(f"Error updating {filepath}: {e}")
+
+    return jsonify({
+        "status": "success",
+        "updated": updated_files,
+        "message": f"Successfully updated {len(updated_files)} files."
+    })
+
 # --- ROUTES ---
 
 @app.route('/')
@@ -1115,7 +1162,7 @@ def find_replace_message():
                         msg["original_content"] = json.loads(json.dumps(content))
                     part["text"] = part["text"].replace(find_str, replace_str)
                     changed = True
-            
+
             if changed:
                 save_chat_data(path, data)
                 return jsonify({"success": True, "new_content": content})
@@ -1809,16 +1856,16 @@ def generate_chat_title():
         data = request.json
         model_id = data.get('model', 'venice-uncensored')
         range_data = data.get('range', {"start": 1, "end": 15})
-        
+
         path = get_active_chat_path()
         chat_data = load_chat_data(path)
 
         # Get text messages
         all_text_msgs = [m for m in chat_data["messages"] if m["role"] != "system" and not (isinstance(m.get('content', ''), str) and m.get('content', '').startswith("__IMG_JSON__"))]
-        
+
         start = max(0, range_data.get('start', 1) - 1)
         end = min(len(all_text_msgs), range_data.get('end', 15))
-        
+
         history = all_text_msgs[start:end]
         history_text = "\n".join([f"{m['role'].upper()}: {get_text_content(m)[:500]}" for m in history])
 
