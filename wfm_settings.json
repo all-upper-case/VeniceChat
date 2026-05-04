@@ -1,5 +1,0 @@
-{
-    "model": "google-gemma-3-27b-it",
-    "temperature": 0.8,
-    "context_depth": 12
-}

@@ -1,0 +1,152 @@
+{
+    "transactions": [
+        {
+            "timestamp": "2026-04-27T14:55:18.791164",
+            "feature": "Chat Response",
+            "model": "kimi-k2-6",
+            "usage": {
+                "prompt_tokens": 25849,
+                "completion_tokens": 7454,
+                "total_tokens": 33303,
+                "prompt_tokens_details": {
+                    "cached_tokens": 0
+                },
+                "breakdown": {
+                    "summary": 7691,
+                    "system": 2319,
+                    "raw": 15839
+                }
+            },
+            "cost": 0.04056444,
+            "balance_after": "5.42962254",
+            "chat_file": "Vespers_Secret_Sexual_Tutelage.json"
+        },
+        {
+            "timestamp": "2026-04-27T15:03:49.278195",
+            "feature": "Chat Response",
+            "model": "kimi-k2-6",
+            "usage": {
+                "prompt_tokens": 24210,
+                "completion_tokens": 2517,
+                "total_tokens": 26727,
+                "prompt_tokens_details": {
+                    "cached_tokens": 0
+                },
+                "breakdown": {
+                    "summary": 8205,
+                    "system": 2450,
+                    "raw": 13555
+                }
+            },
+            "cost": 0.0223671,
+            "balance_after": "5.37567183",
+            "chat_file": "Vespers_Secret_Sexual_Tutelage.json"
+        },
+        {
+            "timestamp": "2026-04-27T15:14:51.449824",
+            "feature": "Chat Response",
+            "model": "kimi-k2-6",
+            "usage": {
+                "prompt_tokens": 25417,
+                "completion_tokens": 5222,
+                "total_tokens": 30639,
+                "prompt_tokens_details": {
+                    "cached_tokens": 0
+                },
+                "breakdown": {
+                    "summary": 8196,
+                    "system": 2590,
+                    "raw": 14632
+                }
+            },
+            "cost": 0.03251052,
+            "balance_after": "5.34592358",
+            "chat_file": "Vespers_Secret_Sexual_Tutelage.json"
+        },
+        {
+            "timestamp": "2026-04-27T15:23:36.765515",
+            "feature": "Chat Response",
+            "model": "kimi-k2-6",
+            "usage": {
+                "prompt_tokens": 24839,
+                "completion_tokens": 4140,
+                "total_tokens": 28979,
+                "prompt_tokens_details": {
+                    "cached_tokens": 0
+                },
+                "breakdown": {
+                    "summary": 8219,
+                    "system": 1886,
+                    "raw": 14734
+                }
+            },
+            "cost": 0.028399840000000003,
+            "balance_after": "5.30268459",
+            "chat_file": "Vespers_Secret_Sexual_Tutelage.json"
+        },
+        {
+            "timestamp": "2026-04-27T15:46:28.975646",
+            "feature": "Chat Response",
+            "model": "kimi-k2-6",
+            "usage": {
+                "prompt_tokens": 26736,
+                "completion_tokens": 8471,
+                "total_tokens": 35207,
+                "prompt_tokens_details": {
+                    "cached_tokens": 0
+                },
+                "breakdown": {
+                    "summary": 8756,
+                    "system": 2039,
+                    "raw": 15941
+                }
+            },
+            "cost": 0.04462066,
+            "balance_after": "5.2649128",
+            "chat_file": "Vespers_Secret_Sexual_Tutelage.json"
+        },
+        {
+            "timestamp": "2026-04-27T16:06:35.965255",
+            "feature": "Chat Response",
+            "model": "kimi-k2-6",
+            "usage": {
+                "prompt_tokens": 30012,
+                "completion_tokens": 5261,
+                "total_tokens": 35273,
+                "prompt_tokens_details": {
+                    "cached_tokens": 0
+                },
+                "breakdown": {
+                    "summary": 8803,
+                    "system": 1906,
+                    "raw": 19303
+                }
+            },
+            "cost": 0.035220219999999997,
+            "balance_after": "5.20556732",
+            "chat_file": "Vespers_Secret_Sexual_Tutelage.json"
+        },
+        {
+            "timestamp": "2026-04-27T16:42:29.501190",
+            "feature": "Chat Response",
+            "model": "kimi-k2-6",
+            "usage": {
+                "prompt_tokens": 32442,
+                "completion_tokens": 7572,
+                "total_tokens": 40014,
+                "prompt_tokens_details": {
+                    "cached_tokens": 0
+                },
+                "breakdown": {
+                    "summary": 9180,
+                    "system": 1911,
+                    "raw": 21351
+                }
+            },
+            "cost": 0.04466952,
+            "balance_after": "5.15872442",
+            "chat_file": "Vespers_Secret_Sexual_Tutelage.json"
+        }
+    ],
+    "total_expenditure": 0.2483523
+}

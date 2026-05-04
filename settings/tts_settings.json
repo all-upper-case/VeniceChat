@@ -1,0 +1,6 @@
+{
+    "enabled": false,
+    "model": "tts-kokoro",
+    "voice": "af_bella",
+    "speed": 1
+}

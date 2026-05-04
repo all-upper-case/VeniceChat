@@ -1,0 +1,7 @@
+{
+    "enabled": false,
+    "k": 3,
+    "max_chars": 1200,
+    "min_chars": 200,
+    "extraction_model": "gemma-4-uncensored"
+}

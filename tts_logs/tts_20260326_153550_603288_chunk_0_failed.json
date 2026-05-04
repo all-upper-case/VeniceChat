@@ -1,4 +1,0 @@
-{
-    "status": 404,
-    "error": "{\"object\":\"error\",\"message\":\"Voice 'af_bella' not found.\",\"type\":\"invalid_voice\",\"param\":null,\"code\":\"1902\",\"raw_status_code\":404}"
-}

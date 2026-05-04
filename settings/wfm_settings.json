@@ -1,0 +1,5 @@
+{
+    "model": "kimi-k2-6",
+    "temperature": 0.8,
+    "context_depth": 12
+}

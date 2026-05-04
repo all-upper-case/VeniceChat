@@ -1,0 +1,557 @@
+{
+    "Flagship & Uncensored (Private)": [
+        {
+            "id": "venice-uncensored-role-play",
+            "name": "Venice Role Play Uncensored (128K)",
+            "traits": "Private, Uncensored, Vision",
+            "pricing": "$0.50 / $2.00",
+            "context": "128,000",
+            "vision": true,
+            "description": "Highest-quality model for long-context creative writing. Natively supports Vision and excels at complex character logic.",
+            "tags": [
+                "PRIVATE",
+                "UNCENSORED",
+                "STORYTELLING",
+                "VISION"
+            ]
+        },
+        {
+            "id": "venice-uncensored",
+            "name": "Venice Uncensored 1.1 (32K)",
+            "traits": "Private, Uncensored",
+            "pricing": "$0.20 / $0.90",
+            "context": "32,000",
+            "description": "Venice's crown jewel for unrestricted AI. Custom fine-tune of Mistral-Small-24B. Zero alignment tax or refusal mechanisms.",
+            "tags": [
+                "PRIVATE",
+                "UNCENSORED",
+                "CREATIVE"
+            ]
+        },
+        {
+            "id": "e2ee-venice-uncensored-24b-p",
+            "name": "E2EE Venice Uncensored 1.1 (32K)",
+            "traits": "Private, Uncensored",
+            "pricing": "$0.25 / $1.15",
+            "context": "32,000",
+            "description": "Encrypted version of Venice Uncensored. Zero alignment tax or refusal mechanisms.",
+            "tags": [
+                "PRIVATE",
+                "UNCENSORED",
+                "CREATIVE"
+            ]
+        },
+        {
+            "id": "hermes-3-llama-3.1-405b",
+            "name": "Hermes 3 Llama 3.1 405b (128K)",
+            "traits": "Private, Large",
+            "pricing": "$1.10 / $3.00",
+            "context": "128,000",
+            "description": "Massive state-of-the-art open model fine-tuned for high intelligence and broad capability.",
+            "tags": [
+                "PRIVATE",
+                "SMART"
+            ]
+        },
+        {
+            "id": "mistral-31-24b",
+            "name": "Mistral 3.1 24B (131K)",
+            "traits": "Private, Vision, Fast",
+            "pricing": "$0.20 / $0.90",
+            "context": "131,000",
+            "vision": true,
+            "description": "Best 'daily driver'. Fast, capable, reads images, and reliably executes JSON function calls.",
+            "tags": [
+                "BALANCED",
+                "VISION"
+            ]
+        },
+        {
+            "id": "llama-3.2-3b",
+            "name": "Llama 3.2 3B (128K)",
+            "traits": "Private, Context-Heavy",
+            "pricing": "$0.15 / $0.60",
+            "context": "128,000",
+            "description": "Cheapest way to summarize massive text files. High context window for a small model.",
+            "tags": [
+                "SUMMARY",
+                "LARGE-CONTEXT"
+            ]
+        },
+        {
+            "id": "gemma-4-uncensored",
+            "name": "Gemma 4 Uncensored (256K)",
+            "traits": "Private",
+            "pricing": "$0.16 / $0.50",
+            "context": "256,000",
+            "description": "Uncensored variant of Google's Gemma 4. Balanced performance and safety-free output.",
+            "tags": [
+                "PRIVATE",
+                "UNCENSORED"
+            ]
+        },
+        {
+            "id": "e2ee-gpt-oss-120b-p",
+            "name": "GPT OSS 120B (Beta) (128K)",
+            "traits": "E2EE \u00b7 Private",
+            "pricing": "$0.13 / $0.65",
+            "context": "128,000",
+            "description": "Large-scale open-source foundation model with end-to-end encryption.",
+            "tags": [
+                "BETA",
+                "E2EE",
+                "UNCENSORED"
+            ]
+        },
+        {
+            "id": "e2ee-gpt-oss-20b-p",
+            "name": "GPT OSS 20B (Beta) (128K)",
+            "traits": "E2EE \u00b7 Private",
+            "pricing": "$0.05 / $0.19",
+            "context": "128,000",
+            "description": "Fast and efficient open-source model with end-to-end encryption.",
+            "tags": [
+                "BETA",
+                "E2EE",
+                "UNCENSORED"
+            ]
+        },
+        {
+            "id": "google.gemma-4-31b-it",
+            "name": "Google Gemma 4 31B Instruct",
+            "traits": "Private",
+            "pricing": "$0.17 / $0.50",
+            "context": "256K",
+            "description": "Next-generation Gemma model from Google, optimized for high efficiency and prompt adherence.",
+            "tags": [
+                "PRIVATE",
+                "EFFICIENT"
+            ]
+        },
+        {
+            "id": "google.gemma-4-26b-a4b-it",
+            "name": "Google Gemma 4 26B A4B Instruct",
+            "traits": "Private",
+            "pricing": "$0.16 / $0.50",
+            "context": "256K",
+            "description": "Highly efficient variant of the Gemma 4 series, ideal for rapid responses.",
+            "tags": [
+                "PRIVATE",
+                "EFFICIENT"
+            ]
+        },
+        {
+            "id": "nvidia-nemotron-cascade-2-30b-a3b",
+            "name": "Nemotron Cascade 2 30B A3B",
+            "traits": "Private, Beta",
+            "pricing": "$0.14 / $0.80",
+            "context": "256K",
+            "description": "NVIDIA's cascade model optimized for performance, low latency, and high context efficiency.",
+            "tags": [
+                "PRIVATE",
+                "BETA",
+                "EFFICIENT"
+            ]
+        }
+    ],
+    "Reasoning Suite & High Intelligence": [
+        {
+            "id": "qwen-3-6-plus",
+            "name": "Qwen 3.6 Plus Uncensored",
+            "traits": "Anonymized, Beta",
+            "pricing": "$0.63 / $3.75 ($0.06 Cache)",
+            "context": "1.0M",
+            "description": "High-capacity uncensored model with massive context support and enhanced reasoning.",
+            "tags": [
+                "ANONYMIZED",
+                "BETA",
+                "UNCENSORED"
+            ]
+        },
+        {
+            "id": "zai-org-glm-5-1",
+            "name": "GLM 5.1",
+            "traits": "Private, Beta",
+            "pricing": "$1.75 / $5.50 ($0.33 Cache)",
+            "context": "200K",
+            "description": "Advanced reasoning model from the GLM series with improved logic and context processing.",
+            "tags": [
+                "PRIVATE",
+                "BETA",
+                "REASONING"
+            ]
+        },
+        {
+            "id": "kimi-k2-5",
+            "name": "Kimi K2.5 (256K)",
+            "traits": "Private, Reasoning, Vision",
+            "pricing": "$0.56 / $3.50 ($0.11 Cache)",
+            "context": "256,000",
+            "vision": true,
+            "description": "Optimized for complex logic and chain-of-thought tasks with native vision support.",
+            "tags": [
+                "VISION",
+                "SMART"
+            ]
+        },
+        {
+            "id": "kimi-k2-6",
+            "name": "Kimi K2.6 (256K)",
+            "traits": "Private",
+            "pricing": "$0.56 / $3.50 ($0.11 Cache)",
+            "context": "256,000",
+            "description": "Updated Kimi model with enhanced reasoning and context handling.",
+            "tags": [
+                "REASONING"
+            ]
+        },
+        {
+            "id": "arcee-trinity-large-thinking",
+            "name": "Trinity Large Thinking",
+            "traits": "Private, Reasoning",
+            "pricing": "$0.31 / $1.13 ($0.07 Cache)",
+            "context": "256K",
+            "description": "Arcee's specialized reasoning model designed for deep thinking and complex instruction following.",
+            "tags": [
+                "PRIVATE",
+                "REASONING"
+            ]
+        },
+        {
+            "id": "deepseek-v3.2",
+            "name": "DeepSeek V3.2 (160K)",
+            "traits": "Private, Reasoning",
+            "pricing": "$0.33 / $0.48 ($0.16 Cache)",
+            "context": "64,000",
+            "description": "World-class math and coding model. Generates deep internal chain-of-thought thoughts.",
+            "tags": [
+                "MATH",
+                "CODE"
+            ]
+        },
+        {
+            "id": "aion-labs.aion-2-0",
+            "name": "Aion 2.0",
+            "traits": "Anonymized",
+            "pricing": "$1.00 / $2.00 ($0.25 Cache)",
+            "context": "128K",
+            "description": "Aion Labs' general purpose foundation model designed for reliable text generation.",
+            "tags": [
+                "ANONYMIZED"
+            ]
+        }
+    ],
+    "GLM & Qwen Series": [
+        {
+            "id": "z-ai-glm-5v-turbo",
+            "name": "GLM 5V Turbo",
+            "traits": "Anonymized, Beta, Vision",
+            "pricing": "$1.50 / $5.00 ($0.30 Cache)",
+            "context": "200K",
+            "vision": true,
+            "description": "High-speed multimodal model with vision capabilities and strong logical reasoning.",
+            "tags": [
+                "ANONYMIZED",
+                "BETA",
+                "VISION"
+            ]
+        },
+        {
+            "id": "zai-org-glm-5",
+            "name": "GLM 5 (198K)",
+            "traits": "Private, Reasoning, Vision",
+            "pricing": "$1.00 / $3.20 ($0.20 Cache)",
+            "context": "198,000",
+            "vision": true,
+            "description": "Advanced reasoning model with strong vision capabilities for complex logic and system design.",
+            "tags": [
+                "REASONING",
+                "VISION"
+            ]
+        },
+        {
+            "id": "olafangensan-glm-4.7-flash-heretic",
+            "name": "GLM 4.7 Flash Heretic (198K)",
+            "traits": "Private, Reasoning, Tool-Use",
+            "pricing": "$0.14 / $0.80",
+            "context": "198,000",
+            "description": "De-censored version of GLM 4.7 Flash.",
+            "tags": [
+                "REASONING",
+                "UNCENSORED",
+                "TOOLS"
+            ]
+        },
+        {
+            "id": "qwen3-coder-480b-a35b-instruct",
+            "name": "Qwen 3 Coder 480b (256K)",
+            "traits": "Private, Coding",
+            "pricing": "$0.75 / $3.00",
+            "context": "256,000",
+            "description": "The ultimate coding assistant. Excels at ingesting massive repositories and reasoning across dozens of files.",
+            "tags": [
+                "CODING",
+                "BETA"
+            ]
+        },
+        {
+            "id": "qwen3-vl-235b-a22b",
+            "name": "Qwen 3 VL 235B",
+            "traits": "Private, Uncensored, Vision Specialist",
+            "pricing": "$0.50 / $2.00",
+            "context": "32,000",
+            "vision": true,
+            "description": "The highest-capacity private vision specialist. Excels at complex image analysis and OCR.",
+            "tags": [
+                "PRIVATE",
+                "UNCENSORED",
+                "VISION"
+            ]
+        },
+        {
+            "id": "qwen3-5-35b-a3b",
+            "name": "Qwen 3.5 35B A3B",
+            "traits": "Private, Vision, Fast",
+            "pricing": "$0.20 / $0.90",
+            "context": "32,000",
+            "vision": true,
+            "description": "Very fast, new-generation private vision model. Great for quick image descriptions.",
+            "tags": [
+                "PRIVATE",
+                "VISION",
+                "FAST"
+            ]
+        },
+        {
+            "id": "qwen3-4b",
+            "name": "Venice Small (Qwen 3 4B) (40K)",
+            "traits": "Private, Fast",
+            "pricing": "$0.05 / $0.15",
+            "context": "40,000",
+            "description": "Venice Small. Lightning-fast inference; perfect for basic classification and simple chatbots.",
+            "tags": [
+                "FAST",
+                "CHEAP"
+            ]
+        }
+    ],
+    "External: OpenAI (Censored)": [
+        {
+            "id": "openai-gpt-54",
+            "name": "GPT-5.4",
+            "traits": "Anonymized, Censored, Vision",
+            "pricing": "$3.13 / $18.80",
+            "context": "1,000,000",
+            "vision": true,
+            "description": "OpenAI's latest flagship reasoning model with vision support.",
+            "tags": [
+                "CENSORED",
+                "SMART",
+                "VISION"
+            ]
+        },
+        {
+            "id": "openai-gpt-oss-120b",
+            "name": "OpenAI GPT OSS 120B (128K)",
+            "traits": "Private",
+            "pricing": "$0.07 / $0.30",
+            "context": "128,000",
+            "description": "OSS-based large model optimized for general performance.",
+            "tags": [
+                "PRIVATE"
+            ]
+        },
+        {
+            "id": "openai-gpt-4o-2024-11-20",
+            "name": "GPT-4o",
+            "traits": "Anonymized, Censored, Vision",
+            "pricing": "$3.13 / $12.50",
+            "context": "128,000",
+            "vision": true,
+            "description": "OpenAI flagship. High versatility with strong vision capabilities.",
+            "tags": [
+                "CENSORED",
+                "VISION"
+            ]
+        },
+        {
+            "id": "openai-gpt-54-mini",
+            "name": "GPT-5.4 Mini (Beta) (400K)",
+            "traits": "Anonymized",
+            "pricing": "$0.94 / $5.63 ($0.09 Cache)",
+            "context": "400,000",
+            "description": "Efficient mini version of OpenAI's GPT-5.4 flagship with expanded context.",
+            "tags": [
+                "ANONYMIZED",
+                "BETA",
+                "CENSORED"
+            ]
+        },
+        {
+            "id": "openai-gpt-4o-mini-2024-07-18",
+            "name": "GPT-4o Mini",
+            "traits": "Anonymized, Fast, Vision",
+            "pricing": "$0.19 / $0.75",
+            "context": "128,000",
+            "vision": true,
+            "description": "Fast and cheap OpenAI alternative with vision support.",
+            "tags": [
+                "CENSORED",
+                "FAST",
+                "VISION"
+            ]
+        }
+    ],
+    "External: Anthropic (Censored)": [
+        {
+            "id": "claude-opus-4-6-fast",
+            "name": "Claude Opus 4.6 Fast",
+            "traits": "Anonymized, Beta",
+            "pricing": "$36.00 / $180.00 ($3.60 Cache)",
+            "context": "1.0M",
+            "description": "Enhanced speed version of the Opus 4.6 flagship reasoning model with massive context.",
+            "tags": [
+                "ANONYMIZED",
+                "BETA"
+            ]
+        },
+        {
+            "id": "claude-opus-4-6",
+            "name": "Claude Opus 4.6 (1M)",
+            "traits": "Anonymized, Reasoning, Vision",
+            "pricing": "$6.00 / $30.00",
+            "context": "1,000,000",
+            "vision": true,
+            "description": "Anthropic's reigning champion for complex logic and coding with high-quality vision.",
+            "tags": [
+                "CENSORED",
+                "REASONING",
+                "VISION"
+            ]
+        },
+        {
+            "id": "claude-sonnet-4-6",
+            "name": "Claude Sonnet 4.6 (1M)",
+            "traits": "Anonymized, Vision",
+            "pricing": "$3.60 / $18.00",
+            "context": "1,000,000",
+            "vision": true,
+            "description": "Balanced high intelligence and vision support.",
+            "tags": [
+                "CENSORED",
+                "VISION"
+            ]
+        }
+    ],
+    "External: Google & xAI (Censored)": [
+        {
+            "id": "google-gemini-3-1-pro-preview",
+            "name": "Gemini 3.1 Pro (1M)",
+            "traits": "Anonymized, Vision",
+            "pricing": "$2.50 / $15.00",
+            "context": "1,000,000",
+            "vision": true,
+            "description": "Massive 1M-context multimodal model from Google.",
+            "tags": [
+                "CENSORED",
+                "LARGE-CONTEXT",
+                "VISION"
+            ]
+        },
+        {
+            "id": "grok-41-fast",
+            "name": "Grok 4.1 Fast",
+            "traits": "Anonymized, Vision, Fast",
+            "pricing": "Standard",
+            "context": "128,000",
+            "vision": true,
+            "description": "X.ai's Grok model with vision capabilities.",
+            "tags": [
+                "FAST",
+                "VISION"
+            ]
+        }
+    ],
+    "MiniMax Series": [
+        {
+            "id": "minimax-m27",
+            "name": "MiniMax M2.7 (198K)",
+            "traits": "Anonymized, Fast",
+            "pricing": "$0.38 / $1.50 ($0.07 Cache)",
+            "context": "198,000",
+            "description": "Powerful anonymized model with large context and efficient processing.",
+            "tags": [
+                "ANONYMIZED",
+                "BALANCED"
+            ]
+        },
+        {
+            "id": "minimax-m25",
+            "name": "MiniMax M2.5 (198K)",
+            "traits": "Private, Reasoning",
+            "pricing": "$0.34 / $1.19 ($0.04 Cache)",
+            "context": "198,000",
+            "description": "High-intelligence private model supporting variable reasoning effort.",
+            "tags": [
+                "PRIVATE",
+                "REASONING",
+                "SMART"
+            ]
+        },
+        {
+            "id": "minimax-m21",
+            "name": "MiniMax M2.1 (198K)",
+            "traits": "Private, Reasoning, Fast",
+            "pricing": "$0.35 / $1.50 ($0.04 Cache)",
+            "context": "198,000",
+            "description": "Fast private model with strong reasoning capabilities and high throughput.",
+            "tags": [
+                "PRIVATE",
+                "REASONING",
+                "FAST"
+            ]
+        }
+    ],
+    "Imported Models": [
+        {
+            "id": "mistral-small-2603",
+            "name": "Mistral Small 4",
+            "traits": "text",
+            "pricing": "0.1875 / 0.75",
+            "context": "256,000",
+            "vision": true,
+            "description": "Mistral Small 4 unifies instruction following, reasoning, coding, and vision in a single 119B MoE model with 256K context and configurable reasoning effort.",
+            "tags": []
+        },
+        {
+            "id": "qwen3-6-27b",
+            "name": "Qwen3.6 27B",
+            "traits": "text",
+            "pricing": "0.325 / 3.25",
+            "context": "256,000",
+            "vision": true,
+            "description": "The Qwen 3.6 27B native vision-language dense model builds upon the 3.5-27B version, with key improvements in agentic coding capabilities and enhanced STEM reasoning and inference skills. In the vision modality, it demonstrates significant advances in spatial intelligence, object localization, and detection, while video understanding, document OCR, and visual agent capabilities continue to improve steadily. (DeepInfra Venice deployment, FP8.)",
+            "tags": []
+        },
+        {
+            "id": "deepseek-v4-pro",
+            "name": "DeepSeek V4 Pro",
+            "traits": "text",
+            "pricing": "2.175 / 4.35",
+            "context": "1,000,000",
+            "vision": false,
+            "description": "DeepSeek V4 Pro is a 1.6T-parameter Mixture-of-Experts model with 49B active parameters and a 1M-token context window. Built for advanced reasoning, coding, and long-horizon agentic workflows with a hybrid attention system for efficient long-context processing. Note: This model is hosted in China and your prompts may be used for training.",
+            "tags": []
+        },
+        {
+            "id": "deepseek-v4-flash",
+            "name": "DeepSeek V4 Flash",
+            "traits": "text",
+            "pricing": "0.175 / 0.35",
+            "context": "1,000,000",
+            "vision": false,
+            "description": "DeepSeek V4 Flash is an efficiency-optimized 284B-parameter Mixture-of-Experts model with 13B active parameters and a 1M-token context window. Tuned for fast inference and high-throughput workloads while maintaining strong reasoning and coding performance. Note: This model is hosted in China and your prompts may be used for training.",
+            "tags": []
+        }
+    ]
+}

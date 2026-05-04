@@ -2,6 +2,8 @@ document.addEventListener('DOMContentLoaded', () => {
     let chatHistory = [];
     let summaries = [];
     let currentVisualMemory = "";
+    let currentSelfMemory = "";
+    let memoryLogs = [];
     let isGenerating = false;
     let guidedModeEnabled = false;
     let activeEditIndex = -1;
@@ -9,6 +11,16 @@ document.addEventListener('DOMContentLoaded', () => {
     let runningInput = 0;
     let runningOutput = 0;
     let diffModeMsgs = new Set();
+    
+    // Audit Mode State
+    let isAuditMode = false;
+    let auditContextSelection = { batches: [], includeRaw: true };
+    let parentSummariesCache = [];
+
+    // Arena Vars
+    window.isArenaMode = false;
+    window.arenaData = null;
+    window.activeArenaTab = null;
 
     const chatbox = document.getElementById('chatbox');
     const userInput = document.getElementById('userInput');
@@ -22,6 +34,131 @@ document.addEventListener('DOMContentLoaded', () => {
     const vmTextarea = document.getElementById('visual-memory-text');
     const analyticsModal = document.getElementById('analytics-modal');
     const loreExtractorModal = document.getElementById('lore-extractor-modal');
+    const apiExplorerModal = document.getElementById('api-explorer-modal');
+
+    // Model Selector Enhancements
+    const modelSearchInput = document.getElementById('model-search-input');
+    const modelFilterTags = document.querySelectorAll('.filter-tag');
+
+    if (modelSearchInput) {
+        modelSearchInput.addEventListener('input', (e) => filterAllModelSelectors());
+    }
+
+    const modelSortSelect = document.getElementById('model-sort-select');
+    if (modelSortSelect) {
+        modelSortSelect.addEventListener('change', () => filterAllModelSelectors());
+    }
+
+    modelFilterTags.forEach(tag => {
+        tag.addEventListener('click', () => {
+            modelFilterTags.forEach(t => t.classList.remove('active'));
+            tag.classList.add('active');
+            filterAllModelSelectors();
+        });
+    });
+
+    function parsePrice(pricingStr, type) {
+        // pricing format example: "$0.56 / $3.50 ($0.11 Cache)"
+        if (!pricingStr || pricingStr === 'N/A') return 0;
+        const parts = pricingStr.split('/');
+        if (type === 'input') return parseFloat(parts[0].replace(/[^0-9.]/g, '')) || 0;
+        if (type === 'output') return parts[1] ? (parseFloat(parts[1].split('(')[0].replace(/[^0-9.]/g, '')) || 0) : 0;
+        if (type === 'cache') {
+            const cacheMatch = pricingStr.match(/\$(\d+\.?\d*)\s+Cache/);
+            return cacheMatch ? parseFloat(cacheMatch[1]) : 0;
+        }
+        return 0;
+    }
+
+    function parseContext(contextStr) {
+        if (!contextStr || contextStr === 'N/A') return 0;
+        return parseInt(contextStr.replace(/[^0-9]/g, '')) || 0;
+    }
+
+    function filterAllModelSelectors() {
+        const searchInput = document.getElementById('model-search-input');
+        const query = searchInput ? searchInput.value : "";
+        const trait = document.querySelector('.filter-tag.active')?.dataset.filter || 'all';
+        const sort = document.getElementById('model-sort-select')?.value || 'name';
+        
+        const selectors = document.querySelectorAll('.model-selector-sync');
+        selectors.forEach(select => {
+            if (availableModels) {
+                const currentVal = select.dataset.currentValue || select.value;
+                populateFilteredSelect(select, query, trait, sort, false, false);
+                if (currentVal && currentVal !== "Loading models...") {
+                    select.value = currentVal;
+                }
+            } else {
+                select.innerHTML = '<option value="">Loading models...</option>';
+            }
+        });
+    }
+
+    function populateFilteredSelect(select, query = "", trait = "all", sort = "name", forceAll = false, showDefault = false) {
+        if (!select || !availableModels) return;
+
+        const lowQuery = forceAll ? "" : query.toLowerCase();
+        const effectiveTrait = forceAll ? "all" : trait;
+        const currentVal = select.dataset.currentValue || select.value;
+        
+        select.innerHTML = '';
+        if (showDefault) {
+            const defOpt = document.createElement('option');
+            defOpt.value = "";
+            defOpt.textContent = "(Default)";
+            select.appendChild(defOpt);
+        }
+
+        let allFiltered = [];
+
+        for (const group in availableModels) {
+            let filteredGroup = availableModels[group].filter(m => {
+                const matchesQuery = m.name.toLowerCase().includes(lowQuery) || m.id.toLowerCase().includes(lowQuery);
+                let matchesTrait = true;
+                if (effectiveTrait === 'vision') matchesTrait = m.vision;
+                else if (effectiveTrait === 'reasoning') matchesTrait = m.traits?.toLowerCase().includes('reasoning') || m.id.includes('reasoning') || m.id.includes('thinking');
+                else if (effectiveTrait === 'private') matchesTrait = m.traits?.toLowerCase().includes('private');
+                else if (effectiveTrait === 'beta') matchesTrait = (m.tags && m.tags.includes('BETA')) || m.id.includes('beta');
+
+                return matchesQuery && matchesTrait;
+            });
+
+            if (sort === 'name' && filteredGroup.length > 0) {
+                filteredGroup.sort((a, b) => a.name.localeCompare(b.name));
+                const optgroup = document.createElement('optgroup');
+                optgroup.label = group;
+                filteredGroup.forEach(m => {
+                    const opt = document.createElement('option');
+                    opt.value = m.id;
+                    opt.textContent = (m.vision ? '👁️ ' : '') + m.name;
+                    if (m.id === currentVal) opt.selected = true;
+                    optgroup.appendChild(opt);
+                });
+                select.appendChild(optgroup);
+            } else if (sort !== 'name' && filteredGroup.length > 0) {
+                allFiltered.push(...filteredGroup);
+            }
+        }
+
+        if (sort !== 'name' && allFiltered.length > 0) {
+            allFiltered.sort((a, b) => {
+                if (sort === 'context') return parseContext(b.context) - parseContext(a.context);
+                if (sort === 'input') return parsePrice(a.pricing, 'input') - parsePrice(b.pricing, 'input');
+                if (sort === 'output') return parsePrice(a.pricing, 'output') - parsePrice(b.pricing, 'output');
+                if (sort === 'cache') return parsePrice(a.pricing, 'cache') - parsePrice(b.pricing, 'cache');
+                return 0;
+            });
+
+            allFiltered.forEach(m => {
+                const opt = document.createElement('option');
+                opt.value = m.id;
+                opt.textContent = (m.vision ? '👁️ ' : '') + m.name;
+                if (m.id === currentVal) opt.selected = true;
+                select.appendChild(opt);
+            });
+        }
+    }
 
     // Architect UI Vars
     const architectModal = document.getElementById('architect-modal');
@@ -132,7 +269,12 @@ document.addEventListener('DOMContentLoaded', () => {
             const mRes = await fetch('/venice_models');
             availableModels = await mRes.json();
 
-            // Populate Rename modal model selector
+            // Populate all model selectors
+            if (typeof filterAllModelSelectors === 'function') {
+                filterAllModelSelectors();
+            }
+
+            // Populate Rename modal model selector specifically if needed
             const renameSelect = document.getElementById('rename-model-select');
             if (renameSelect && availableModels) {
                 for (const group in availableModels) {
@@ -158,6 +300,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 window.ttsSettings = d.tts;
             }
 
+            if (d && d.summarizer) {
+                const elLive = document.getElementById('live-sum-enabled');
+                if (elLive) elLive.checked = d.summarizer.live_summary_enabled || false;
+                
+                const elKeep = document.getElementById('sum-keep');
+                if (elKeep) elKeep.value = d.summarizer.recent_turns_to_keep || 12;
+                
+                const elBatch = document.getElementById('sum-batch');
+                if (elBatch) elBatch.value = d.summarizer.batch_size || 4;
+            }
+
             // Fetch persisted balance
             try {
                 const bRes = await fetch('/get_balance');
@@ -172,6 +325,7 @@ document.addEventListener('DOMContentLoaded', () => {
             await loadHistory();
             await loadSidebar();
             updateAttachmentButtonVisibility();
+            checkScanStatus();
 
             // Auto-expand all textareas on init and bind listeners
             document.querySelectorAll('textarea').forEach(ta => {
@@ -599,9 +753,17 @@ document.addEventListener('DOMContentLoaded', () => {
         activeRefineIndex = -1;
     });
 
+    safeBind('refine-context-toggle', 'change', (e) => {
+        const container = document.getElementById('refine-context-depth-container');
+        if (container) container.style.display = e.target.checked ? 'flex' : 'none';
+    });
+
     safeBind('refine-guidance-submit', 'click', async () => {
         const index = activeRefineIndex;
         const guidance = refineGuidanceInput ? refineGuidanceInput.value.trim() : "";
+        const includeContext = document.getElementById('refine-context-toggle')?.checked || false;
+        const contextDepth = parseInt(document.getElementById('refine-context-depth')?.value) || 5;
+
         if (refineGuidanceModal) refineGuidanceModal.style.display = 'none';
 
         const tools = document.querySelectorAll('.tools-panel');
@@ -618,13 +780,23 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const res = await fetch('/ai_refine_message', {
                 method: 'POST', headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({index: index, guidance: guidance})
+                body: JSON.stringify({
+                    index: index, 
+                    guidance: guidance,
+                    include_context: includeContext,
+                    context_depth: contextDepth
+                })
             });
             const d = await res.json();
             if (d.success) {
-                chatHistory[index].original_content = originalText;
-                chatHistory[index].content = d.refined_text;
-                diffModeMsgs.add(index);
+                if (d.no_changes) {
+                    alert("The AI model determined that no changes were necessary.");
+                } else {
+                    chatHistory[index].original_content = originalText;
+                    chatHistory[index].content = d.refined_text;
+                    chatHistory[index].refine_logic = d.refine_logic;
+                    diffModeMsgs.add(index);
+                }
                 renderChat();
             } else {
                 alert("Refinement Error: " + d.error);
@@ -1030,12 +1202,143 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function loadHistory() {
         try {
+            const sbRes = await fetch('/sidebar_data');
+            const sbData = await sbRes.json();
+            isAuditMode = sbData.active_chat && sbData.active_chat.endsWith('.audit.json');
+            
+            const auditTopBar = document.getElementById('audit-top-bar');
+            if (auditTopBar) {
+                auditTopBar.style.display = isAuditMode ? 'flex' : 'none';
+                if (chatbox) chatbox.style.paddingTop = isAuditMode ? '115px' : '70px';
+            }
+            if (!isAuditMode) {
+                const drawer = document.getElementById('audit-drawer');
+                if (drawer) drawer.style.display = 'none';
+            }
+
             const res = await fetch('/get_history');
             const data = await res.json();
+            
+            if (data.is_arena) {
+                window.arenaData = data;
+                window.isArenaMode = true;
+                
+                document.getElementById('arena-toolbar').style.display = 'flex';
+                document.getElementById('chatbox').style.paddingTop = '115px';
+                
+                const compareContainer = document.getElementById('compare-mode-container');
+                if (compareContainer) compareContainer.style.display = 'none';
+                
+                // VALIDATION: Ensure activeArenaTab is valid for the current arenaData models
+                const isValidTab = window.activeArenaTab === 'evaluator' || 
+                                 (window.arenaData.models && window.arenaData.models.some(m => m.id === window.activeArenaTab));
+                
+                if (!window.activeArenaTab || !isValidTab) {
+                    window.activeArenaTab = data.models[0].id;
+                }
+                
+                // Populate Evaluator Model Select if empty
+                const evalSelect = document.getElementById('arena-eval-model-select');
+                if (evalSelect && evalSelect.options.length === 0 && availableModels) {
+                    for (const group in availableModels) {
+                        const optgroup = document.createElement('optgroup');
+                        optgroup.label = group;
+                        availableModels[group].forEach(m => {
+                            const opt = document.createElement('option');
+                            opt.value = m.id;
+                            opt.textContent = m.name;
+                            if (m.id === 'venice-uncensored') opt.selected = true;
+                            optgroup.appendChild(opt);
+                        });
+                        evalSelect.appendChild(optgroup);
+                    }
+                }
+
+                renderArenaChat();
+                return;
+            } else {
+                window.isArenaMode = false;
+                const toolbar = document.getElementById('arena-toolbar');
+                if (toolbar) toolbar.style.display = 'none';
+                const aRow = document.getElementById('arena-controls-row');
+                if (aRow) aRow.style.display = 'none';
+                const eRow = document.getElementById('evaluator-controls-row');
+                if (eRow) eRow.style.display = 'none';
+                document.getElementById('chatbox').style.paddingTop = '70px';
+            }
+
+            if (isAuditMode && data.audit_context) {
+                auditContextSelection = data.audit_context;
+                updateAuditTopBar();
+                                fetchParentContext();
+            }
+
+            // [INJECTION] Check for Pipeline
+            const openBtn = document.getElementById('open-pipeline-panel-btn');
+            const chatHeader = document.getElementById('chat-header');
+            if (data.chat_type === 'pipeline') {
+                if (chatHeader) {
+                    chatHeader.style.display = 'flex';
+                    const nameSpan = document.getElementById('header-chat-name');
+                    if (nameSpan && sbData.active_chat) {
+                        nameSpan.textContent = sbData.active_chat.replace('.json', '').replace(/_/g, ' ');
+                    }
+                }
+                if (openBtn) openBtn.style.display = 'block';
+                if (chatbox) chatbox.style.paddingTop = '60px'; // Adjust for header
+                
+                // Sync Content to Modal
+                const editor = document.getElementById('blueprint-editor');
+                if (editor) {
+                    editor.value = data.blueprint || '';
+                    previousBlueprint = data.blueprint || '';
+                }
+                
+                currentPipelinePhase = data.pipeline_phase || 'architect';
+                
+                // Update Badge
+                const badge = document.getElementById('pipeline-status-badge');
+                if (badge) {
+                    badge.textContent = currentPipelinePhase.toUpperCase();
+                    badge.style.background = currentPipelinePhase === 'scribe' ? 'var(--purple)' : 'var(--accent)';
+                }
+                
+                // Update Mode Label
+                const modeLabel = document.getElementById('pipeline-mode-label');
+                if (modeLabel) modeLabel.textContent = currentPipelinePhase.charAt(0).toUpperCase() + currentPipelinePhase.slice(1);
+
+                // Update Lock Button
+                const lockBtn = document.getElementById('lock-scribe-btn');
+                if (lockBtn) {
+                    if (currentPipelinePhase === 'scribe') {
+                        lockBtn.textContent = '◀ Back to Architect';
+                        if (editor) editor.readOnly = true;
+                    } else {
+                        lockBtn.textContent = 'Lock & Scribe';
+                        if (editor) editor.readOnly = false;
+                    }
+                }
+            } else {
+                if (chatHeader) chatHeader.style.display = 'none';
+                if (openBtn) openBtn.style.display = 'none';
+                if (!window.isArenaMode && !isAuditMode) {
+                    if (chatbox) chatbox.style.paddingTop = '70px';
+                }
+                const docModal = document.getElementById('pipeline-doc-modal');
+                if (docModal) docModal.style.display = 'none';
+                document.body.style.overflow = '';
+            }
+
             chatHistory = data.history || [];
             summaries = data.summaries || [];
             currentVisualMemory = data.visual_memory || "";
             if (vmTextarea) vmTextarea.value = currentVisualMemory;
+
+            currentSelfMemory = data.self_memory || "";
+            memoryLogs = data.memory_logs || [];
+            if (document.getElementById('memory-modal')?.style.display === 'block') {
+                renderMemoryManagerUI();
+            }
 
             // Character UI handling
             if (data.character_slug) {
@@ -1101,12 +1404,37 @@ document.addEventListener('DOMContentLoaded', () => {
         const isAtBottom = chatbox.scrollHeight - chatbox.scrollTop <= chatbox.clientHeight + 100;
         
         chatbox.innerHTML = '';
+
+
+
         runningInput = 0;
         runningOutput = 0;
         let textMsgCounter = 0;
 
+        // --- SUMMARIZATION UI LOGIC ---
+        const liveSumEnabled = document.getElementById('live-sum-enabled')?.checked || false;
+        const keepTurns = parseInt(document.getElementById('sum-keep')?.value) || 12;
+        
         let lastSumIndex = -1;
-        if (summaries && summaries.length > 0) {
+        let liveThresholdIdx = -1;
+
+        if (liveSumEnabled) {
+            const batchSize = parseInt(document.getElementById('sum-batch')?.value) || 4;
+            let validIndices = [];
+            for (let i = 0; i < chatHistory.length; i++) {
+                if (chatHistory[i].role !== 'system' && !(typeof chatHistory[i].content === 'string' && chatHistory[i].content.startsWith('__IMG_JSON__'))) {
+                    validIndices.push(i);
+                }
+            }
+            let V = validIndices.length;
+            let summarizableCount = V - keepTurns;
+            if (summarizableCount > 0) {
+                let summarizedCount = Math.floor(summarizableCount / batchSize) * batchSize;
+                if (summarizedCount > 0) {
+                    liveThresholdIdx = validIndices[summarizedCount - 1];
+                }
+            }
+        } else if (summaries && summaries.length > 0) {
             lastSumIndex = summaries[summaries.length - 1].end_index;
         }
 
@@ -1132,7 +1460,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 div.appendChild(ts);
             }
 
-            const isSummed = (idx <= lastSumIndex);
+            // Determine if message is visually "archived/summarized"
+            const isSummed = liveSumEnabled ? (idx <= liveThresholdIdx) : (idx <= lastSumIndex);
             if (isSummed) div.classList.add('summarized-msg');
 
             if (isImage) {
@@ -1191,6 +1520,27 @@ document.addEventListener('DOMContentLoaded', () => {
                         };
                         div.appendChild(rBlock);
                     }
+                    
+                    // Live Summary Block
+                    if (msg.live_summary) {
+                        const sBlock = document.createElement('div');
+                        sBlock.className = 'summary-block';
+                        sBlock.innerHTML = `
+                            <div class="summary-header">
+                                <span><i style="margin-right:5px;">📝</i> Live Inline Summary</span>
+                                <span class="toggle-icon-sum">▼</span>
+                            </div>
+                            <div class="summary-content" style="display:none;">${msg.live_summary}</div>
+                        `;
+                        sBlock.querySelector('.summary-header').onclick = () => {
+                            const content = sBlock.querySelector('.summary-content');
+                            const icon = sBlock.querySelector('.toggle-icon-sum');
+                            const isHidden = content.style.display === 'none';
+                            content.style.display = isHidden ? 'block' : 'none';
+                            icon.textContent = isHidden ? '▲' : '▼';
+                        };
+                        div.appendChild(sBlock);
+                    }
 
                     const contentDiv = document.createElement('div');
                     contentDiv.style.cssText = "white-space:pre-wrap; font-family:inherit;";
@@ -1201,7 +1551,34 @@ document.addEventListener('DOMContentLoaded', () => {
                         contentDiv.innerHTML = renderDiff(origText, curText);
                     } else {
                         let textContent = Array.isArray(msg.content) ? (msg.content.find(p => p.type === 'text')?.text || "") : msg.content;
-                        contentDiv.innerHTML = typeof marked !== 'undefined' ? marked.parse(textContent || "") : textContent;
+                        
+                        // Parse markdown first so we don't break code blocks or standard formatting
+                        let parsedContent = typeof marked !== 'undefined' ? marked.parse(textContent || "") : textContent;
+                        
+                        // Detect and transform the Audit tool tags into Comparison Cards
+                        const auditRegex = /\[UPDATE_SUMMARY index=["&quot;]*(\d+)["&quot;]*\]([\s\S]*?)\[\/UPDATE_SUMMARY\]/gi;
+                        parsedContent = parsedContent.replace(auditRegex, (match, idx, newText) => {
+                            const cleanNew = newText.trim();
+                            let oldTextHTML = `<div style="color:#888; font-style:italic;">(Original summary data not loaded. Open Evidence Drawer to sync.)</div>`;
+                            
+                            const bIdx = parseInt(idx);
+                            if (parentSummariesCache && parentSummariesCache[bIdx]) {
+                                const oldText = parentSummariesCache[bIdx].content.replace(/<think>.*?<\/think>/gs, '').trim();
+                                oldTextHTML = `<div><strong>Original Summary:</strong><br><div class="audit-comparison-panel">${oldText}</div></div>`;
+                            }
+                            
+                            return `<div class="audit-tool-card">
+                                <div class="audit-tool-header">🛠️ Proposed Summary Update (Batch #${bIdx + 1})</div>
+                                ${oldTextHTML}
+                                <div><strong>Proposed Fix:</strong><br><div class="audit-comparison-panel" style="border-left-color:#10b981;">${cleanNew}</div></div>
+                                <div style="display:flex; gap:10px; margin-top:12px;">
+                                    <button class="msg-btn" style="flex:1; background:#333; border:1px solid #555;" onclick="document.getElementById('audit-top-bar').click();">View Sources</button>
+                                    <button class="msg-btn apply-audit-btn" data-index="${idx}" data-text="${encodeURIComponent(cleanNew)}" style="flex:2; background:#2563eb; color:white; border:none; font-weight:bold;">Approve & Apply to Original Chat</button>
+                                </div>
+                            </div>`;
+                        });
+
+                        contentDiv.innerHTML = parsedContent;
 
                         if (Array.isArray(msg.content)) {
                             msg.content.forEach((part, partIdx) => {
@@ -1276,6 +1653,12 @@ document.addEventListener('DOMContentLoaded', () => {
             const branchBtn = document.createElement('button'); branchBtn.className = 'msg-btn'; branchBtn.textContent = 'Branch Here';
             branchBtn.onclick = () => handleBranch(idx);
 
+            const branchArenaBtn = document.createElement('button'); 
+            branchArenaBtn.className = 'msg-btn'; 
+            branchArenaBtn.style.borderColor = 'var(--purple)';
+            branchArenaBtn.textContent = 'Branch to Arena';
+            branchArenaBtn.onclick = () => handleBranchToArena(idx);
+
             const refineBtn = document.createElement('button'); refineBtn.className = 'msg-btn'; refineBtn.textContent = 'AI Refine';
             refineBtn.onclick = () => handleAIRefine(idx);
 
@@ -1311,7 +1694,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 btnRow.append(ttsBtn);
             }
 
-            btnRow.append(branchBtn, refineBtn, findReplaceBtn, delBtn);
+            btnRow.append(branchBtn, branchArenaBtn, refineBtn, findReplaceBtn, delBtn);
             toolsPanel.appendChild(btnRow);
 
             // After appending everything to toolsPanel, update state if this was playing
@@ -1344,6 +1727,24 @@ document.addEventListener('DOMContentLoaded', () => {
                 undoBtn.onclick = () => handleUndoRefine(idx);
 
                 diffRow.append(toggleBtn, undoBtn);
+
+                if (msg.refine_logic) {
+                    const logicBtn = document.createElement('button');
+                    logicBtn.className = 'msg-btn';
+                    logicBtn.style.background = 'var(--purple)';
+                    logicBtn.style.borderColor = 'var(--purple)';
+                    logicBtn.textContent = 'View Refinement Logic';
+                    logicBtn.onclick = () => {
+                        const modal = document.getElementById('logic-view-modal');
+                        const content = document.getElementById('logic-view-content');
+                        if (modal && content) {
+                            content.textContent = msg.refine_logic;
+                            modal.style.display = 'block';
+                        }
+                    };
+                    diffRow.append(logicBtn);
+                }
+
                 toolsPanel.appendChild(diffRow);
             }
 
@@ -1404,7 +1805,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             const outputCost = (u.completion_tokens / 1000000) * pricing.output;
                             const totalCost = inputCost + cacheCost + outputCost;
 
-                            statHtml += `<br><span class="cost-toggle" style="cursor:pointer; text-decoration:underline dashed; color:var(--accent);" onclick="this.nextElementSibling.style.display = (this.nextElementSibling.style.display === 'none' ? 'block' : 'none')">Cost: ${totalCost.toFixed(5)}</span>`;
+                            statHtml += `<br><span class="cost-wrapper" style="cursor:pointer; color:var(--text-dim);" onclick="const val = this.querySelector('.cost-value'); const placeholder = this.querySelector('.cost-placeholder'); if(val.style.display === 'none') { val.style.display = 'inline'; placeholder.style.display = 'none'; this.style.color = 'inherit'; } else { const details = this.nextElementSibling; details.style.display = (details.style.display === 'none' ? 'block' : 'none'); }">Cost: <span class="cost-placeholder" style="text-decoration:underline dotted;">[Show]</span><span class="cost-value" style="display:none; text-decoration:underline dashed; color:var(--accent);">${totalCost.toFixed(5)}</span></span>`;
                             statHtml += `<div class="cost-details" style="display:none; font-size:0.85em; color:var(--text-dim); margin-top:4px; padding-left:10px; border-left:1px solid #444;">`;
                             statHtml += `├ Input: ${inputCost.toFixed(5)}<br>`;
                             if (cachedTokens > 0) statHtml += `├ Cache: ${cacheCost.toFixed(5)}<br>`;
@@ -1422,7 +1823,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (isSummed && !isImage) {
                 const myBatch = summaries.find(s => idx >= s.start_index && idx <= s.end_index);
-                if (myBatch) {
+                if (myBatch && !msg.live_summary) {
                     const viewSumBtn = document.createElement('button');
                     viewSumBtn.className = 'msg-btn';
                     viewSumBtn.style.marginTop = '5px';
@@ -1615,7 +2016,12 @@ document.addEventListener('DOMContentLoaded', () => {
             checkbox.style.height = '18px';
 
             const title = document.createElement('strong');
-            title.textContent = `Batch #${i + 1} (Msgs #${startNum} - #${endNum})`;
+            if (batch.type === "live") {
+                title.textContent = `Live Turn (Msgs #${startNum} - #${endNum})`;
+            } else {
+                title.textContent = `Batch #${i + 1} (Msgs #${startNum} - #${endNum})`;
+            }
+            
             if (isConsolidated) {
                 const badge = document.createElement('span');
                 badge.className = 'sum-badge';
@@ -2026,6 +2432,11 @@ document.addEventListener('DOMContentLoaded', () => {
         autoExpandTextarea(userInput);
 
         let messagePayload = txt;
+        let customModelOverride = null;
+        const pipeOverrideEl = document.getElementById('pipeline-model-override');
+        if (pipeOverrideEl && pipeOverrideEl.style.display !== 'none' && pipeOverrideEl.value) {
+            customModelOverride = pipeOverrideEl.value;
+        }
         if (attachedImageBase64) {
             const highResToggle = document.getElementById('set-vision-high-res');
             const isHigh = highResToggle ? highResToggle.checked : true;
@@ -2043,6 +2454,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
         clearAttachedImage();
 
+        if (window.isArenaMode) {
+            sendArenaMessage(messagePayload);
+            return;
+        }
+
         const cb = document.getElementById('compare-mode-cb');
         if (isComparing) {
             triggerCompareGen(messagePayload, true);
@@ -2059,7 +2475,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         chatHistory.push(msgObj);
         renderChat();
-        triggerGen(messagePayload, null, sendTime);
+        triggerGen(messagePayload, customModelOverride, sendTime);
     }
 
     let isComparing = false;
@@ -2291,6 +2707,66 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    // --- AI MEMORY LOGIC ---
+    safeBind('open-memory-btn', 'click', () => {
+        const modal = document.getElementById('memory-modal');
+        if (modal) {
+            modal.style.display = 'block';
+            renderMemoryManagerUI();
+        }
+    });
+
+    safeBind('close-memory-x', 'click', () => {
+        const modal = document.getElementById('memory-modal');
+        if (modal) modal.style.display = 'none';
+    });
+
+    function renderMemoryManagerUI() {
+        const contentTa = document.getElementById('memory-content-text');
+        const logsDiv = document.getElementById('memory-logs-list');
+        if (contentTa) contentTa.value = currentSelfMemory;
+        if (logsDiv) {
+            logsDiv.innerHTML = '';
+            if (memoryLogs.length === 0) {
+                logsDiv.innerHTML = '<div style="color:#666; font-style:italic; text-align:center; padding:20px;">No change history found.</div>';
+                return;
+            }
+            memoryLogs.forEach(log => {
+                const item = document.createElement('div');
+                item.style.cssText = "padding:8px; border-bottom:1px solid #222; display:flex; justify-content:space-between; align-items:flex-start; gap:10px;";
+                const date = new Date(log.timestamp).toLocaleString();
+                item.innerHTML = `
+                    <div style="flex:1;">
+                        <div style="color:var(--text-dim); font-size:0.8em;">${date}</div>
+                        <div style="color:#ccc;">${log.change}</div>
+                    </div>
+                    <div style="font-size:0.75em; color:var(--primary); background:rgba(37,99,235,0.1); padding:2px 6px; border-radius:4px;">${log.model}</div>
+                `;
+                logsDiv.appendChild(item);
+            });
+        }
+    }
+
+    safeBind('save-memory-btn', 'click', async () => {
+        const val = document.getElementById('memory-content-text').value;
+        const btn = document.getElementById('save-memory-btn');
+        const ogText = btn.textContent;
+        btn.textContent = "Saving..."; btn.disabled = true;
+
+        try {
+            await fetch('/update_visual_memory', { // We reuse the update route but specify self_memory
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ memory: val, type: 'self' }) // Add type to distinguish
+            });
+            currentSelfMemory = val;
+            alert("Internal Memory updated manually.");
+            await loadHistory();
+        } catch(e) { alert("Failed to save memory."); }
+        
+        btn.textContent = ogText; btn.disabled = false;
+    });
+
     async function triggerGen(msg, customModel = null, timestamp = null) {
         lastWfmText = "";
         lastWfmUsage = null;
@@ -2310,12 +2786,20 @@ document.addEventListener('DOMContentLoaded', () => {
             const payload = {message: msg};
             if (customModel) payload.custom_model = customModel;
             if (timestamp) payload.timestamp = timestamp;
+            if (isAuditMode && auditContextSelection.batches.length > 0) {
+                payload.audit_context = auditContextSelection;
+            }
+            
             const res = await fetch('/chat', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload) });
             const reader = res.body.getReader();
             const dec = new TextDecoder();
 
             let rBlock = null;
+            let sBlock = null;
             let contentDiv = null;
+            let liveSummary = "";
+            let hasClearedPlaceholder = false;
+            let inThinkTag = false;
 
             while(true){
                 const {done, value} = await reader.read();
@@ -2341,8 +2825,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
                            if(d.reasoning) {
                                if (statusMsg) statusMsg.innerHTML = '';
+                               if (!hasClearedPlaceholder) { div.innerHTML = ''; hasClearedPlaceholder = true; }
                                if(!rBlock) {
-                                   div.innerHTML = '';
                                    rBlock = document.createElement('div');
                                    rBlock.className = 'reasoning-block';
                                    rBlock.innerHTML = `
@@ -2360,16 +2844,67 @@ document.addEventListener('DOMContentLoaded', () => {
                                if (isAtBottom) chatbox.scrollTop = chatbox.scrollHeight;
                            }
 
+                           if(d.live_summary) {
+                               if (statusMsg) statusMsg.innerHTML = '';
+                               if (!hasClearedPlaceholder) { div.innerHTML = ''; hasClearedPlaceholder = true; }
+                               if(!sBlock) {
+                                   sBlock = document.createElement('div');
+                                   sBlock.className = 'summary-block';
+                                   sBlock.innerHTML = `
+                                       <div class="summary-header">
+                                           <span><i style="margin-right:5px;">📝</i> Live Inline Summary</span>
+                                           <span class="toggle-icon-sum">▲</span>
+                                       </div>
+                                       <div class="summary-content" style="display:block;"></div>
+                                   `;
+                                   sBlock.querySelector('.summary-header').onclick = () => {
+                                       const c = sBlock.querySelector('.summary-content');
+                                       const i = sBlock.querySelector('.toggle-icon-sum');
+                                       const isH = c.style.display === 'none';
+                                       c.style.display = isH ? 'block' : 'none';
+                                       i.textContent = isH ? '▲' : '▼';
+                                   };
+                                   if (rBlock && rBlock.nextSibling) {
+                                       div.insertBefore(sBlock, rBlock.nextSibling);
+                                   } else {
+                                       div.appendChild(sBlock);
+                                   }
+                               }
+                               liveSummary += d.live_summary;
+                               sBlock.querySelector('.summary-content').textContent = liveSummary;
+                               
+                               if (isAtBottom) chatbox.scrollTop = chatbox.scrollHeight;
+                           }
+
                            if(d.content) {
                                if (statusMsg) statusMsg.innerHTML = '';
-                               if(!contentDiv) {
-                                   contentDiv = document.createElement('div');
-                                   contentDiv.style.cssText = "white-space:pre-wrap; font-family:inherit;";
-                                   div.appendChild(contentDiv);
+                               if (!hasClearedPlaceholder) { div.innerHTML = ''; hasClearedPlaceholder = true; }
+                               
+                               // Handle cases where reasoning is delivered inside <think> tags in the main content
+                               if (d.content.includes('<think>')) {
+                                   inThinkTag = true;
+                                   const parts = d.content.split('<think>');
                                    
-                                   if(rBlock) {
-                                       rBlock.querySelector('.reasoning-content').style.display = 'none';
-                                       rBlock.querySelector('.toggle-icon').textContent = '▼';
+                                   if (parts[0]) {
+                                       full += parts[0];
+                                       if(!contentDiv) {
+                                           contentDiv = document.createElement('div');
+                                           contentDiv.style.cssText = "white-space:pre-wrap; font-family:inherit;";
+                                           div.appendChild(contentDiv);
+                                       }
+                                       contentDiv.innerHTML = typeof marked !== 'undefined' ? marked.parse(full) : full;
+                                   }
+                                   
+                                   if (!rBlock) {
+                                       rBlock = document.createElement('div');
+                                       rBlock.className = 'reasoning-block';
+                                       rBlock.innerHTML = `
+                                           <div class="reasoning-header">
+                                               <span><i style="margin-right:5px;">💭</i> Thought Process</span>
+                                               <span class="toggle-icon">▲</span>
+                                           </div>
+                                           <div class="reasoning-content" style="display:block;"></div>
+                                       `;
                                        rBlock.querySelector('.reasoning-header').onclick = () => {
                                            const c = rBlock.querySelector('.reasoning-content');
                                            const i = rBlock.querySelector('.toggle-icon');
@@ -2377,10 +2912,111 @@ document.addEventListener('DOMContentLoaded', () => {
                                            c.style.display = isH ? 'block' : 'none';
                                            i.textContent = isH ? '▲' : '▼';
                                        };
+                                       div.appendChild(rBlock); // Append instead of insertBefore so it flows naturally
+                                   }
+                                   
+                                   if (parts[1]) {
+                                       if (parts[1].includes('</think>')) {
+                                           inThinkTag = false;
+                                           const subParts = parts[1].split('</think>');
+                                           reasoning += subParts[0];
+                                           rBlock.querySelector('.reasoning-content').textContent = reasoning;
+                                           if (subParts[1]) {
+                                               full += subParts[1];
+                                               if(!contentDiv) {
+                                                   contentDiv = document.createElement('div');
+                                                   contentDiv.style.cssText = "white-space:pre-wrap; font-family:inherit;";
+                                                   div.appendChild(contentDiv);
+                                               }
+                                               contentDiv.innerHTML = typeof marked !== 'undefined' ? marked.parse(full) : full;
+                                           }
+                                       } else {
+                                           reasoning += parts[1];
+                                           rBlock.querySelector('.reasoning-content').textContent = reasoning;
+                                       }
+                                   }
+                               } else if (d.content.includes('</think>')) {
+                                   inThinkTag = false;
+                                   const parts = d.content.split('</think>');
+                                   reasoning += parts[0];
+                                   if (rBlock) rBlock.querySelector('.reasoning-content').textContent = reasoning;
+                                   if (parts[1]) {
+                                       full += parts[1];
+                                       if(!contentDiv) {
+                                           contentDiv = document.createElement('div');
+                                           contentDiv.style.cssText = "white-space:pre-wrap; font-family:inherit;";
+                                           div.appendChild(contentDiv);
+                                       }
+                                       contentDiv.innerHTML = typeof marked !== 'undefined' ? marked.parse(full) : full;
+                                   }
+                               } else if (inThinkTag) {
+                                    // We are inside a <think> block
+                                    reasoning += d.content;
+                                    if (rBlock) rBlock.querySelector('.reasoning-content').textContent = reasoning;
+                               } else {
+                                   // Normal content delivery
+                                   if(!contentDiv) {
+                                       contentDiv = document.createElement('div');
+                                       contentDiv.style.cssText = "white-space:pre-wrap; font-family:inherit;";
+                                       div.appendChild(contentDiv);
+                                       
+                                       // Collapse reasoning/summary if we just created the content block
+                                       if(rBlock && rBlock.querySelector('.reasoning-content').style.display !== 'none') {
+                                           rBlock.querySelector('.reasoning-content').style.display = 'none';
+                                           rBlock.querySelector('.toggle-icon').textContent = '▼';
+                                       }
+                                       if(sBlock && sBlock.querySelector('.summary-content').style.display !== 'none') {
+                                           sBlock.querySelector('.summary-content').style.display = 'none';
+                                           sBlock.querySelector('.toggle-icon-sum').textContent = '▼';
+                                       }
+                                   }
+                                   full += d.content;
+                                   
+                                   // [INJECTION] Hide blueprint tags during streaming
+                                   let displayFull = full;
+                                   displayFull = displayFull.replace(/\[(?:ADD_TO|REWRITE|EDIT)_BLUEPRINT\].*?(\[\/(?:ADD_TO|REWRITE|EDIT)_BLUEPRINT\]|$)/gs, '');
+                                   
+                                   contentDiv.innerHTML = typeof marked !== 'undefined' ? marked.parse(displayFull.trim()) : displayFull.trim();
+                               }
+                               if (d.blueprint_update) {
+                                   const docEditor = document.getElementById('blueprint-editor');
+                                   if (docEditor) {
+                                       const oldBp = previousBlueprint;
+                                       const newBp = d.blueprint_update;
+                                       docEditor.value = newBp;
+                                       updateBlueprintDiff(oldBp, newBp);
+                                       previousBlueprint = newBp;
                                    }
                                }
-                               full += d.content;
-                               contentDiv.innerHTML = typeof marked !== 'undefined' ? marked.parse(full) : full;
+                               if (d.tool_calls) {
+                                   // Render a collapsible "Blueprint Tool Calls" block
+                                   let tcBlock = div.querySelector('.tool-calls-block');
+                                   if (!tcBlock) {
+                                       tcBlock = document.createElement('div');
+                                       tcBlock.className = 'tool-calls-block';
+                                       tcBlock.style.cssText = 'margin-top:8px; border:1px solid #2d4a2d; border-radius:6px; overflow:hidden; font-size:0.85em;';
+                                       tcBlock.innerHTML = `
+                                           <div class="tool-calls-header" style="display:flex; justify-content:space-between; align-items:center; padding:6px 12px; background:#1a2e1a; cursor:pointer; user-select:none;">
+                                               <span><i style="margin-right:5px;">🔧</i>Blueprint Tool Calls</span>
+                                               <span class="toggle-icon-tc">▼</span>
+                                           </div>
+                                           <div class="tool-calls-content" style="display:none; padding:12px; background:#111; white-space:pre-wrap; font-family:monospace; color:#a3e635; overflow-x:auto;"></div>
+                                       `;
+                                       tcBlock.querySelector('.tool-calls-header').onclick = () => {
+                                           const c = tcBlock.querySelector('.tool-calls-content');
+                                           const ic = tcBlock.querySelector('.toggle-icon-tc');
+                                           const isH = c.style.display === 'none';
+                                           c.style.display = isH ? 'block' : 'none';
+                                           ic.textContent = isH ? '▲' : '▼';
+                                       };
+                                       div.appendChild(tcBlock);
+                                   }
+                                   tcBlock.querySelector('.tool-calls-content').textContent = d.tool_calls;
+                               }
+                               if (d.content_overwrite) {
+                                   full = d.content_overwrite;
+                                   if (contentDiv) contentDiv.innerHTML = typeof marked !== 'undefined' ? marked.parse(full) : full;
+                               }
                                
                                if (isAtBottom) chatbox.scrollTop = chatbox.scrollHeight;
                            }
@@ -2394,6 +3030,27 @@ document.addEventListener('DOMContentLoaded', () => {
                            }
 
                            if(d.balance) updateBalanceDisplay(d.balance);
+                           if(d.balance_refresh) updateBalanceDisplay(d.balance_refresh);
+
+                           if(d.memory_update) {
+                               currentSelfMemory = d.memory_update;
+                               if (d.memory_logs) {
+                                   memoryLogs = d.memory_logs;
+                               }
+                               
+                               // If the modal is open, re-render it immediately
+                               if (document.getElementById('memory-modal')?.style.display === 'block') {
+                                   renderMemoryManagerUI();
+                               }
+
+                               if (statusMsg) {
+                                   const toast = document.createElement('div');
+                                   toast.style.cssText = "color:var(--accent); font-weight:bold; animation: fadeOut 3s forwards;";
+                                   toast.innerHTML = "🧠 AI updated its Internal Notepad";
+                                   statusMsg.appendChild(toast);
+                                   setTimeout(() => toast.remove(), 4000);
+                               }
+                           }
                        }catch(e){}
                    } 
                 });
@@ -2466,7 +3123,11 @@ document.addEventListener('DOMContentLoaded', () => {
             const list = document.getElementById('chat-list');
             if (!list) return;
             list.innerHTML = '';
-            data.chats.forEach(file => {
+            
+            const normalChats = data.chats.filter(f => !f.endsWith('.audit.json'));
+            const auditChats = data.chats.filter(f => f.endsWith('.audit.json'));
+            
+            normalChats.forEach(file => {
                 const li = document.createElement('li'); li.className = 'chat-item';
                 if (file === data.active_chat) li.classList.add('active-chat');
                 li.innerHTML = `<span class="chat-name">${file.replace('.json','').replace(/_/g,' ')}</span>
@@ -2475,7 +3136,36 @@ document.addEventListener('DOMContentLoaded', () => {
                 li.querySelector('.r-btn').onclick = () => renameChat(file);
                 li.querySelector('.d-btn').onclick = () => deleteChat(file);
                 list.appendChild(li);
+                
+                // Check if this chat has an audit child
+                const auditFile = file.replace('.json', '.audit.json');
+                if (auditChats.includes(auditFile)) {
+                    const ali = document.createElement('li');
+                    ali.className = 'chat-item audit-chat-item';
+                    if (auditFile === data.active_chat) ali.classList.add('active-chat');
+                    ali.innerHTML = `<span class="chat-name">↳ 🕵️ Audit: ${file.replace('.json','').replace(/_/g,' ')}</span>
+                                    <div><button class="icon-btn d-btn">🗑</button></div>`;
+                    ali.onclick = (e) => { if(!e.target.closest('.icon-btn')) loadChat(auditFile); };
+                    ali.querySelector('.d-btn').onclick = () => deleteChat(auditFile);
+                    list.appendChild(ali);
+                }
             });
+            
+            // Render orphaned audit chats just in case parent was deleted
+            auditChats.forEach(aFile => {
+                const parentExpected = aFile.replace('.audit.json', '.json');
+                if (!normalChats.includes(parentExpected)) {
+                    const ali = document.createElement('li');
+                    ali.className = 'chat-item audit-chat-item';
+                    if (aFile === data.active_chat) ali.classList.add('active-chat');
+                    ali.innerHTML = `<span class="chat-name">↳ 🕵️ Orphaned Audit: ${aFile.replace('.audit.json','').replace(/_/g,' ')}</span>
+                                    <div><button class="icon-btn d-btn">🗑</button></div>`;
+                    ali.onclick = (e) => { if(!e.target.closest('.icon-btn')) loadChat(aFile); };
+                    ali.querySelector('.d-btn').onclick = () => deleteChat(aFile);
+                    list.appendChild(ali);
+                }
+            });
+            
         } catch(e) {
             console.error("Sidebar load failed:", e);
         }
@@ -2523,6 +3213,11 @@ document.addEventListener('DOMContentLoaded', () => {
     safeBind('close-rename-x', 'click', () => {
         document.getElementById('rename-modal').style.display = 'none';
         activeRenameFile = null;
+    });
+
+    safeBind('close-logic-view-x', 'click', () => {
+        const modal = document.getElementById('logic-view-modal');
+        if (modal) modal.style.display = 'none';
     });
 
     safeBind('manual-rename-submit', 'click', async () => {
@@ -2623,6 +3318,14 @@ document.addEventListener('DOMContentLoaded', () => {
         if (sidebar) sidebar.classList.add('hidden');
     }
 
+    safeBind('live-sum-enabled', 'change', (e) => {
+        const bgSumOpts = document.getElementById('sum-options');
+        const sumEnabled = document.getElementById('sum-enabled')?.checked;
+        if (bgSumOpts) {
+            bgSumOpts.style.display = (e.target.checked || sumEnabled) ? 'block' : 'none';
+        }
+    });
+
     const openSettings = async () => {
         try {
             const res = await fetch('/get_settings');
@@ -2631,40 +3334,49 @@ document.addEventListener('DOMContentLoaded', () => {
             const mRes = await fetch('/venice_models');
             const mData = await mRes.json();
 
-            const populateModelSelect = (id, currentVal) => {
-                const select = document.getElementById(id);
-                if (!select) return;
-                select.innerHTML = '';
-                for (const group in mData) {
-                    const optgroup = document.createElement('optgroup');
-                    optgroup.label = group;
-                    mData[group].forEach(m => {
-                        const opt = document.createElement('option');
-                        opt.value = m.id;
-                        // Add Eye emoji to vision models
-                        opt.textContent = (m.vision ? '👁️ ' : '') + m.name;
-                        if (m.id === currentVal) opt.selected = true;
-                        optgroup.appendChild(opt);
-                    });
-                    select.appendChild(optgroup);
+            const setCheck = (id, val) => { const el = document.getElementById(id); if (el) el.checked = val; };
+            const setVal = (id, val) => { const el = document.getElementById(id); if (el) el.value = val; };
+
+            const populateAllSyncSelectors = (currentSettings) => {
+                const mappings = {
+                    'set-model-chat': currentSettings.venice.model,
+                    'ga-wfm': currentSettings.wfm.model,
+                    'ga-refiner': currentSettings.refiner.model,
+                    'ga-img': currentSettings.venice_img.model,
+                    'ga-visual': currentSettings.venice_img.visual_scan_model,
+                    'ga-sum': currentSettings.summarizer.model,
+                    'ga-cons': currentSettings.summarizer.consolidation_model,
+                    'ga-lore': currentSettings.rag.extraction_model || "venice-uncensored",
+                    'ga-eval': currentSettings.evaluator_model || "venice-uncensored"
+                };
+
+                for (const [id, val] of Object.entries(mappings)) {
+                    const select = document.getElementById(id);
+                    if (select) {
+                        select.dataset.currentValue = val;
+                        populateFilteredSelect(select);
+                    }
                 }
             };
 
-            const bRes = await fetch('/get_banned_phrases');
-            const bData = await bRes.json();
-            const bannedTa = document.getElementById('set-banned-phrases');
-            if (bannedTa) bannedTa.value = bData.banned_phrases || "";
+            populateAllSyncSelectors(d);
 
-            const dl = document.getElementById('model-history-list'); 
-            if (dl) {
-                dl.innerHTML = '';
-                d.model_history.forEach(m => { const o = document.createElement('option'); o.value = m; dl.appendChild(o); });
-            }
+            const updateMiniModelInfo = (selectId, infoId) => {
+                const select = document.getElementById(selectId);
+                const infoDiv = document.getElementById(infoId);
+                if (!select || !infoDiv || !availableModels) return;
 
-            const setVal = (id, val) => { const el = document.getElementById(id); if (el) el.value = val; };
-            const setCheck = (id, checked) => { const el = document.getElementById(id); if (el) el.checked = checked; };
+                const modelId = select.value;
+                let selectedModel = null;
+                for (const group in availableModels) {
+                    const found = availableModels[group].find(m => m.id === modelId);
+                    if (found) { selectedModel = found; break; }
+                }
 
-            populateModelSelect('set-model-chat', d.venice.model);
+                if (selectedModel) {
+                    infoDiv.textContent = `CTX: ${selectedModel.context} | ${selectedModel.pricing}`;
+                }
+            };
             setCheck('set-venice-system', d.venice.include_venice_system_prompt ?? true);
             setCheck('set-vision-high-res', d.venice.vision_high_res ?? true);
             setVal('set-temp-chat', d.venice.temperature);
@@ -2706,24 +3418,53 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 const reasoningContainer = document.getElementById('reasoning-effort-container');
                 if (reasoningContainer) {
-                    const isReasoning = modelId.includes('kimi-k2') || modelId.toLowerCase().includes('deepseek') || modelId.includes('zai-org-glm');
+                    const isReasoning = modelId.startsWith('openai-gpt-') || 
+                                       modelId.startsWith('claude-') || 
+                                       modelId.startsWith('google-gemini-') ||
+                                       modelId.includes('kimi-k2') || 
+                                       modelId.includes('minimax-m2') ||
+                                       modelId.includes('glm-4.7') ||
+                                       modelId.includes('glm-5') ||
+                                       modelId.includes('qwen3-5-35b') ||
+                                       modelId.includes('qwen3-vl-235b') ||
+                                       modelId.includes('trinity-large-thinking');
                     reasoningContainer.style.display = isReasoning ? 'block' : 'none';
                 }
             };
 
-            if (modelSelect) {
-                modelSelect.onchange = (e) => updateModelInfo(e.target.value);
-                updateModelInfo(modelSelect.value);
-            }
+            // Sync other Global Assignment selectors to their counterparts
+            const syncGA = (gaId, targetId) => {
+                const ga = document.getElementById(gaId);
+                const target = document.getElementById(targetId);
+                if (ga && target) {
+                    ga.addEventListener('change', (e) => {
+                        target.value = e.target.value;
+                    });
+                }
+            };
 
-            populateModelSelect('set-model-wfm', d.wfm.model || "venice-uncensored");
+            syncGA('ga-wfm', 'set-model-wfm');
+            syncGA('ga-refiner', 'set-model-refiner');
+            syncGA('ga-img', 'set-model-img');
+            syncGA('ga-visual', 'set-model-visual-scan');
+            syncGA('ga-sum', 'sum-model');
+            syncGA('ga-cons', 'sum-cons-model');
+
+            if (modelSelect) {
+                modelSelect.addEventListener('change', (e) => updateModelInfo(e.target.value));
+                if (modelSelect.value) updateModelInfo(modelSelect.value);
+            }
+            
+            document.querySelectorAll('.model-selector-sync').forEach(select => {
+                if (select.id.startsWith('ga-')) {
+                    select.addEventListener('change', () => updateMiniModelInfo(select.id, 'mi-' + select.id.split('-')[1]));
+                }
+            });
+
             setVal('set-temp-wfm', d.wfm.temperature || 0.8);
             setVal('set-depth-wfm', d.wfm.context_depth || 10);
 
-            populateModelSelect('set-model-refiner', d.refiner?.model || "venice-uncensored");
             setVal('set-temp-refiner', d.refiner?.temperature || 0.3);
-
-            populateModelSelect('set-model-img', d.venice_img.model || "qwen3-4b");
 
             setVal('set-art-style', d.image_gen.art_style || "None");
             setVal('set-negative-styles', d.image_gen.negative_styles || "");
@@ -2744,16 +3485,24 @@ document.addEventListener('DOMContentLoaded', () => {
             setCheck('set-guided', guidedModeEnabled);
 
             setCheck('sum-enabled', d.summarizer.enabled);
-            populateModelSelect('sum-model', d.summarizer.model || "qwen3-4b");
+            setCheck('live-sum-enabled', d.summarizer.live_summary_enabled || false);
+
+            setCheck('set-auto-memory', d.venice.auto_memory_enabled ?? false);
             setVal('sum-threshold', d.summarizer.trigger_threshold_turns);
             setVal('sum-batch', d.summarizer.batch_size);
             setVal('sum-keep', d.summarizer.recent_turns_to_keep);
             setVal('sum-prompt', d.summarizer.system_prompt);
-            populateModelSelect('sum-cons-model', d.summarizer.consolidation_model || "venice-uncensored");
             setVal('sum-cons-prompt', d.summarizer.consolidation_prompt || "Summarize.");
 
             const sumOpts = document.getElementById('sum-options');
-            if (sumOpts) sumOpts.style.display = d.summarizer.enabled ? 'block' : 'none';
+            if (sumOpts) {
+                sumOpts.style.display = (d.summarizer.enabled || d.summarizer.live_summary_enabled) ? 'block' : 'none';
+                const bgFields1 = document.getElementById('bg-sum-fields');
+                const bgFields2 = document.getElementById('bg-sum-prompt-field');
+                const displayBg = d.summarizer.enabled ? 'block' : 'none';
+                if (bgFields1) bgFields1.style.display = displayBg;
+                if (bgFields2) bgFields2.style.display = displayBg;
+            }
 
             setCheck('rag-enabled', d.rag.enabled);
             setVal('rag-k', d.rag.k);
@@ -2789,6 +3538,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             if (modal) modal.style.display = 'block';
+            checkScanStatus();
         } catch(e) {
             console.error("Failed to open settings:", e);
         }
@@ -2973,8 +3723,14 @@ document.addEventListener('DOMContentLoaded', () => {
         const debugMode = document.getElementById('guided-debug-mode')?.checked || false;
         triggerImageGen(guidedInput?.value, debugMode);
     });
-    safeBind('guided-cancel', 'click', () => { if(guidedModal) guidedModal.style.display='none'; });
-    safeBind('guided-cancel-x', 'click', () => { if(guidedModal) guidedModal.style.display='none'; });
+    safeBind('guided-cancel', 'click', () => { 
+        const modal = document.getElementById('guided-modal');
+        if(modal) modal.style.display='none'; 
+    });
+    safeBind('guided-cancel-x', 'click', () => { 
+        const modal = document.getElementById('guided-modal');
+        if(modal) modal.style.display='none'; 
+    });
 
     function showDebugModal(debugData) {
         const modal = document.getElementById('debug-modal');
@@ -3029,6 +3785,663 @@ document.addEventListener('DOMContentLoaded', () => {
         if (sb) sb.classList.add('hidden'); 
     });
 
+    // ARENA MODE BINDINGS
+    window.arenaBranchIndex = null;
+
+    safeBind('new-arena-btn', 'click', async () => {
+        window.arenaBranchIndex = null;
+        if (!availableModels) {
+            const r = await fetch('/venice_models');
+            availableModels = await r.json();
+        }
+        const container = document.getElementById('arena-model-checkboxes');
+        container.innerHTML = '';
+        
+        for (const group in availableModels) {
+            const groupDiv = document.createElement('div');
+            groupDiv.style.cssText = "margin-top:10px; font-weight:bold; color:var(--purple); font-size:0.9em;";
+            groupDiv.textContent = group;
+            container.appendChild(groupDiv);
+            
+            availableModels[group].forEach(m => {
+                const lbl = document.createElement('label');
+                lbl.style.cssText = "display:flex; align-items:center; gap:8px; padding:5px; margin-left:10px; color:#ccc; font-weight:normal; cursor:pointer;";
+                lbl.innerHTML = `<input type="checkbox" value="${m.id}" data-name="${m.name}"> ${m.name}`;
+                container.appendChild(lbl);
+            });
+        }
+        document.getElementById('arena-setup-modal').style.display = 'block';
+        const sb = document.getElementById('sidebar');
+        if (sb) sb.classList.add('hidden');
+    });
+
+    window.handleBranchToArena = async (idx) => {
+        window.arenaBranchIndex = idx;
+        if (!availableModels) {
+            const r = await fetch('/venice_models');
+            availableModels = await r.json();
+        }
+        const container = document.getElementById('arena-model-checkboxes');
+        if (!container) return;
+        container.innerHTML = '';
+        
+        for (const group in availableModels) {
+            const groupDiv = document.createElement('div');
+            groupDiv.style.cssText = "margin-top:10px; font-weight:bold; color:var(--purple); font-size:0.9em;";
+            groupDiv.textContent = group;
+            container.appendChild(groupDiv);
+            
+            availableModels[group].forEach(m => {
+                const lbl = document.createElement('label');
+                lbl.style.cssText = "display:flex; align-items:center; gap:8px; padding:5px; margin-left:10px; color:#ccc; font-weight:normal; cursor:pointer;";
+                lbl.innerHTML = `<input type="checkbox" value="${m.id}" data-name="${m.name}"> ${m.name}`;
+                container.appendChild(lbl);
+            });
+        }
+        document.getElementById('arena-setup-modal').style.display = 'block';
+    };
+
+    safeBind('close-arena-setup-x', 'click', () => {
+        document.getElementById('arena-setup-modal').style.display = 'none';
+        window.arenaBranchIndex = null;
+    });
+
+    safeBind('start-arena-btn', 'click', async () => {
+        const cbs = document.querySelectorAll('#arena-model-checkboxes input:checked');
+        if (cbs.length < 2) { alert("Select at least 2 models."); return; }
+        
+        const selected = Array.from(cbs).map(c => ({id: c.value, name: c.dataset.name}));
+        const btn = document.getElementById('start-arena-btn');
+        btn.textContent = "Starting..."; btn.disabled = true;
+        
+        try {
+            const endpoint = window.arenaBranchIndex !== null ? '/branch_to_arena' : '/create_arena';
+            const payload = {models: selected};
+            if (window.arenaBranchIndex !== null) payload.index = window.arenaBranchIndex;
+
+            const res = await fetch(endpoint, {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(payload)
+            });
+            const d = await res.json();
+            if (d.success) {
+                document.getElementById('arena-setup-modal').style.display = 'none';
+                window.arenaBranchIndex = null;
+                await loadSidebar();
+                await loadChat(d.filename);
+            } else {
+                alert("Arena Error: " + (d.error || "Unknown error"));
+            }
+        } catch(e) { 
+            console.error(e);
+            alert("Failed to start Arena."); 
+        }
+        btn.textContent = "Start Arena"; btn.disabled = false;
+    });
+
+    safeBind('arena-prev-btn', 'click', () => {
+        if (!window.arenaData) return;
+        if (window.activeArenaTab === 'evaluator') {
+            window.activeArenaTab = window.arenaData.models[window.arenaData.models.length-1].id;
+        } else {
+            const idx = window.arenaData.models.findIndex(m => m.id === window.activeArenaTab);
+            if (idx > 0) window.activeArenaTab = window.arenaData.models[idx-1].id;
+            else window.activeArenaTab = 'evaluator';
+        }
+        renderArenaChat();
+    });
+
+    safeBind('arena-next-btn', 'click', () => {
+        if (!window.arenaData) return;
+        if (window.activeArenaTab === 'evaluator') {
+            window.activeArenaTab = window.arenaData.models[0].id;
+        } else {
+            const idx = window.arenaData.models.findIndex(m => m.id === window.activeArenaTab);
+            if (idx < window.arenaData.models.length - 1) window.activeArenaTab = window.arenaData.models[idx+1].id;
+            else window.activeArenaTab = 'evaluator';
+        }
+        renderArenaChat();
+    });
+
+    safeBind('arena-eval-btn', 'click', () => {
+        window.activeArenaTab = 'evaluator';
+        renderArenaChat();
+    });
+
+    function isGeneratingArena() {
+        // Simple check to see if we're in arena mode and generation is active
+        return window.isArenaMode && isGenerating;
+    }
+
+    function renderArenaChat() {
+        const chatbox = document.getElementById('chatbox');
+        if (!chatbox) return;
+        chatbox.innerHTML = '';
+
+        // [INJECTION] Check for Pipeline
+        if (data.chat_type === 'pipeline') {
+            document.getElementById('pipeline-workspace').style.display = 'flex';
+            currentPipelinePhase = data.pipeline_phase || 'architect';
+            document.getElementById('pipeline-phase-badge').textContent = `PHASE: ${currentPipelinePhase.toUpperCase()}`;
+            
+            if (currentPipelinePhase === 'scribe') {
+                document.getElementById('pipeline-lock-btn').textContent = '◀ Back to Architect';
+                document.getElementById('pipeline-lock-btn').style.background = '#444';
+            } else {
+                document.getElementById('pipeline-lock-btn').textContent = 'Lock Blueprint & Move to Scribe ▶';
+                document.getElementById('pipeline-lock-btn').style.background = 'var(--purple)';
+            }
+            
+            document.getElementById('blueprint-editor').value = data.blueprint || '';
+            
+            // Render history into pipeline chatbox instead of main chatbox
+            const pbox = document.getElementById('pipeline-chatbox');
+            pbox.innerHTML = '';
+            data.history.forEach((msg, idx) => {
+                if (msg.role !== 'system') {
+                    let html = `<div class="message ${msg.role}-msg"><div class="msg-content">${marked.parse(msg.content)}</div></div>`;
+                    pbox.innerHTML += html;
+                }
+            });
+            pbox.scrollTop = pbox.scrollHeight;
+            return; // Exit normal chatbox rendering
+        } else {
+            document.getElementById('pipeline-workspace').style.display = 'none';
+        }
+
+        
+        const isEval = window.activeArenaTab === 'evaluator';
+        const aRow = document.getElementById('arena-controls-row');
+        if (aRow) aRow.style.display = isEval ? 'none' : 'flex';
+        const eRow = document.getElementById('evaluator-controls-row');
+        if (eRow) eRow.style.display = isEval ? 'flex' : 'none';
+        
+        const label = document.getElementById('arena-current-tab');
+        if (isEval) {
+            label.textContent = "⚖️ Evaluator Mode";
+        } else {
+            const m = window.arenaData.models.find(x => x.id === window.activeArenaTab);
+            label.textContent = m ? m.name : window.activeArenaTab;
+        }
+        
+        const msgs = isEval ? window.arenaData.evaluator : window.arenaData.threads[window.activeArenaTab];
+        
+        msgs.forEach((msg, idx) => {
+            if (msg.role === 'system') return;
+            
+            const div = document.createElement('div');
+            div.className = `message ${msg.role}`;
+            div.id = `msg-arena-${idx}`;
+
+            if (msg.timestamp) {
+                const ts = document.createElement('div');
+                ts.className = 'msg-timestamp';
+                ts.textContent = new Date(msg.timestamp).toLocaleTimeString([], { hour12: true, hour: 'numeric', minute: '2-digit', second: '2-digit' });
+                div.appendChild(ts);
+            }
+
+            // Reasoning Block
+            if (msg.reasoning) {
+                const rBlock = document.createElement('div');
+                rBlock.className = 'reasoning-block';
+                // If it's the last message and it's generating, keep it expanded
+                const isGeneratingMsg = (idx === msgs.length - 1 && msg.role === 'assistant');
+                const displayStyle = isGeneratingMsg ? 'block' : 'none';
+                const toggleChar = isGeneratingMsg ? '▲' : '▼';
+                
+                rBlock.innerHTML = `
+                    <div class="reasoning-header">
+                        <span><i style="margin-right:5px;">💭</i> Thought Process</span>
+                        <span class="toggle-icon">${toggleChar}</span>
+                    </div>
+                    <div class="reasoning-content" style="display:${displayStyle};"></div>
+                `;
+                rBlock.querySelector('.reasoning-content').textContent = msg.reasoning;
+                rBlock.querySelector('.reasoning-header').onclick = () => {
+                    const content = rBlock.querySelector('.reasoning-content');
+                    const icon = rBlock.querySelector('.toggle-icon');
+                    const isHidden = content.style.display === 'none';
+                    content.style.display = isHidden ? 'block' : 'none';
+                    icon.textContent = isHidden ? '▲' : '▼';
+                };
+                div.appendChild(rBlock);
+            }
+
+            // Blueprint Tool Calls Block (persisted on message)
+            if (msg.blueprint_tool_calls) {
+                const tcBlock = document.createElement('div');
+                tcBlock.className = 'tool-calls-block';
+                tcBlock.style.cssText = 'margin-top:8px; border:1px solid #2d4a2d; border-radius:6px; overflow:hidden; font-size:0.85em;';
+                tcBlock.innerHTML = `
+                    <div class="tool-calls-header" style="display:flex; justify-content:space-between; align-items:center; padding:6px 12px; background:#1a2e1a; cursor:pointer; user-select:none;">
+                        <span><i style="margin-right:5px;">🔧</i>Blueprint Tool Calls</span>
+                        <span class="toggle-icon-tc">▼</span>
+                    </div>
+                    <div class="tool-calls-content" style="display:none; padding:12px; background:#111; white-space:pre-wrap; font-family:monospace; color:#a3e635; overflow-x:auto;"></div>
+                `;
+                tcBlock.querySelector('.tool-calls-content').textContent = msg.blueprint_tool_calls;
+                tcBlock.querySelector('.tool-calls-header').onclick = () => {
+                    const c = tcBlock.querySelector('.tool-calls-content');
+                    const ic = tcBlock.querySelector('.toggle-icon-tc');
+                    const isH = c.style.display === 'none';
+                    c.style.display = isH ? 'block' : 'none';
+                    ic.textContent = isH ? '▲' : '▼';
+                };
+                div.appendChild(tcBlock);
+            }
+
+            const contentDiv = document.createElement('div');
+            contentDiv.className = 'msg-content';
+            contentDiv.style.cssText = "white-space:pre-wrap; font-family:inherit;";
+            
+            let textContent = msg.content;
+            if (!textContent && msg.role === 'assistant') {
+                if (msg.reasoning) {
+                    textContent = '';
+                } else {
+                    // Check if this is the absolute last message in a currently generating arena
+                    const isGenerating = (idx === msgs.length - 1 && isGeneratingArena()); 
+                    textContent = isGenerating ? '<i>Thinking...</i>' : '';
+                }
+            }
+            contentDiv.innerHTML = typeof marked !== 'undefined' ? marked.parse(textContent || "") : (textContent || "");
+            div.appendChild(contentDiv);
+
+            // Options/Stats Panel
+            const optionsBtn = document.createElement('div');
+            optionsBtn.className = 'options-btn';
+            optionsBtn.textContent = '⋮';
+
+            const toolsPanel = document.createElement('div');
+            toolsPanel.className = 'tools-panel';
+
+            const stats = document.createElement('div');
+            stats.className = 'stats-block';
+            let statHtml = `Arena Msg`;
+            if (msg.model) statHtml += `<br>Model: <span style="color:var(--primary);">${msg.model}</span>`;
+            if (msg.usage) {
+                const u = msg.usage;
+                statHtml += `<br>Usage: In:${u.prompt_tokens} Out:${u.completion_tokens}`;
+                const pricing = getModelPricing(msg.model);
+                if (pricing) {
+                    const totalCost = (u.prompt_tokens / 1000000 * pricing.input) + (u.completion_tokens / 1000000 * pricing.output);
+                    statHtml += `<br>Est. Cost: <span style="color:var(--accent);">${totalCost.toFixed(5)}</span>`;
+                }
+            }
+            stats.innerHTML = statHtml;
+            toolsPanel.appendChild(stats);
+
+            optionsBtn.onclick = () => { toolsPanel.style.display = (toolsPanel.style.display === 'block') ? 'none' : 'block'; };
+            div.appendChild(optionsBtn);
+            div.appendChild(toolsPanel);
+
+            chatbox.appendChild(div);
+        });
+        chatbox.scrollTop = chatbox.scrollHeight;
+    }
+
+    // --- ARENA STREAMING OPTIMIZATION ---
+    let arenaUpdateQueue = [];
+    let isAnimationFrameRequested = false;
+
+    function processArenaUpdateQueue() {
+        while (arenaUpdateQueue.length > 0) {
+            const { mId, update } = arenaUpdateQueue.shift();
+            
+            // Only update the DOM if the user is looking at this model's tab
+            if (window.activeArenaTab !== mId) continue;
+
+            const thread = window.arenaData.threads[mId] || window.arenaData.evaluator;
+            const lastMsgIdx = thread.length - 1;
+            const msgDiv = document.getElementById(`msg-arena-${lastMsgIdx}`);
+            
+            if (!msgDiv) continue;
+
+            if (update.content) {
+                const contentDiv = msgDiv.querySelector('.msg-content');
+                if (contentDiv) {
+                    // Remove 'Thinking...' placeholder if it's there
+                    if (contentDiv.innerHTML === '<i>Thinking...</i>') {
+                        contentDiv.innerHTML = '';
+                    }
+                    contentDiv.innerHTML = typeof marked !== 'undefined' ? marked.parse(thread[lastMsgIdx].content) : thread[lastMsgIdx].content;
+                }
+            }
+            if (update.reasoning) {
+                const rContent = msgDiv.querySelector('.reasoning-content');
+                if (rContent) {
+                    rContent.textContent = thread[lastMsgIdx].reasoning;
+                    rContent.style.display = 'block';
+                    const icon = msgDiv.querySelector('.toggle-icon');
+                    if (icon) icon.textContent = '▲';
+                }
+                // Also clear thinking placeholder if content hasn't arrived yet but reasoning has
+                const contentDiv = msgDiv.querySelector('.msg-content');
+                if (contentDiv && contentDiv.innerHTML === '<i>Thinking...</i>') {
+                    contentDiv.innerHTML = '';
+                }
+            }
+            if (update.usage) {
+                const stats = msgDiv.querySelector('.stats-block');
+                if (stats) {
+                    const u = update.usage;
+                    let statHtml = `Arena Msg<br>Model: <span style="color:var(--primary);">${thread[lastMsgIdx].model || mId}</span>`;
+                    statHtml += `<br>Usage: In:${u.prompt_tokens} Out:${u.completion_tokens}`;
+                    stats.innerHTML = statHtml;
+                }
+            }
+        }
+
+        // Maintain sticky scroll
+        const isAtBottom = chatbox.scrollHeight - chatbox.scrollTop <= chatbox.clientHeight + 150;
+        if (isAtBottom) chatbox.scrollTop = chatbox.scrollHeight;
+        
+        isAnimationFrameRequested = false;
+    }
+
+    function queueArenaUIUpdate(mId, update) {
+        arenaUpdateQueue.push({ mId, update });
+        if (!isAnimationFrameRequested) {
+            isAnimationFrameRequested = true;
+            requestAnimationFrame(processArenaUpdateQueue);
+        }
+    }
+
+    async function sendArenaMessage(txt) {
+        const isEval = window.activeArenaTab === 'evaluator';
+        const sendTime = new Date().toISOString();
+        
+        if (isEval) {
+            const evalModel = document.getElementById('arena-eval-model-select').value;
+            window.arenaData.evaluator.push({role: 'user', content: txt, timestamp: sendTime});
+            window.arenaData.evaluator.push({role: 'assistant', content: '', model: evalModel, timestamp: new Date().toISOString()});
+            renderArenaChat();
+            
+            const hideNames = document.getElementById('eval-hide-names').checked;
+            
+            try {
+                const res = await fetch('/arena_eval', { 
+                    method:'POST', 
+                    headers:{'Content-Type':'application/json'}, 
+                    body:JSON.stringify({message: txt, hide_names: hideNames, model: evalModel}) 
+                });
+                const reader = res.body.getReader();
+                const dec = new TextDecoder();
+                let buffer = "";
+                
+                while(true){
+                    const {done, value} = await reader.read();
+                    if(done) break;
+                    
+                    buffer += dec.decode(value, {stream: true});
+                    let lines = buffer.split('\n\n');
+                    buffer = lines.pop();
+
+                    for (const l of lines) {
+                        if(l.startsWith('data: ')) {
+                            try { 
+                                const d = JSON.parse(l.substring(6)); 
+                                const thread = window.arenaData.evaluator;
+                                const lastMsg = thread[thread.length - 1];
+
+                                if (d.content) lastMsg.content += d.content;
+                                if (d.reasoning) lastMsg.reasoning += d.reasoning;
+                                if (d.usage) lastMsg.usage = d.usage;
+                                
+                                queueArenaUIUpdate('evaluator', d);
+                            } catch(e){}
+                        }
+                    }
+                }
+            } catch(e) { console.error("Arena Eval Error:", e); }
+            await loadHistory();
+        } else {
+            const msgObj = {role: 'user', content: txt, timestamp: sendTime};
+            const target = document.getElementById('arena-target-select').value;
+            const targets = target === 'all' ? window.arenaData.models.map(m=>m.id) : [window.activeArenaTab];
+            
+            targets.forEach(m => {
+                window.arenaData.threads[m].push(msgObj);
+                window.arenaData.threads[m].push({role: 'assistant', content: '', model: m, timestamp: new Date().toISOString()});
+            });
+            renderArenaChat();
+            
+            try {
+                const reqBody = {message: txt, target: target === 'all' ? 'all' : window.activeArenaTab};
+                const res = await fetch('/arena_chat', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(reqBody) });
+                const reader = res.body.getReader();
+                const dec = new TextDecoder();
+                let buffer = "";
+                
+                while(true){
+                    const {done, value} = await reader.read();
+                    if(done) break;
+                    
+                    buffer += dec.decode(value, {stream: true});
+                    let lines = buffer.split('\n\n');
+                    buffer = lines.pop();
+
+                    for (const l of lines) {
+                        if(l.startsWith('data: ')) {
+                            try { 
+                                const d = JSON.parse(l.substring(6)); 
+                                const mId = Object.keys(d)[0];
+                                const thread = window.arenaData.threads[mId];
+                                const update = d[mId];
+                                
+                                const lastMsg = thread[thread.length - 1];
+                                if (update.content) lastMsg.content += update.content;
+                                if (update.reasoning) lastMsg.reasoning += update.reasoning;
+                                if (update.usage) lastMsg.usage = update.usage;
+                                
+                                queueArenaUIUpdate(mId, update);
+                            } catch(e){}
+                        }
+                    }
+                }
+            } catch(e) { console.error("Arena Chat Error:", e); }
+            await loadHistory();
+        }
+    }
+
+    // AUDIT MODE BINDINGS
+    safeBind('open-audit-btn', 'click', async () => {
+        const sbRes = await fetch('/sidebar_data');
+        const sbData = await sbRes.json();
+        const activeFile = sbData.active_chat;
+        
+        if (!activeFile || activeFile.endsWith('.audit.json')) {
+            alert("Please select a standard chat first to create an audit for it.");
+            return;
+        }
+        
+        try {
+            const res = await fetch('/open_audit', {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ filename: activeFile })
+            });
+            const d = await res.json();
+            if (d.success) {
+                await loadSidebar();
+                await loadChat(d.filename);
+            }
+        } catch (e) {
+            alert("Failed to open audit chat.");
+        }
+    });
+
+    async function fetchParentContext() {
+        try {
+            const res = await fetch('/get_parent_context');
+            const d = await res.json();
+            if (d.success) parentSummariesCache = d.summaries || [];
+        } catch(e) { console.error("Failed to load parent context", e); }
+    }
+
+    function updateAuditTopBar() {
+        const countSpan = document.getElementById('audit-batch-count');
+        if (countSpan) countSpan.textContent = auditContextSelection.batches.length;
+        
+        // Sync the auto-include raw checkbox if drawer is built
+        const rawCb = document.getElementById('audit-include-raw');
+        if (rawCb) rawCb.checked = auditContextSelection.includeRaw !== false;
+    }
+
+    async function saveAuditContext() {
+        updateAuditTopBar();
+        try {
+            await fetch('/save_audit_context', {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(auditContextSelection)
+            });
+        } catch(e) { console.error("Failed to save audit context."); }
+    }
+
+    function renderAuditDrawer() {
+        const listDiv = document.getElementById('audit-batch-list');
+        if (!listDiv) return;
+        listDiv.innerHTML = '';
+        
+        if (parentSummariesCache.length === 0) {
+            listDiv.innerHTML = '<div style="color:#aaa; padding:10px;">No summaries exist in the original chat yet.</div>';
+            return;
+        }
+        
+        parentSummariesCache.forEach((batch, idx) => {
+            const isSelected = auditContextSelection.batches.includes(idx);
+            
+            const card = document.createElement('div');
+            card.className = 'audit-drawer-card' + (isSelected ? ' selected' : '');
+            
+            const headRow = document.createElement('div');
+            headRow.style.cssText = "display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;";
+            
+            const titleWrap = document.createElement('div');
+            titleWrap.style.cssText = "display:flex; align-items:center; gap:8px;";
+            
+            const cb = document.createElement('input');
+            cb.type = 'checkbox';
+            cb.value = idx;
+            cb.checked = isSelected;
+            cb.style.cssText = "width:18px; height:18px; cursor:pointer;";
+            cb.onchange = (e) => {
+                if (e.target.checked) {
+                    if (!auditContextSelection.batches.includes(idx)) auditContextSelection.batches.push(idx);
+                } else {
+                    auditContextSelection.batches = auditContextSelection.batches.filter(b => b !== idx);
+                }
+                card.classList.toggle('selected', e.target.checked);
+                saveAuditContext();
+            };
+            
+            const title = document.createElement('div');
+            title.style.cssText = "font-weight:bold; color:var(--primary);";
+            title.textContent = `Batch #${idx + 1} (Msgs ${batch.start_index} - ${batch.end_index})`;
+            
+            titleWrap.appendChild(cb);
+            titleWrap.appendChild(title);
+            
+            const expandBtn = document.createElement('button');
+            expandBtn.className = 'msg-btn';
+            expandBtn.textContent = 'View Sources ▼';
+            
+            headRow.appendChild(titleWrap);
+            headRow.appendChild(expandBtn);
+            
+            const preview = document.createElement('div');
+            preview.style.cssText = "font-size:0.85em; color:#bbb; line-height:1.4;";
+            preview.textContent = batch.content.replace(/<think>.*?<\/think>/gs, '').trim();
+            
+            const sourcesDiv = document.createElement('div');
+            sourcesDiv.style.cssText = "display:none; margin-top:10px; padding-top:10px; border-top:1px solid #333; font-size:0.85em; max-height:200px; overflow-y:auto; background:#111; padding:8px; border-radius:6px;";
+            // Note: In a full app, we would fetch the raw messages here. For now we explain it.
+            sourcesDiv.innerHTML = `<i style="color:#888;">Associated raw messages (${batch.start_index} to ${batch.end_index}) are automatically linked when this batch is selected.</i>`;
+            
+            expandBtn.onclick = () => {
+                const isHidden = sourcesDiv.style.display === 'none';
+                sourcesDiv.style.display = isHidden ? 'block' : 'none';
+                expandBtn.textContent = isHidden ? 'Hide Sources ▲' : 'View Sources ▼';
+            };
+            
+            card.appendChild(headRow);
+            card.appendChild(preview);
+            card.appendChild(sourcesDiv);
+            
+            listDiv.appendChild(card);
+        });
+    }
+
+    safeBind('audit-top-bar', 'click', async () => {
+        const drawer = document.getElementById('audit-drawer');
+        if (!drawer) return;
+        
+        if (drawer.style.display === 'none') {
+            if (parentSummariesCache.length === 0) await fetchParentContext();
+            renderAuditDrawer();
+            drawer.style.display = 'flex';
+        } else {
+            drawer.style.display = 'none';
+        }
+    });
+
+    safeBind('close-audit-drawer', 'click', (e) => {
+        e.stopPropagation();
+        const drawer = document.getElementById('audit-drawer');
+        if (drawer) drawer.style.display = 'none';
+    });
+
+    safeBind('audit-select-all', 'click', () => {
+        if (!parentSummariesCache) return;
+        auditContextSelection.batches = parentSummariesCache.map((_, i) => i);
+        saveAuditContext();
+        renderAuditDrawer();
+    });
+
+    safeBind('audit-clear-all', 'click', () => {
+        auditContextSelection.batches = [];
+        saveAuditContext();
+        renderAuditDrawer();
+    });
+
+    safeBind('audit-include-raw', 'change', (e) => {
+        auditContextSelection.includeRaw = e.target.checked;
+        saveAuditContext();
+    });
+    
+    // Setup event delegation for dynamically created "Apply Fix" buttons in the chat
+    if (chatbox) {
+        chatbox.addEventListener('click', async (e) => {
+            if (e.target.classList.contains('apply-audit-btn')) {
+                const btn = e.target;
+                const idx = btn.getAttribute('data-index');
+                const newText = decodeURIComponent(btn.getAttribute('data-text'));
+                
+                if (!confirm(`Apply this rewrite to Summary Batch #${parseInt(idx) + 1} in the original chat?`)) return;
+                
+                const ogTxt = btn.textContent;
+                btn.textContent = "Applying..."; btn.disabled = true;
+                
+                try {
+                    const res = await fetch('/apply_audit_fix', {
+                        method: 'POST', headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({ index: idx, new_text: newText })
+                    });
+                    const d = await res.json();
+                    if (d.success) {
+                        btn.textContent = "✅ Fix Applied";
+                        btn.style.background = "var(--accent)";
+                    } else {
+                        alert("Error applying fix: " + d.error);
+                        btn.textContent = ogTxt; btn.disabled = false;
+                    }
+                } catch(err) {
+                    alert("Network error applying fix.");
+                    btn.textContent = ogTxt; btn.disabled = false;
+                }
+            }
+        });
+    }
+
     safeBind('expand-main-prompt', 'click', () => { 
         if(modal) modal.style.display='none'; 
         openLargeEditor(null, 'prompt'); 
@@ -3043,21 +4456,118 @@ document.addEventListener('DOMContentLoaded', () => {
         if (modal) modal.style.display = 'none'; 
     });
 
-    safeBind('scan-visuals-btn', 'click', async () => {
+    let scanStatusInterval = null;
+
+    const updateScanUI = (job) => {
         const btn = document.getElementById('scan-visuals-btn');
-        const depthEl = document.getElementById('set-visual-depth');
-        const depthVal = depthEl ? depthEl.value : 50;
-        if (btn) { btn.textContent = "Scanning..."; btn.disabled = true; }
+        const statusDisplay = document.getElementById('scan-status-indicator');
+        
+        if (!statusDisplay) {
+            // Create a small indicator if it doesn't exist
+            const newIndicator = document.createElement('div');
+            newIndicator.id = 'scan-status-indicator';
+            newIndicator.style.cssText = "font-size:0.75em; padding:5px; margin-top:5px; border-radius:4px; text-align:center; display:none;";
+            const btnParent = btn.parentNode;
+            btnParent.insertBefore(newIndicator, btn.nextSibling);
+        }
+
+        const indicator = document.getElementById('scan-status-indicator');
+
+        if (job.status === 'running') {
+            btn.disabled = true;
+            btn.textContent = "Scanning...";
+            indicator.style.display = 'block';
+            indicator.style.background = 'rgba(139, 92, 246, 0.2)';
+            indicator.style.color = 'var(--purple)';
+            indicator.innerHTML = `<span class="spinner" style="display:inline-block; vertical-align:middle; margin-right:5px;"></span> ${job.message}`;
+            
+            // If settings is open, ensure we keep polling
+            if (!scanStatusInterval) {
+                scanStatusInterval = setInterval(checkScanStatus, 3000);
+            }
+        } else if (job.status === 'completed') {
+            btn.disabled = false;
+            btn.textContent = "Scan Context";
+            indicator.style.display = 'block';
+            indicator.style.background = 'rgba(16, 185, 129, 0.2)';
+            indicator.style.color = 'var(--accent)';
+            indicator.textContent = `✅ ${job.message}`;
+            
+            if (scanStatusInterval) {
+                clearInterval(scanStatusInterval);
+                scanStatusInterval = null;
+            }
+            
+            // Refresh visuals if in settings
+            fetch('/get_history').then(r => r.json()).then(data => {
+                if (data.visual_memory) {
+                    currentVisualMemory = data.visual_memory;
+                    if (vmTextarea) vmTextarea.value = currentVisualMemory;
+                }
+            });
+        } else if (job.status === 'error') {
+            btn.disabled = false;
+            btn.textContent = "Scan Context";
+            indicator.style.display = 'block';
+            indicator.style.background = 'rgba(239, 68, 68, 0.2)';
+            indicator.style.color = 'var(--danger)';
+            indicator.textContent = `❌ Error: ${job.message}`;
+            
+            if (scanStatusInterval) {
+                clearInterval(scanStatusInterval);
+                scanStatusInterval = null;
+            }
+        } else {
+            btn.disabled = false;
+            btn.textContent = "Scan Context";
+            indicator.style.display = 'none';
+        }
+    };
+
+    async function checkScanStatus() {
         try {
-            const res = await fetch('/scan_visuals', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({depth: parseInt(depthVal)}) });
+            const res = await fetch('/check_scan_status');
+            const job = await res.json();
+            updateScanUI(job);
+        } catch (e) {
+            console.warn("Status check failed");
+        }
+    }
+
+    safeBind('scan-visuals-btn', 'click', async () => {
+        const startEl = document.getElementById('set-visual-start');
+        const endEl = document.getElementById('set-visual-end');
+        const modelEl = document.getElementById('set-model-visual-scan');
+        
+        const startVal = startEl && startEl.value ? parseInt(startEl.value) : null;
+        const endVal = endEl && endEl.value ? parseInt(endEl.value) : null;
+        const modelVal = modelEl ? modelEl.value : null;
+
+        const btn = document.getElementById('scan-visuals-btn');
+        const ogText = btn.textContent;
+
+        try {
+            const res = await fetch('/scan_visuals', { 
+                method:'POST', 
+                headers:{'Content-Type':'application/json'}, 
+                body:JSON.stringify({
+                    start: startVal,
+                    end: endVal,
+                    model: modelVal
+                }) 
+            });
             const d = await res.json();
             if(d.success) { 
-                if (vmTextarea) vmTextarea.value = d.memory; 
-                currentVisualMemory = d.memory; 
-                await loadHistory(); 
+                // Immediate update to show it started
+                updateScanUI({status: 'running', message: d.message});
+            } else {
+                alert("Scan Error: " + d.error);
             }
-        } catch(e) { alert("Scan Error"); }
-        finally { if (btn) { btn.textContent = "Scan Context"; btn.disabled = false; } }
+        } catch(e) { 
+            alert("Network Error"); 
+            btn.textContent = ogText;
+            btn.disabled = false;
+        }
     });
 
     safeBind('save-visuals-btn', 'click', async () => {
@@ -3068,8 +4578,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
     safeBind('sum-enabled', 'click', async (e) => {
         const isChecked = e.target.checked;
+        const liveEnabled = document.getElementById('live-sum-enabled')?.checked;
         const opts = document.getElementById('sum-options');
-        if (opts) opts.style.display = isChecked ? 'block' : 'none';
+        if (opts) opts.style.display = (isChecked || liveEnabled) ? 'block' : 'none';
+
+        const bgFields1 = document.getElementById('bg-sum-fields');
+        const bgFields2 = document.getElementById('bg-sum-prompt-field');
+        if (bgFields1) bgFields1.style.display = isChecked ? 'block' : 'none';
+        if (bgFields2) bgFields2.style.display = isChecked ? 'block' : 'none';
 
         if (isChecked) {
             const keepEl = document.getElementById('sum-keep');
@@ -3144,6 +4660,7 @@ document.addEventListener('DOMContentLoaded', () => {
             venice: { 
                 model: getVal('set-model-chat', 'venice-uncensored'), 
                 include_venice_system_prompt: getCheck('set-venice-system', true),
+                auto_memory_enabled: getCheck('set-auto-memory', false),
                 vision_high_res: getCheck('set-vision-high-res', true),
                 temperature: parseFloat(getVal('set-temp-chat', 0.8)),
                 max_tokens: parseInt(getVal('set-tokens-chat', 4000)),
@@ -3152,31 +4669,38 @@ document.addEventListener('DOMContentLoaded', () => {
                 presence_penalty: parseFloat(getVal('set-pres-chat', 0))
             },
             wfm: {
-                model: getVal('set-model-wfm', 'venice-uncensored'),
+                model: getVal('ga-wfm', getVal('set-model-wfm', 'venice-uncensored')),
                 temperature: parseFloat(getVal('set-temp-wfm', 0.8)),
                 context_depth: parseInt(getVal('set-depth-wfm', 10))
             },
             refiner: {
-                model: getVal('set-model-refiner', 'venice-uncensored'),
+                model: getVal('ga-refiner', getVal('set-model-refiner', 'venice-uncensored')),
                 temperature: parseFloat(getVal('set-temp-refiner', 0.3))
             },
-            venice_img: { model: getVal('set-model-img', 'qwen3-4b'), context_depth: parseInt(getVal('set-img-depth', 3)) },
+            venice_img: { 
+                model: getVal('ga-img', getVal('set-model-img', 'qwen3-4b')), 
+                visual_scan_model: getVal('ga-visual', getVal('set-model-visual-scan', 'venice-uncensored')),
+                context_depth: parseInt(getVal('set-img-depth', 3)) 
+            },
             summarizer: { 
                 enabled: getCheck('sum-enabled', false), 
-                model: getVal('sum-model', 'qwen3-4b'),
+                live_summary_enabled: getCheck('live-sum-enabled', false),
+                model: getVal('ga-sum', getVal('sum-model', 'qwen3-4b')),
                 trigger_threshold_turns: parseInt(getVal('sum-threshold', 12)), 
                 batch_size: parseInt(getVal('sum-batch', 4)), 
                 recent_turns_to_keep: parseInt(getVal('sum-keep', 12)), 
                 system_prompt: getVal('sum-prompt', 'Summarize.'),
-                consolidation_model: getVal('sum-cons-model', 'venice-uncensored'),
+                consolidation_model: getVal('ga-cons', getVal('sum-cons-model', 'venice-uncensored')),
                 consolidation_prompt: getVal('sum-cons-prompt', 'Summarize.')
             },
             rag: {
                 enabled: getCheck('rag-enabled', false),
                 k: parseInt(getVal('rag-k', 3)),
                 max_chars: parseInt(getVal('rag-max-chars', 1200)),
-                min_chars: parseInt(getVal('rag-min-chars', 200))
+                min_chars: parseInt(getVal('rag-min-chars', 200)),
+                extraction_model: getVal('ga-lore', 'venice-uncensored')
             },
+            evaluator_model: getVal('ga-eval', 'venice-uncensored'),
             tts: {
                 enabled: getCheck('tts-enabled', false),
                 model: getVal('set-tts-model', 'tts-kokoro'),
@@ -3296,6 +4820,7 @@ document.addEventListener('DOMContentLoaded', () => {
             setTxt('stat-p-tot', gData.proj_tot.toLocaleString());
             setTxt('stat-p-raw', gData.proj_raw.toLocaleString());
             setTxt('stat-p-sum', gData.proj_sum.toLocaleString());
+            setTxt('stat-p-mem', gData.proj_mem.toLocaleString());
             setTxt('stat-p-sys', gData.proj_sys.toLocaleString());
         } catch (e) {
             console.error("Failed to load global stats", e);
@@ -3303,6 +4828,156 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (analyticsModal) analyticsModal.style.display = 'block';
     });
+
+    safeBind('open-api-explorer-btn', 'click', () => {
+        if (apiExplorerModal) apiExplorerModal.style.display = 'block';
+        // Auto-load models tab on open
+        loadExplorerTab('models');
+    });
+
+    safeBind('close-api-explorer-x', 'click', () => {
+        if (apiExplorerModal) apiExplorerModal.style.display = 'none';
+    });
+
+    document.querySelectorAll('.explorer-tab').forEach(tab => {
+        tab.onclick = () => {
+            document.querySelectorAll('.explorer-tab').forEach(t => t.classList.remove('active'));
+            tab.classList.add('active');
+            loadExplorerTab(tab.dataset.tab);
+        };
+    });
+
+    async function loadExplorerTab(endpoint) {
+        const results = document.getElementById('explorer-results');
+        if (!results) return;
+        results.innerHTML = `<div style="text-align:center; padding:50px;"><div class="spinner" style="width:30px; height:30px; margin:0 auto;"></div><br>Fetching ${endpoint} from Venice...</div>`;
+
+        try {
+            const res = await fetch(`/venice/discovery/${endpoint}`);
+            const data = await res.json();
+
+            if (data.error) {
+                results.innerHTML = `<div style="color:var(--danger); padding:20px;">Error: ${data.error}</div>`;
+                return;
+            }
+
+            if (endpoint === 'models') {
+                renderDiscoveredModels(data.data, results);
+            } else {
+                results.innerHTML = `<pre style="font-family:monospace; font-size:0.85em; white-space:pre-wrap; color:#ccc;">${JSON.stringify(data, null, 2)}</pre>`;
+            }
+        } catch (e) {
+            results.innerHTML = `<div style="color:var(--danger); padding:20px;">Failed to connect to backend.</div>`;
+        }
+    }
+
+    function renderDiscoveredModels(models, container) {
+        container.innerHTML = `
+            <div style="margin-bottom:15px; display:flex; justify-content:space-between; align-items:center;">
+                <h3 style="margin:0; color:var(--accent);">Available Models (${models.length})</h3>
+                <input type="text" id="explorer-search" placeholder="Search models..." style="background:#222; border:1px solid #444; color:white; padding:6px 12px; border-radius:6px; font-size:0.9em;">
+            </div>
+            <div id="explorer-list" style="display:flex; flex-direction:column; gap:10px;"></div>
+        `;
+
+        const list = document.getElementById('explorer-list');
+        const searchInput = document.getElementById('explorer-search');
+
+        const drawList = (filter = "") => {
+            list.innerHTML = "";
+            const filtered = models.filter(m => 
+                m.id.toLowerCase().includes(filter.toLowerCase()) || 
+                (m.name && m.name.toLowerCase().includes(filter.toLowerCase()))
+            );
+
+            filtered.forEach(m => {
+                const card = document.createElement('div');
+                card.style.cssText = "background:#1a1a1a; border:1px solid #333; border-radius:8px; padding:12px; display:flex; justify-content:space-between; align-items:center; transition:border-color 0.2s;";
+                card.onmouseenter = () => card.style.borderColor = "var(--primary)";
+                card.onmouseleave = () => card.style.borderColor = "#333";
+
+                const info = document.createElement('div');
+                info.style.flex = "1";
+                
+                const spec = m.model_spec || {};
+                const modelName = spec.name || m.name || m.id;
+
+                let pricingStr = "Free/Unknown";
+                if (spec.pricing) {
+                    pricingStr = `${spec.pricing.input?.usd || 0} / ${spec.pricing.output?.usd || 0}`;
+                } else if (m.pricePer1MInputTokens) {
+                    pricingStr = `${m.pricePer1MInputTokens} / ${m.pricePer1MOutputTokens}`;
+                }
+
+                const contextVal = spec.availableContextTokens || m.contextWindowSize;
+                const contextStr = contextVal ? contextVal.toLocaleString() : "N/A";
+
+                info.innerHTML = `
+                    <div style="font-weight:bold; color:white;">${modelName}</div>
+                    <div style="font-size:0.75em; color:var(--text-dim); font-family:monospace;">${m.id}</div>
+                    <div style="font-size:0.8em; color:var(--accent); margin-top:4px;">Context: ${contextStr} • Price: ${pricingStr}</div>
+                `;
+
+                const btn = document.createElement('button');
+                btn.className = "msg-btn";
+                btn.style.cssText = "background:var(--primary); color:white; border:none; padding:6px 12px;";
+                btn.textContent = "Import";
+                btn.onclick = () => importDiscoveredModel(m);
+
+                card.appendChild(info);
+                card.appendChild(btn);
+                list.appendChild(card);
+            });
+        };
+
+        searchInput.oninput = (e) => drawList(e.target.value);
+        drawList();
+    }
+
+    async function importDiscoveredModel(m) {
+        const category = prompt("Which category should this model be added to?", "Imported Models");
+        if (category === null) return;
+
+        const spec = m.model_spec || {};
+        const capabilities = spec.capabilities || m.capabilities || {};
+
+        let pricingStr = "N/A";
+        if (spec.pricing) {
+            pricingStr = `${spec.pricing.input?.usd || 0} / ${spec.pricing.output?.usd || 0}`;
+        } else if (m.pricePer1MInputTokens) {
+            pricingStr = `${m.pricePer1MInputTokens} / ${m.pricePer1MOutputTokens}`;
+        }
+
+        const payload = {
+            id: m.id,
+            name: spec.name || m.name || m.id,
+            traits: (spec.traits ? spec.traits.join(", ") : null) || m.type || "Universal",
+            pricing: pricingStr,
+            context: (spec.availableContextTokens || m.contextWindowSize || "N/A").toLocaleString(),
+            vision: capabilities.supportsVision || capabilities.supportsMultipleImages || false,
+            description: spec.description || "Imported via API Explorer.",
+            tags: m.tags || []
+        };
+
+        try {
+            const res = await fetch(`/venice/import_model?category=${encodeURIComponent(category)}`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(payload)
+            });
+            const d = await res.json();
+            if (d.success) {
+                alert(`Successfully added ${payload.name} to ${category}!`);
+                // Refresh local models cache
+                const mRes = await fetch('/venice_models');
+                availableModels = await mRes.json();
+            } else {
+                alert(d.message || "Failed to import model.");
+            }
+        } catch (e) {
+            alert("Error importing model.");
+        }
+    }
 
     safeBind('run-analytics-btn', 'click', async () => {
         await runAnalytics();
@@ -3366,6 +5041,117 @@ document.addEventListener('DOMContentLoaded', () => {
             document.body.style.overflow = ''; // Restore background scrolling
         }
     });
+
+    // --- LEDGER LOGIC ---
+    safeBind('open-ledger-btn', 'click', async () => {
+        const modal = document.getElementById('ledger-modal');
+        if (modal) {
+            modal.style.display = 'block';
+            document.body.style.overflow = 'hidden';
+        }
+        await loadLedger();
+    });
+
+    safeBind('close-ledger-x', 'click', () => {
+        const modal = document.getElementById('ledger-modal');
+        if (modal) {
+            modal.style.display = 'none';
+            document.body.style.overflow = '';
+        }
+    });
+
+    safeBind('clear-ledger-btn', 'click', async () => {
+        if (!confirm("Are you sure you want to permanently delete all API call history from the ledger?")) return;
+        try {
+            await fetch('/clear_ledger', { method: 'POST' });
+            await loadLedger();
+        } catch (e) {
+            alert("Error clearing ledger.");
+        }
+    });
+
+    async function loadLedger() {
+        const tBody = document.getElementById('ledger-tbody');
+        const summaryDiv = document.getElementById('ledger-summary');
+        if (!tBody || !summaryDiv) return;
+
+        tBody.innerHTML = '<tr><td colspan="6" style="text-align:center;">Loading...</td></tr>';
+        
+        try {
+            const res = await fetch('/get_ledger');
+            const data = await res.json();
+            
+            // Build Summary
+            const s = data.summary;
+            let summaryHTML = `
+                <div style="display:flex; justify-content:space-between; margin-bottom:15px; flex-wrap:wrap; gap:10px;">
+                    <div style="background:var(--bg-lighter); padding:10px; border-radius:4px; flex:1; min-width:150px;">
+                        <strong>Total Calls:</strong><br>${s.total_calls}
+                    </div>
+                    <div style="background:var(--bg-lighter); padding:10px; border-radius:4px; flex:1; min-width:150px;">
+                        <strong>Total Est. Cost:</strong><br>$${s.total_estimated.toFixed(4)}
+                    </div>
+                    <div style="background:var(--bg-lighter); padding:10px; border-radius:4px; flex:1; min-width:150px;">
+                        <strong>Total Actual Cost:</strong><br>$${s.total_actual.toFixed(4)}
+                    </div>
+                    <div style="background:var(--bg-lighter); padding:10px; border-radius:4px; flex:1; min-width:150px;">
+                        <strong>Avg Cache Hit:</strong><br>${s.avg_cache_hit_rate}%
+                    </div>
+                </div>
+                <div style="font-size:0.9em;">
+                    <strong>Cost by Feature:</strong><br>
+            `;
+            for (const [feat, stats] of Object.entries(s.feature_breakdown)) {
+                summaryHTML += `<span style="display:inline-block; margin-right:15px; background:rgba(255,255,255,0.05); padding:2px 6px; border-radius:3px;">${feat}: $${stats.actual.toFixed(4)}</span>`;
+            }
+            summaryHTML += `</div>`;
+            summaryDiv.innerHTML = summaryHTML;
+
+            // Build Table (reversed so newest is on top)
+            const calls = data.calls.slice().reverse();
+            tBody.innerHTML = '';
+            
+            if (calls.length === 0) {
+                tBody.innerHTML = '<tr><td colspan="6" style="text-align:center;">No API calls logged yet.</td></tr>';
+                return;
+            }
+
+            for (const c of calls) {
+                const tr = document.createElement('tr');
+                
+                const timeStr = new Date(c.timestamp).toLocaleString();
+                
+                // Color code actual vs estimated
+                let costColor = '';
+                const diff = (c.actual_cost || 0) - (c.estimated_cost || 0);
+                if (diff > 0.001) costColor = 'color:var(--red);'; // Significantly higher than estimated
+                else if (diff < -0.001) costColor = 'color:var(--accent);'; // Lower than estimated (cache hit)
+                
+                let actualCostStr = c.actual_cost !== null ? `$${c.actual_cost.toFixed(4)}` : 'N/A';
+                if (c.actual_cost !== null) {
+                    actualCostStr = `<span style="${costColor}">${actualCostStr}</span>`;
+                }
+
+                let estCostStr = c.estimated_cost !== null ? `$${c.estimated_cost.toFixed(4)}` : 'N/A';
+
+                tr.innerHTML = `
+                    <td style="font-size:0.8em; color:var(--text-dim);">${timeStr}</td>
+                    <td><strong>${c.feature}</strong><br><span style="font-size:0.8em; color:var(--text-dim);">${c.model}</span></td>
+                    <td style="text-align:right;">${c.prompt_tokens.toLocaleString()}<br><span style="font-size:0.8em; color:var(--text-dim);">${c.completion_tokens.toLocaleString()} out</span></td>
+                    <td style="text-align:right;">
+                        ${c.cached_tokens.toLocaleString()}<br>
+                        <span style="font-size:0.8em; color:${c.cache_hit_rate > 50 ? 'var(--accent)' : 'var(--text-dim)'};">${c.cache_hit_rate}%</span>
+                    </td>
+                    <td style="text-align:right; font-family:monospace;">${estCostStr}</td>
+                    <td style="text-align:right; font-family:monospace; font-weight:bold;">${actualCostStr}</td>
+                `;
+                tBody.appendChild(tr);
+            }
+
+        } catch (e) {
+            tBody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:red;">Error fetching ledger: ${e.message}</td></tr>`;
+        }
+    }
 
     async function handleDeleteMessage(index) {
         if (!confirm("Remove this message from the chat? This will remove it from the conversation context.")) return;
@@ -3587,4 +5373,271 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         btn.textContent = ogText; btn.disabled = false;
     });
+
+// --- STORY PIPELINE LOGIC ---
+document.querySelectorAll('.pipe-select').forEach(sel => {
+    sel.addEventListener('change', (e) => {
+        const customInput = document.getElementById(e.target.id + '-custom');
+        if (customInput) {
+            customInput.style.display = e.target.value === 'custom' ? 'block' : 'none';
+        }
+    });
+});
+
+// --- STORY PIPELINE LOGIC (INTEGRATED) ---
+const newPipelineBtn = document.getElementById('new-pipeline-btn');
+const pipelineSetupModal = document.getElementById('pipeline-setup-modal');
+const closePipelineSetupX = document.getElementById('close-pipeline-setup-x');
+const startPipelineBtn = document.getElementById('start-pipeline-btn');
+const pipelineLockBtn = document.getElementById('pipeline-lock-btn');
+const pipelineSaveDocBtn = document.getElementById('pipeline-save-doc-btn');
+const openPipelinePanelBtn = document.getElementById('open-pipeline-panel-btn');
+let currentPipelinePhase = 'architect';
+
+if (newPipelineBtn) {
+    newPipelineBtn.addEventListener('click', () => {
+        const sidebar = document.getElementById('sidebar');
+        if (sidebar) sidebar.classList.add('hidden');
+        if (pipelineSetupModal) {
+            pipelineSetupModal.style.display = 'flex';
+            // Trigger model population
+            if (typeof filterAllModelSelectors === 'function') filterAllModelSelectors();
+            
+            // Re-bind custom toggles just in case
+            document.querySelectorAll('.pipe-select').forEach(sel => {
+                sel.addEventListener('change', (e) => {
+                    const customInput = document.getElementById(sel.id + '-custom');
+                    if (customInput) {
+                        customInput.style.display = e.target.value === 'custom' ? 'block' : 'none';
+                        if (e.target.value === 'custom') customInput.focus();
+                    }
+                });
+            });
+        }
+    });
+}
+if (closePipelineSetupX) closePipelineSetupX.addEventListener('click', () => pipelineSetupModal.style.display = 'none');
+
+if (startPipelineBtn) {
+    startPipelineBtn.addEventListener('click', async () => {
+        const concept = document.getElementById('pipe-concept').value.trim();
+        if (!concept) {
+            alert("Core Concept is required.");
+            return;
+        }
+        
+        const getSetting = (id) => {
+            const el = document.getElementById(id);
+            if (!el) return '';
+            const val = el.value;
+            if (val === 'custom') {
+                const cEl = document.getElementById(id + '-custom');
+                return cEl ? cEl.value.trim() : '';
+            }
+            return val;
+        };
+
+        const settings = {
+            length: getSetting('pipe-length'),
+            detail: getSetting('pipe-detail'),
+            genre: getSetting('pipe-genre'),
+            tone: getSetting('pipe-tone'),
+            themes: getSetting('pipe-themes'),
+            setting: getSetting('pipe-setting'),
+            pov: getSetting('pipe-pov'),
+            pacing: getSetting('pipe-pacing'),
+            nsfw: getSetting('pipe-nsfw')
+        };
+        
+        if (pipelineSetupModal) pipelineSetupModal.style.display = 'none';
+        
+        try {
+            const res = await fetch('/create_pipeline_chat', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ concept, settings })
+            });
+            const data = await res.json();
+            if (data.success) {
+                await loadSidebar();
+                const sbRes = await fetch('/sidebar_data');
+                const sbData = await sbRes.json();
+                if (sbData.active_chat) {
+                    await loadHistory();
+                    triggerGen("Please acknowledge these settings and let's begin architecting.");
+                }
+            } else {
+                alert("Error: " + data.error);
+            }
+        } catch (e) { console.error(e); }
+    });
+}
+
+// Full-screen Modal Toggle
+if (openPipelinePanelBtn) {
+    openPipelinePanelBtn.addEventListener('click', () => {
+        const docModal = document.getElementById('pipeline-doc-modal');
+        if (docModal) {
+            docModal.style.display = 'flex';
+            document.body.style.overflow = 'hidden';
+            
+            // Sync editor content
+            const editor = document.getElementById('blueprint-editor');
+            if (editor) {
+                // If it's a pipeline chat, history might have the blueprint
+                // We'll trust the current value in editor or fetch it
+            }
+        }
+    });
+}
+
+safeBind('close-pipeline-doc-x', 'click', () => {
+    const docModal = document.getElementById('pipeline-doc-modal');
+    if (docModal) {
+        docModal.style.display = 'none';
+        document.body.style.overflow = '';
+    }
+});
+
+// Lock Phase
+safeBind('lock-scribe-btn', 'click', async () => {
+    try {
+        const res = await fetch('/toggle_pipeline_phase', {method: 'POST'});
+        const data = await res.json();
+        if (data.success) {
+            currentPipelinePhase = data.new_phase;
+            const badge = document.getElementById('pipeline-status-badge');
+            const modeLabel = document.getElementById('pipeline-mode-label');
+            if (badge) {
+                badge.textContent = currentPipelinePhase.toUpperCase();
+                badge.style.background = currentPipelinePhase === 'scribe' ? 'var(--purple)' : 'var(--accent)';
+            }
+            if (modeLabel) modeLabel.textContent = currentPipelinePhase.charAt(0).toUpperCase() + currentPipelinePhase.slice(1);
+            
+            const lockBtn = document.getElementById('lock-scribe-btn');
+            const editor = document.getElementById('blueprint-editor');
+            if (currentPipelinePhase === 'scribe') {
+                if (lockBtn) lockBtn.textContent = '◀ Back to Architect';
+                if (editor) editor.readOnly = true;
+            } else {
+                if (lockBtn) lockBtn.textContent = 'Lock & Scribe';
+                if (editor) editor.readOnly = false;
+            }
+        }
+    } catch (e) { console.error(e); }
+});
+
+// --- DIFF LOGIC ---
+let previousBlueprint = '';
+
+function updateBlueprintDiff(oldText, newText) {
+    const diffView = document.getElementById('diff-view-container');
+    if (!diffView) return;
+
+    const oldLines = oldText.split('\n');
+    const newLines = newText.split('\n');
+    
+    let html = '';
+    const maxLines = Math.max(oldLines.length, newLines.length);
+    
+    // Simple line-based diff (can be improved, but good for start)
+    // We'll use a basic approach: if line changed, show both. If new, show green. If removed, show red.
+    // For a more advanced diff, we'd use Myers or similar, but let's stick to line comparison.
+    
+    let i = 0, j = 0;
+    while (i < oldLines.length || j < newLines.length) {
+        if (i < oldLines.length && j < newLines.length && oldLines[i] === newLines[j]) {
+            html += `<div>${escapeHtml(oldLines[i]) || '&nbsp;'}</div>`;
+            i++; j++;
+        } else {
+            // Check if it's a replacement or just additions/deletions
+            // We'll look ahead a bit to see if we can resync
+            let foundResync = false;
+            for (let look = 1; look < 5; look++) {
+                if (i + look < oldLines.length && oldLines[i+look] === newLines[j]) {
+                    // Removed lines
+                    for (let k = 0; k < look; k++) {
+                        html += `<div style="background:#450a0a; color:#f87171;">- ${escapeHtml(oldLines[i+k]) || '&nbsp;'}</div>`;
+                    }
+                    i += look;
+                    foundResync = true;
+                    break;
+                }
+                if (j + look < newLines.length && oldLines[i] === newLines[j+look]) {
+                    // Added lines
+                    for (let k = 0; k < look; k++) {
+                        html += `<div style="background:#064e3b; color:#4ade80;">+ ${escapeHtml(newLines[j+k]) || '&nbsp;'}</div>`;
+                    }
+                    j += look;
+                    foundResync = true;
+                    break;
+                }
+            }
+            
+            if (!foundResync) {
+                if (i < oldLines.length && j < newLines.length) {
+                    html += `<div style="background:#450a0a; color:#f87171;">- ${escapeHtml(oldLines[i]) || '&nbsp;'}</div>`;
+                    html += `<div style="background:#064e3b; color:#4ade80;">+ ${escapeHtml(newLines[j]) || '&nbsp;'}</div>`;
+                    i++; j++;
+                } else if (i < oldLines.length) {
+                    html += `<div style="background:#450a0a; color:#f87171;">- ${escapeHtml(oldLines[i]) || '&nbsp;'}</div>`;
+                    i++;
+                } else if (j < newLines.length) {
+                    html += `<div style="background:#064e3b; color:#4ade80;">+ ${escapeHtml(newLines[j]) || '&nbsp;'}</div>`;
+                    j++;
+                }
+            }
+        }
+    }
+    
+    diffView.innerHTML = html || '<div style="color:#666; font-style:italic;">No changes yet...</div>';
+}
+
+function escapeHtml(text) {
+    if (!text) return '';
+    return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+}
+
+// Bind Toggles
+safeBind('view-edit-btn', 'click', () => {
+    document.getElementById('view-edit-btn').classList.add('active');
+    document.getElementById('view-diff-btn').classList.remove('active');
+    document.getElementById('edit-view-container').style.display = 'block';
+    document.getElementById('diff-view-container').style.display = 'none';
+});
+
+safeBind('view-diff-btn', 'click', () => {
+    document.getElementById('view-diff-btn').classList.add('active');
+    document.getElementById('view-edit-btn').classList.remove('active');
+    document.getElementById('edit-view-container').style.display = 'none';
+    document.getElementById('diff-view-container').style.display = 'block';
+    
+    // Compute diff on demand: compare saved blueprint vs current editor content
+    const editor = document.getElementById('blueprint-editor');
+    const currentText = editor ? editor.value : '';
+    updateBlueprintDiff(previousBlueprint, currentText);
+});
+
+// Save Doc
+safeBind('save-blueprint-btn', 'click', async () => {
+    const editor = document.getElementById('blueprint-editor');
+    const saveBtn = document.getElementById('save-blueprint-btn');
+    if (!editor || !saveBtn) return;
+    try {
+        const res = await fetch('/update_blueprint', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ blueprint: editor.value })
+        });
+        if (res.ok) {
+            const ogText = saveBtn.textContent;
+            saveBtn.textContent = 'Saved!';
+            saveBtn.style.background = 'var(--accent)';
+            setTimeout(() => {
+                saveBtn.textContent = ogText;
+                saveBtn.style.background = 'var(--primary)';
+            }, 2000);
+        }
+    } catch(e) {}
+});
 });

@@ -1,0 +1,5 @@
+{
+    "model": "gemma-4-uncensored",
+    "visual_scan_model": "gemma-4-uncensored",
+    "context_depth": 8
+}
