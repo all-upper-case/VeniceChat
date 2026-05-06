@@ -28,11 +28,11 @@ body {
 
 /* SIDEBAR */
 #sidebar {
-    width: 300px; background: var(--bg-sidebar); border-right: 1px solid var(--border);
+    width: 320px; background: var(--bg-sidebar); border-right: 1px solid var(--border);
     display: flex; flex-direction: column; flex-shrink: 0;
     transition: margin-left 0.3s ease; z-index: 1000; overflow-x: hidden;
 }
-#sidebar.hidden { margin-left: -300px; }
+#sidebar.hidden { margin-left: -320px; }
 
 #new-chat-btn {
     padding: 15px; background: var(--primary); color: white; border: none;
@@ -41,10 +41,46 @@ body {
 }
 #new-chat-btn:hover { background: var(--primary-hover); }
 
+/* Collapsible Utilities Section */
+#sidebar-utilities {
+    border-bottom: 1px solid var(--border);
+}
+#sidebar-utilities summary {
+    padding: 12px 15px;
+    background: #151515;
+    color: var(--accent);
+    font-size: 0.85rem;
+    font-weight: bold;
+    cursor: pointer;
+    list-style: none;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+#sidebar-utilities summary::after {
+    content: '▼';
+    font-size: 0.7em;
+    transition: transform 0.2s;
+}
+#sidebar-utilities[open] summary::after {
+    transform: rotate(180deg);
+}
+#sidebar-utilities-content {
+    padding: 10px;
+    background: #0f0f0f;
+}
+
 #sidebar-header {
-    padding: 10px 15px; border-bottom: 1px solid var(--border);
-    display: flex; justify-content: space-between; align-items: center;
-    color: var(--text-dim); font-size: 0.85em; text-transform: uppercase; letter-spacing: 1px;
+    padding: 15px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #050505;
+    border-bottom: 1px solid var(--border);
+    font-size: 0.8em;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 1px;
 }
 
 #chat-list { list-style: none; padding: 0; margin: 0; overflow-y: auto; flex: 1; }
@@ -720,6 +756,16 @@ details[open] summary::after { content: "-"; }
     max-width: 800px;
     margin: 0 auto 20px auto;
 }
+.scribe-track .message.assistant {
+    border-left: 4px solid var(--purple);
+    background: rgba(139, 92, 246, 0.03);
+}
+.tool-calls-block {
+    transition: all 0.2s;
+}
+.tool-calls-block:hover {
+    border-color: #4ade80 !important;
+}
 /* PIPELINE SIDE PANEL */
 #pipeline-side-panel {
     display: flex;
@@ -740,17 +786,37 @@ details[open] summary::after { content: "-"; }
     border-radius: 10px;
 }
 
-#pipeline-doc-editor {
-    flex: 1;
-    min-height: 0; /* Important for flex children */
-    background: transparent;
-    color: #eee;
-    border: none;
-    padding: 20px;
-    font-size: 1.1em;
-    line-height: 1.6;
-    outline: none;
-    resize: none;
+#diff-view-container {
+    padding: 0;
+    background: #050505;
+}
+.diff-line-equal {
+    padding: 2px 20px;
+    border-left: 4px solid transparent;
+}
+.diff-line-add {
+    background: rgba(16, 185, 129, 0.1);
+    color: #4ade80;
+    border-left: 4px solid #10b981;
+    padding: 2px 20px;
+}
+.diff-line-remove {
+    background: rgba(239, 68, 68, 0.1);
+    color: #f87171;
+    border-left: 4px solid #ef4444;
+    padding: 2px 20px;
+    text-decoration: line-through;
+}
+
+#pipeline-doc-body::-webkit-scrollbar {
+    width: 8px;
+}
+#pipeline-doc-body::-webkit-scrollbar-thumb {
+    background: #333;
+    border-radius: 4px;
+}
+#pipeline-doc-body::-webkit-scrollbar-track {
+    background: #111;
 }
 
 @media (max-width: 768px) {

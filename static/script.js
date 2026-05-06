@@ -131,7 +131,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 filteredGroup.forEach(m => {
                     const opt = document.createElement('option');
                     opt.value = m.id;
-                    opt.textContent = (m.vision ? '👁️ ' : '') + m.name;
+                    opt.textContent = (m.vision ? 'ðŸ‘ï¸ ' : '') + m.name;
                     if (m.id === currentVal) opt.selected = true;
                     optgroup.appendChild(opt);
                 });
@@ -153,7 +153,7 @@ document.addEventListener('DOMContentLoaded', () => {
             allFiltered.forEach(m => {
                 const opt = document.createElement('option');
                 opt.value = m.id;
-                opt.textContent = (m.vision ? '👁️ ' : '') + m.name;
+                opt.textContent = (m.vision ? 'ðŸ‘ï¸ ' : '') + m.name;
                 if (m.id === currentVal) opt.selected = true;
                 select.appendChild(opt);
             });
@@ -266,68 +266,45 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const init = async () => {
         try {
-            const mRes = await fetch('/venice_models');
-            availableModels = await mRes.json();
+            // Concurrent fetching for speed
+            const [mRes, settingsRes, bRes] = await Promise.allSettled([
+                fetch('/venice_models'),
+                fetch('/get_settings'),
+                fetch('/get_balance')
+            ]);
 
-            // Populate all model selectors
-            if (typeof filterAllModelSelectors === 'function') {
+            if (mRes.status === 'fulfilled' && mRes.value.ok) {
+                availableModels = await mRes.value.json();
                 filterAllModelSelectors();
             }
 
-            // Populate Rename modal model selector specifically if needed
-            const renameSelect = document.getElementById('rename-model-select');
-            if (renameSelect && availableModels) {
-                for (const group in availableModels) {
-                    const optgroup = document.createElement('optgroup');
-                    optgroup.label = group;
-                    availableModels[group].forEach(m => {
-                        const opt = document.createElement('option');
-                        opt.value = m.id;
-                        opt.textContent = m.name;
-                        if (m.id === 'venice-uncensored') opt.selected = true;
-                        optgroup.appendChild(opt);
-                    });
-                    renameSelect.appendChild(optgroup);
+            if (settingsRes.status === 'fulfilled' && settingsRes.value.ok) {
+                const d = await settingsRes.value.json();
+                if(d.interface) applyInterfaceSettings(d.interface.font_size, d.interface.bg_color);
+                if(d.tts) window.ttsSettings = d.tts;
+                
+                // Sync summarizer settings to UI
+                if (d.summarizer) {
+                    const ids = {'live-sum-enabled': 'live_summary_enabled', 'sum-keep': 'recent_turns_to_keep', 'sum-batch': 'batch_size'};
+                    for (const [elId, key] of Object.entries(ids)) {
+                        const el = document.getElementById(elId);
+                        if (el) el[el.type === 'checkbox' ? 'checked' : 'value'] = d.summarizer[key];
+                    }
                 }
             }
 
-            const settingsRes = await fetch('/get_settings');
-            const d = await settingsRes.json();
-            if(d && d.interface) {
-                applyInterfaceSettings(d.interface.font_size, d.interface.bg_color);
-            }
-            if(d && d.tts) {
-                window.ttsSettings = d.tts;
+            if (bRes.status === 'fulfilled' && bRes.value.ok) {
+                const bData = await bRes.value.json();
+                if (bData?.balance) updateBalanceDisplay(bData.balance);
             }
 
-            if (d && d.summarizer) {
-                const elLive = document.getElementById('live-sum-enabled');
-                if (elLive) elLive.checked = d.summarizer.live_summary_enabled || false;
-                
-                const elKeep = document.getElementById('sum-keep');
-                if (elKeep) elKeep.value = d.summarizer.recent_turns_to_keep || 12;
-                
-                const elBatch = document.getElementById('sum-batch');
-                if (elBatch) elBatch.value = d.summarizer.batch_size || 4;
-            }
-
-            // Fetch persisted balance
-            try {
-                const bRes = await fetch('/get_balance');
-                const bData = await bRes.json();
-                if (bData && bData.balance) {
-                    updateBalanceDisplay(bData.balance);
-                }
-            } catch (e) {
-                console.warn("Failed to fetch persisted balance:", e);
-            }
-
-            await loadHistory();
-            await loadSidebar();
+            // Load UI data
+            await Promise.all([loadHistory(), loadSidebar()]);
+            
             updateAttachmentButtonVisibility();
             checkScanStatus();
 
-            // Auto-expand all textareas on init and bind listeners
+            // Post-init cleanup
             document.querySelectorAll('textarea').forEach(ta => {
                 autoExpandTextarea(ta);
                 ta.addEventListener('input', () => autoExpandTextarea(ta));
@@ -371,12 +348,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 btn.classList.add('tts-ready');
                 if (currentTTS.msgIndex === idx && currentTTS.contentHash === hash) {
                     if (currentTTS.audio && !currentTTS.audio.paused) {
-                        btn.innerHTML = '⏹ Stop';
+                        btn.innerHTML = 'â¹ Stop';
                     } else {
-                        btn.innerHTML = '▶ Play';
+                        btn.innerHTML = 'â–¶ Play';
                     }
                 } else {
-                    btn.innerHTML = '▶ Play';
+                    btn.innerHTML = 'â–¶ Play';
                 }
             }
         });
@@ -401,7 +378,7 @@ document.addEventListener('DOMContentLoaded', () => {
         controls.innerHTML = `
             <button class="tts-ctrl-btn" data-skip="-15" title="Back 15s">-15s</button>
             <button class="tts-ctrl-btn" data-skip="-5" title="Back 5s">-5s</button>
-            <button class="tts-ctrl-btn play-pause-btn" title="Play/Pause">⏸</button>
+            <button class="tts-ctrl-btn play-pause-btn" title="Play/Pause">â¸</button>
             <button class="tts-ctrl-btn" data-skip="5" title="Forward 5s">+5s</button>
             <button class="tts-ctrl-btn" data-skip="15" title="Forward 15s">+15s</button>
             <div class="tts-progress-container">
@@ -424,10 +401,10 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!currentTTS.audio) return;
             if (currentTTS.audio.paused) {
                 currentTTS.audio.play();
-                ppBtn.textContent = '⏸';
+                ppBtn.textContent = 'â¸';
             } else {
                 currentTTS.audio.pause();
-                ppBtn.textContent = '▶';
+                ppBtn.textContent = 'â–¶';
             }
             updateTTSButtonStates();
         };
@@ -441,7 +418,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const pct = (currentTTS.audio.currentTime / currentTTS.audio.duration) * 100;
                 if (bar) bar.style.width = pct + '%';
             };
-            ppBtn.textContent = currentTTS.audio.paused ? '▶' : '⏸';
+            ppBtn.textContent = currentTTS.audio.paused ? 'â–¶' : 'â¸';
         }
     }
 
@@ -498,7 +475,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // 1. GENERATION PHASE (If not in cache)
         if (!ttsCache[hash]) {
-            btn.innerHTML = '⌛ Generating...';
+            btn.innerHTML = 'âŒ› Generating...';
             btn.disabled = true;
 
             try {
@@ -524,7 +501,7 @@ document.addEventListener('DOMContentLoaded', () => {
             } catch (e) {
                 console.error("TTS Error:", e);
                 alert("TTS Error: " + e.message);
-                btn.innerHTML = '❌ Error';
+                btn.innerHTML = 'âŒ Error';
                 return;
             } finally {
                 btn.disabled = false;
@@ -1034,11 +1011,11 @@ document.addEventListener('DOMContentLoaded', () => {
             info.style.flex = '1';
             info.style.minWidth = '0';
 
-            const ratingHtml = char.stats?.averageRating ? `<span style="color:#fbbf24; margin-left:5px;">★${char.stats.averageRating.toFixed(1)}</span>` : '';
+            const ratingHtml = char.stats?.averageRating ? `<span style="color:#fbbf24; margin-left:5px;">â˜…${char.stats.averageRating.toFixed(1)}</span>` : '';
 
             info.innerHTML = `
                 <div style="font-weight:bold; color:white; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-size:1.1em;">${char.name} ${ratingHtml}</div>
-                <div style="font-size:0.75em; color:var(--text-dim);">@${char.slug} • by ${char.author || 'Anonymous'}</div>
+                <div style="font-size:0.75em; color:var(--text-dim);">@${char.slug} â€¢ by ${char.author || 'Anonymous'}</div>
                 <div style="font-size:0.7em; color:var(--primary); margin-top:2px;">Opt: ${char.modelId || 'Universal'}</div>
             `;
 
@@ -1062,7 +1039,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const peekBtn = document.createElement('button');
             peekBtn.className = 'msg-btn';
             peekBtn.style.cssText = 'padding: 4px 8px; border-color: #555; font-size: 0.75em;';
-            peekBtn.innerHTML = '👁️ Logic';
+            peekBtn.innerHTML = 'ðŸ‘ï¸ Logic';
             peekBtn.title = "View the character's System Prompt / Instructions";
             peekBtn.onclick = (e) => {
                 e.stopPropagation();
@@ -1296,7 +1273,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 currentPipelinePhase = data.pipeline_phase || 'architect';
                 
-                // Update Badge
+                // Update Badge (Header)
+                const phaseBadge = document.getElementById('pipeline-phase-badge');
+                const trackIndicator = document.getElementById('pipeline-track-indicator');
+                if (phaseBadge) {
+                    phaseBadge.textContent = currentPipelinePhase.toUpperCase();
+                    phaseBadge.style.background = currentPipelinePhase === 'scribe' ? 'var(--purple)' : 'var(--accent)';
+                }
+                if (trackIndicator) {
+                    trackIndicator.textContent = currentPipelinePhase === 'scribe' ? '(Actual Story Prose)' : '(Brainstorming & Blueprinting)';
+                }
+
+                // Update Badge (Modal)
                 const badge = document.getElementById('pipeline-status-badge');
                 if (badge) {
                     badge.textContent = currentPipelinePhase.toUpperCase();
@@ -1311,7 +1299,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const lockBtn = document.getElementById('lock-scribe-btn');
                 if (lockBtn) {
                     if (currentPipelinePhase === 'scribe') {
-                        lockBtn.textContent = '◀ Back to Architect';
+                        lockBtn.textContent = 'â—€ Back to Architect';
                         if (editor) editor.readOnly = true;
                     } else {
                         lockBtn.textContent = 'Lock & Scribe';
@@ -1404,8 +1392,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const isAtBottom = chatbox.scrollHeight - chatbox.scrollTop <= chatbox.clientHeight + 100;
         
         chatbox.innerHTML = '';
-
-
+        const fragment = document.createDocumentFragment();
 
         runningInput = 0;
         runningOutput = 0;
@@ -1478,7 +1465,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     const delGenBtn = document.createElement('button');
                     delGenBtn.className = 'msg-btn';
                     delGenBtn.style.cssText = 'background:var(--danger); color:white; border:none; margin-top:10px; padding:6px 12px;';
-                    delGenBtn.textContent = '🗑️ Delete Image';
+                    delGenBtn.textContent = 'ðŸ—‘ï¸ Delete Image';
                     delGenBtn.onclick = async (e) => {
                         e.stopPropagation();
                         if (confirm("Permanently delete this generated image?")) {
@@ -1506,8 +1493,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         rBlock.className = 'reasoning-block';
                         rBlock.innerHTML = `
                             <div class="reasoning-header">
-                                <span><i style="margin-right:5px;">💭</i> Thought Process</span>
-                                <span class="toggle-icon">▼</span>
+                                <span><i style="margin-right:5px;">ðŸ’­</i> Thought Process</span>
+                                <span class="toggle-icon">â–¼</span>
                             </div>
                             <div class="reasoning-content" style="display:none;">${msg.reasoning}</div>
                         `;
@@ -1516,7 +1503,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             const icon = rBlock.querySelector('.toggle-icon');
                             const isHidden = content.style.display === 'none';
                             content.style.display = isHidden ? 'block' : 'none';
-                            icon.textContent = isHidden ? '▲' : '▼';
+                            icon.textContent = isHidden ? 'â–²' : 'â–¼';
                         };
                         div.appendChild(rBlock);
                     }
@@ -1527,8 +1514,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         sBlock.className = 'summary-block';
                         sBlock.innerHTML = `
                             <div class="summary-header">
-                                <span><i style="margin-right:5px;">📝</i> Live Inline Summary</span>
-                                <span class="toggle-icon-sum">▼</span>
+                                <span><i style="margin-right:5px;">ðŸ“</i> Live Inline Summary</span>
+                                <span class="toggle-icon-sum">â–¼</span>
                             </div>
                             <div class="summary-content" style="display:none;">${msg.live_summary}</div>
                         `;
@@ -1537,13 +1524,36 @@ document.addEventListener('DOMContentLoaded', () => {
                             const icon = sBlock.querySelector('.toggle-icon-sum');
                             const isHidden = content.style.display === 'none';
                             content.style.display = isHidden ? 'block' : 'none';
-                            icon.textContent = isHidden ? '▲' : '▼';
+                            icon.textContent = isHidden ? 'â–²' : 'â–¼';
                         };
                         div.appendChild(sBlock);
                     }
 
                     const contentDiv = document.createElement('div');
                     contentDiv.style.cssText = "white-space:pre-wrap; font-family:inherit;";
+                    contentDiv.className = 'msg-content';
+
+                    // Tool Calls Block (Metadata view)
+                    if (msg.blueprint_tool_calls) {
+                        const tcBlock = document.createElement('div');
+                        tcBlock.className = 'tool-calls-block';
+                        tcBlock.style.cssText = 'margin-bottom:12px; border:1px solid #2d4a2d; border-radius:6px; overflow:hidden; font-size:0.85em;';
+                        tcBlock.innerHTML = `
+                            <div class="tool-calls-header" style="display:flex; justify-content:space-between; align-items:center; padding:6px 12px; background:#1a2e1a; cursor:pointer; user-select:none;">
+                                <span style="color:#4ade80;"><i style="margin-right:5px;">🛠️</i> Blueprint Actions</span>
+                                <span class="toggle-icon-tc">▼</span>
+                            </div>
+                            <div class="tool-calls-content" style="display:none; padding:12px; background:#0a0a0a; white-space:pre-wrap; font-family:monospace; color:#a3e635; border-top:1px solid #2d4a2d;">${msg.blueprint_tool_calls}</div>
+                        `;
+                        tcBlock.querySelector('.tool-calls-header').onclick = () => {
+                            const c = tcBlock.querySelector('.tool-calls-content');
+                            const ic = tcBlock.querySelector('.toggle-icon-tc');
+                            const isH = c.style.display === 'none';
+                            c.style.display = isH ? 'block' : 'none';
+                            ic.textContent = isH ? '▲' : '▼';
+                        };
+                        div.appendChild(tcBlock);
+                    }
 
                     if (diffModeMsgs.has(idx) && msg.original_content) {
                         const origText = Array.isArray(msg.original_content) ? msg.original_content.find(p=>p.type==='text')?.text || "" : msg.original_content;
@@ -1568,7 +1578,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             }
                             
                             return `<div class="audit-tool-card">
-                                <div class="audit-tool-header">🛠️ Proposed Summary Update (Batch #${bIdx + 1})</div>
+                                <div class="audit-tool-header">ðŸ› ï¸ Proposed Summary Update (Batch #${bIdx + 1})</div>
                                 ${oldTextHTML}
                                 <div><strong>Proposed Fix:</strong><br><div class="audit-comparison-panel" style="border-left-color:#10b981;">${cleanNew}</div></div>
                                 <div style="display:flex; gap:10px; margin-top:12px;">
@@ -1605,7 +1615,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                                     const delBtn = document.createElement('button');
                                     delBtn.className = 'img-action-btn delete';
-                                    delBtn.textContent = '🗑️';
+                                    delBtn.textContent = 'ðŸ—‘ï¸';
                                     delBtn.title = 'Delete Image';
                                     delBtn.onclick = async () => {
                                         if (confirm("Permanently delete this input image from the message?")) {
@@ -1636,7 +1646,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const optionsBtn = document.createElement('div');
             optionsBtn.className = 'options-btn';
-            optionsBtn.textContent = '⋮';
+            optionsBtn.innerHTML = '&#8942;'; // Vertical Ellipsis
 
             const toolsPanel = document.createElement('div');
             toolsPanel.className = 'tools-panel';
@@ -1689,7 +1699,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 ttsBtn.dataset.index = idx;
                 ttsBtn.style.borderColor = 'var(--accent)';
                 ttsBtn.style.color = 'var(--accent)';
-                ttsBtn.textContent = '▶ Narrate';
+                ttsBtn.textContent = 'â–¶ Narrate';
                 ttsBtn.onclick = () => handleTTS(idx);
                 btnRow.append(ttsBtn);
             }
@@ -1784,9 +1794,9 @@ document.addEventListener('DOMContentLoaded', () => {
                         }
 
                         if (u.breakdown) {
-                            statHtml += `<br><span style="font-size:0.85em; color:var(--text-dim);">├ Sum: ${u.breakdown.summary || 0}</span>`;
-                            statHtml += `<br><span style="font-size:0.85em; color:var(--text-dim);">├ Raw: ${u.breakdown.raw || 0}</span>`;
-                            statHtml += `<br><span style="font-size:0.85em; color:var(--text-dim);">└ Sys: ${u.breakdown.system || 0}</span>`;
+                            statHtml += `<br><span style="font-size:0.85em; color:var(--text-dim);">â”œ Sum: ${u.breakdown.summary || 0}</span>`;
+                            statHtml += `<br><span style="font-size:0.85em; color:var(--text-dim);">â”œ Raw: ${u.breakdown.raw || 0}</span>`;
+                            statHtml += `<br><span style="font-size:0.85em; color:var(--text-dim);">â”” Sys: ${u.breakdown.system || 0}</span>`;
                         }
 
                         let cachedTokens = 0;
@@ -1807,9 +1817,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
                             statHtml += `<br><span class="cost-wrapper" style="cursor:pointer; color:var(--text-dim);" onclick="const val = this.querySelector('.cost-value'); const placeholder = this.querySelector('.cost-placeholder'); if(val.style.display === 'none') { val.style.display = 'inline'; placeholder.style.display = 'none'; this.style.color = 'inherit'; } else { const details = this.nextElementSibling; details.style.display = (details.style.display === 'none' ? 'block' : 'none'); }">Cost: <span class="cost-placeholder" style="text-decoration:underline dotted;">[Show]</span><span class="cost-value" style="display:none; text-decoration:underline dashed; color:var(--accent);">${totalCost.toFixed(5)}</span></span>`;
                             statHtml += `<div class="cost-details" style="display:none; font-size:0.85em; color:var(--text-dim); margin-top:4px; padding-left:10px; border-left:1px solid #444;">`;
-                            statHtml += `├ Input: ${inputCost.toFixed(5)}<br>`;
-                            if (cachedTokens > 0) statHtml += `├ Cache: ${cacheCost.toFixed(5)}<br>`;
-                            statHtml += `└ Output: ${outputCost.toFixed(5)}`;
+                            statHtml += `â”œ Input: ${inputCost.toFixed(5)}<br>`;
+                            if (cachedTokens > 0) statHtml += `â”œ Cache: ${cacheCost.toFixed(5)}<br>`;
+                            statHtml += `â”” Output: ${outputCost.toFixed(5)}`;
                             statHtml += `</div>`;
                         }
 
@@ -1838,8 +1848,10 @@ document.addEventListener('DOMContentLoaded', () => {
             optionsBtn.onclick = () => { toolsPanel.style.display = (toolsPanel.style.display === 'block') ? 'none' : 'block'; };
             div.appendChild(optionsBtn);
             div.appendChild(toolsPanel);
-            chatbox.appendChild(div);
+            fragment.appendChild(div);
         });
+        
+        chatbox.appendChild(fragment);
 
         if (forceScroll || (isAtBottom && !isGenerating)) {
             chatbox.scrollTop = chatbox.scrollHeight;
@@ -1855,8 +1867,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 return `
                     <div class="reasoning-block">
                         <div class="reasoning-header">
-                            <span><i style="margin-right:5px;">💭</i> Summary Thought Process</span>
-                            <span class="toggle-icon">▼</span>
+                            <span><i style="margin-right:5px;">ðŸ’­</i> Summary Thought Process</span>
+                            <span class="toggle-icon">â–¼</span>
                         </div>
                         <div class="reasoning-content" style="display:none;">${thinking}</div>
                     </div>
@@ -1909,7 +1921,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const i = contentDiv.querySelector('.toggle-icon');
                 const isH = c.style.display === 'none';
                 c.style.display = isH ? 'block' : 'none';
-                i.textContent = isH ? '▲' : '▼';
+                i.textContent = isH ? 'â–²' : 'â–¼';
             };
         }
 
@@ -2067,7 +2079,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     const i = content.querySelector('.toggle-icon');
                     const isH = c.style.display === 'none';
                     c.style.display = isH ? 'block' : 'none';
-                    i.textContent = isH ? '▲' : '▼';
+                    i.textContent = isH ? 'â–²' : 'â–¼';
                 };
             }
 
@@ -2642,8 +2654,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function handleRegenWithModel(idx) {
         try {
-            const res = await fetch('/venice_models');
-            const mData = await res.json();
+            const mData = availableModels || await fetch('/venice_models').then(r => r.json());
             const select = document.getElementById('regen-model-select');
             if(!select) return;
             select.innerHTML = '';
@@ -2831,8 +2842,8 @@ document.addEventListener('DOMContentLoaded', () => {
                                    rBlock.className = 'reasoning-block';
                                    rBlock.innerHTML = `
                                        <div class="reasoning-header">
-                                           <span><i style="margin-right:5px;">💭</i> Thought Process</span>
-                                           <span class="toggle-icon">▲</span>
+                                           <span><i style="margin-right:5px;">ðŸ’­</i> Thought Process</span>
+                                           <span class="toggle-icon">â–²</span>
                                        </div>
                                        <div class="reasoning-content" style="display:block;"></div>
                                    `;
@@ -2852,8 +2863,8 @@ document.addEventListener('DOMContentLoaded', () => {
                                    sBlock.className = 'summary-block';
                                    sBlock.innerHTML = `
                                        <div class="summary-header">
-                                           <span><i style="margin-right:5px;">📝</i> Live Inline Summary</span>
-                                           <span class="toggle-icon-sum">▲</span>
+                                           <span><i style="margin-right:5px;">ðŸ“</i> Live Inline Summary</span>
+                                           <span class="toggle-icon-sum">â–²</span>
                                        </div>
                                        <div class="summary-content" style="display:block;"></div>
                                    `;
@@ -2862,7 +2873,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                        const i = sBlock.querySelector('.toggle-icon-sum');
                                        const isH = c.style.display === 'none';
                                        c.style.display = isH ? 'block' : 'none';
-                                       i.textContent = isH ? '▲' : '▼';
+                                       i.textContent = isH ? 'â–²' : 'â–¼';
                                    };
                                    if (rBlock && rBlock.nextSibling) {
                                        div.insertBefore(sBlock, rBlock.nextSibling);
@@ -2900,8 +2911,8 @@ document.addEventListener('DOMContentLoaded', () => {
                                        rBlock.className = 'reasoning-block';
                                        rBlock.innerHTML = `
                                            <div class="reasoning-header">
-                                               <span><i style="margin-right:5px;">💭</i> Thought Process</span>
-                                               <span class="toggle-icon">▲</span>
+                                               <span><i style="margin-right:5px;">ðŸ’­</i> Thought Process</span>
+                                               <span class="toggle-icon">â–²</span>
                                            </div>
                                            <div class="reasoning-content" style="display:block;"></div>
                                        `;
@@ -2910,7 +2921,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                            const i = rBlock.querySelector('.toggle-icon');
                                            const isH = c.style.display === 'none';
                                            c.style.display = isH ? 'block' : 'none';
-                                           i.textContent = isH ? '▲' : '▼';
+                                           i.textContent = isH ? 'â–²' : 'â–¼';
                                        };
                                        div.appendChild(rBlock); // Append instead of insertBefore so it flows naturally
                                    }
@@ -2963,11 +2974,11 @@ document.addEventListener('DOMContentLoaded', () => {
                                        // Collapse reasoning/summary if we just created the content block
                                        if(rBlock && rBlock.querySelector('.reasoning-content').style.display !== 'none') {
                                            rBlock.querySelector('.reasoning-content').style.display = 'none';
-                                           rBlock.querySelector('.toggle-icon').textContent = '▼';
+                                           rBlock.querySelector('.toggle-icon').textContent = 'â–¼';
                                        }
                                        if(sBlock && sBlock.querySelector('.summary-content').style.display !== 'none') {
                                            sBlock.querySelector('.summary-content').style.display = 'none';
-                                           sBlock.querySelector('.toggle-icon-sum').textContent = '▼';
+                                           sBlock.querySelector('.toggle-icon-sum').textContent = 'â–¼';
                                        }
                                    }
                                    full += d.content;
@@ -2997,8 +3008,8 @@ document.addEventListener('DOMContentLoaded', () => {
                                        tcBlock.style.cssText = 'margin-top:8px; border:1px solid #2d4a2d; border-radius:6px; overflow:hidden; font-size:0.85em;';
                                        tcBlock.innerHTML = `
                                            <div class="tool-calls-header" style="display:flex; justify-content:space-between; align-items:center; padding:6px 12px; background:#1a2e1a; cursor:pointer; user-select:none;">
-                                               <span><i style="margin-right:5px;">🔧</i>Blueprint Tool Calls</span>
-                                               <span class="toggle-icon-tc">▼</span>
+                                               <span><i style="margin-right:5px;">ðŸ”§</i>Blueprint Tool Calls</span>
+                                               <span class="toggle-icon-tc">â–¼</span>
                                            </div>
                                            <div class="tool-calls-content" style="display:none; padding:12px; background:#111; white-space:pre-wrap; font-family:monospace; color:#a3e635; overflow-x:auto;"></div>
                                        `;
@@ -3007,7 +3018,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                            const ic = tcBlock.querySelector('.toggle-icon-tc');
                                            const isH = c.style.display === 'none';
                                            c.style.display = isH ? 'block' : 'none';
-                                           ic.textContent = isH ? '▲' : '▼';
+                                           ic.textContent = isH ? 'â–²' : 'â–¼';
                                        };
                                        div.appendChild(tcBlock);
                                    }
@@ -3046,7 +3057,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                if (statusMsg) {
                                    const toast = document.createElement('div');
                                    toast.style.cssText = "color:var(--accent); font-weight:bold; animation: fadeOut 3s forwards;";
-                                   toast.innerHTML = "🧠 AI updated its Internal Notepad";
+                                   toast.innerHTML = "ðŸ§  AI updated its Internal Notepad";
                                    statusMsg.appendChild(toast);
                                    setTimeout(() => toast.remove(), 4000);
                                }
@@ -3131,7 +3142,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const li = document.createElement('li'); li.className = 'chat-item';
                 if (file === data.active_chat) li.classList.add('active-chat');
                 li.innerHTML = `<span class="chat-name">${file.replace('.json','').replace(/_/g,' ')}</span>
-                                <div><button class="icon-btn r-btn">✎</button><button class="icon-btn d-btn">🗑</button></div>`;
+                                <div><button class="icon-btn r-btn">&#9998;</button><button class="icon-btn d-btn">&#128465;</button></div>`;
                 li.onclick = (e) => { if(!e.target.closest('.icon-btn')) loadChat(file); };
                 li.querySelector('.r-btn').onclick = () => renameChat(file);
                 li.querySelector('.d-btn').onclick = () => deleteChat(file);
@@ -3143,8 +3154,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     const ali = document.createElement('li');
                     ali.className = 'chat-item audit-chat-item';
                     if (auditFile === data.active_chat) ali.classList.add('active-chat');
-                    ali.innerHTML = `<span class="chat-name">↳ 🕵️ Audit: ${file.replace('.json','').replace(/_/g,' ')}</span>
-                                    <div><button class="icon-btn d-btn">🗑</button></div>`;
+                    ali.innerHTML = `<span class="chat-name">â†³ ðŸ•µï¸ Audit: ${file.replace('.json','').replace(/_/g,' ')}</span>
+                                    <div><button class="icon-btn d-btn">ðŸ—‘</button></div>`;
                     ali.onclick = (e) => { if(!e.target.closest('.icon-btn')) loadChat(auditFile); };
                     ali.querySelector('.d-btn').onclick = () => deleteChat(auditFile);
                     list.appendChild(ali);
@@ -3158,8 +3169,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     const ali = document.createElement('li');
                     ali.className = 'chat-item audit-chat-item';
                     if (aFile === data.active_chat) ali.classList.add('active-chat');
-                    ali.innerHTML = `<span class="chat-name">↳ 🕵️ Orphaned Audit: ${aFile.replace('.audit.json','').replace(/_/g,' ')}</span>
-                                    <div><button class="icon-btn d-btn">🗑</button></div>`;
+                    ali.innerHTML = `<span class="chat-name">â†³ ðŸ•µï¸ Orphaned Audit: ${aFile.replace('.audit.json','').replace(/_/g,' ')}</span>
+                                    <div><button class="icon-btn d-btn">ðŸ—‘</button></div>`;
                     ali.onclick = (e) => { if(!e.target.closest('.icon-btn')) loadChat(aFile); };
                     ali.querySelector('.d-btn').onclick = () => deleteChat(aFile);
                     list.appendChild(ali);
@@ -3307,13 +3318,16 @@ document.addEventListener('DOMContentLoaded', () => {
         btn.textContent = ogText; btn.disabled = false;
     });
     window.deleteChat = async (file) => {
-        if(confirm("Delete?")) { await fetch('/delete_chat', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({filename:file})}); loadSidebar(); }
+        if(confirm("Delete?")) { 
+            await fetch('/delete_chat', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({filename:file})}); 
+            await loadSidebar(); 
+        }
     };
     async function loadChat(file) {
         diffModeMsgs.clear();
         isComparing = false;
         await fetch('/load_chat', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({filename:file})});
-        loadHistory(); 
+        await loadHistory(); 
         const sidebar = document.getElementById('sidebar');
         if (sidebar) sidebar.classList.add('hidden');
     }
@@ -3328,10 +3342,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const openSettings = async () => {
         try {
-            const res = await fetch('/get_settings');
+            const [res, mRes] = await Promise.all([
+                fetch('/get_settings'),
+                fetch('/venice_models')
+            ]);
             const d = await res.json();
-
-            const mRes = await fetch('/venice_models');
             const mData = await mRes.json();
 
             const setCheck = (id, val) => { const el = document.getElementById(id); if (el) el.checked = val; };
@@ -3421,6 +3436,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     const isReasoning = modelId.startsWith('openai-gpt-') || 
                                        modelId.startsWith('claude-') || 
                                        modelId.startsWith('google-gemini-') ||
+                                       modelId.includes('deepseek-') || 
                                        modelId.includes('kimi-k2') || 
                                        modelId.includes('minimax-m2') ||
                                        modelId.includes('glm-4.7') ||
@@ -3790,20 +3806,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
     safeBind('new-arena-btn', 'click', async () => {
         window.arenaBranchIndex = null;
-        if (!availableModels) {
-            const r = await fetch('/venice_models');
-            availableModels = await r.json();
-        }
+        const mData = availableModels || await fetch('/venice_models').then(r => r.json());
         const container = document.getElementById('arena-model-checkboxes');
         container.innerHTML = '';
         
-        for (const group in availableModels) {
+        for (const group in mData) {
             const groupDiv = document.createElement('div');
             groupDiv.style.cssText = "margin-top:10px; font-weight:bold; color:var(--purple); font-size:0.9em;";
             groupDiv.textContent = group;
             container.appendChild(groupDiv);
             
-            availableModels[group].forEach(m => {
+            mData[group].forEach(m => {
                 const lbl = document.createElement('label');
                 lbl.style.cssText = "display:flex; align-items:center; gap:8px; padding:5px; margin-left:10px; color:#ccc; font-weight:normal; cursor:pointer;";
                 lbl.innerHTML = `<input type="checkbox" value="${m.id}" data-name="${m.name}"> ${m.name}`;
@@ -3919,25 +3932,25 @@ document.addEventListener('DOMContentLoaded', () => {
         chatbox.innerHTML = '';
 
         // [INJECTION] Check for Pipeline
-        if (data.chat_type === 'pipeline') {
+        if (window.arenaData && window.arenaData.chat_type === 'pipeline') {
             document.getElementById('pipeline-workspace').style.display = 'flex';
-            currentPipelinePhase = data.pipeline_phase || 'architect';
+            currentPipelinePhase = window.arenaData.pipeline_phase || 'architect';
             document.getElementById('pipeline-phase-badge').textContent = `PHASE: ${currentPipelinePhase.toUpperCase()}`;
             
             if (currentPipelinePhase === 'scribe') {
-                document.getElementById('pipeline-lock-btn').textContent = '◀ Back to Architect';
+                document.getElementById('pipeline-lock-btn').textContent = 'â—€ Back to Architect';
                 document.getElementById('pipeline-lock-btn').style.background = '#444';
             } else {
-                document.getElementById('pipeline-lock-btn').textContent = 'Lock Blueprint & Move to Scribe ▶';
+                document.getElementById('pipeline-lock-btn').textContent = 'Lock Blueprint & Move to Scribe â–¶';
                 document.getElementById('pipeline-lock-btn').style.background = 'var(--purple)';
             }
             
-            document.getElementById('blueprint-editor').value = data.blueprint || '';
+            document.getElementById('blueprint-editor').value = window.arenaData.blueprint || '';
             
             // Render history into pipeline chatbox instead of main chatbox
             const pbox = document.getElementById('pipeline-chatbox');
             pbox.innerHTML = '';
-            data.history.forEach((msg, idx) => {
+            window.arenaData.history.forEach((msg, idx) => {
                 if (msg.role !== 'system') {
                     let html = `<div class="message ${msg.role}-msg"><div class="msg-content">${marked.parse(msg.content)}</div></div>`;
                     pbox.innerHTML += html;
@@ -3946,7 +3959,8 @@ document.addEventListener('DOMContentLoaded', () => {
             pbox.scrollTop = pbox.scrollHeight;
             return; // Exit normal chatbox rendering
         } else {
-            document.getElementById('pipeline-workspace').style.display = 'none';
+            const pWork = document.getElementById('pipeline-workspace');
+            if (pWork) pWork.style.display = 'none';
         }
 
         
@@ -3958,7 +3972,7 @@ document.addEventListener('DOMContentLoaded', () => {
         
         const label = document.getElementById('arena-current-tab');
         if (isEval) {
-            label.textContent = "⚖️ Evaluator Mode";
+            label.textContent = "âš–ï¸ Evaluator Mode";
         } else {
             const m = window.arenaData.models.find(x => x.id === window.activeArenaTab);
             label.textContent = m ? m.name : window.activeArenaTab;
@@ -3987,11 +4001,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 // If it's the last message and it's generating, keep it expanded
                 const isGeneratingMsg = (idx === msgs.length - 1 && msg.role === 'assistant');
                 const displayStyle = isGeneratingMsg ? 'block' : 'none';
-                const toggleChar = isGeneratingMsg ? '▲' : '▼';
+                const toggleChar = isGeneratingMsg ? 'â–²' : 'â–¼';
                 
                 rBlock.innerHTML = `
                     <div class="reasoning-header">
-                        <span><i style="margin-right:5px;">💭</i> Thought Process</span>
+                        <span><i style="margin-right:5px;">ðŸ’­</i> Thought Process</span>
                         <span class="toggle-icon">${toggleChar}</span>
                     </div>
                     <div class="reasoning-content" style="display:${displayStyle};"></div>
@@ -4002,7 +4016,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     const icon = rBlock.querySelector('.toggle-icon');
                     const isHidden = content.style.display === 'none';
                     content.style.display = isHidden ? 'block' : 'none';
-                    icon.textContent = isHidden ? '▲' : '▼';
+                    icon.textContent = isHidden ? 'â–²' : 'â–¼';
                 };
                 div.appendChild(rBlock);
             }
@@ -4014,8 +4028,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 tcBlock.style.cssText = 'margin-top:8px; border:1px solid #2d4a2d; border-radius:6px; overflow:hidden; font-size:0.85em;';
                 tcBlock.innerHTML = `
                     <div class="tool-calls-header" style="display:flex; justify-content:space-between; align-items:center; padding:6px 12px; background:#1a2e1a; cursor:pointer; user-select:none;">
-                        <span><i style="margin-right:5px;">🔧</i>Blueprint Tool Calls</span>
-                        <span class="toggle-icon-tc">▼</span>
+                        <span><i style="margin-right:5px;">ðŸ”§</i>Blueprint Tool Calls</span>
+                        <span class="toggle-icon-tc">â–¼</span>
                     </div>
                     <div class="tool-calls-content" style="display:none; padding:12px; background:#111; white-space:pre-wrap; font-family:monospace; color:#a3e635; overflow-x:auto;"></div>
                 `;
@@ -4025,7 +4039,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     const ic = tcBlock.querySelector('.toggle-icon-tc');
                     const isH = c.style.display === 'none';
                     c.style.display = isH ? 'block' : 'none';
-                    ic.textContent = isH ? '▲' : '▼';
+                    ic.textContent = isH ? 'â–²' : 'â–¼';
                 };
                 div.appendChild(tcBlock);
             }
@@ -4050,7 +4064,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // Options/Stats Panel
             const optionsBtn = document.createElement('div');
             optionsBtn.className = 'options-btn';
-            optionsBtn.textContent = '⋮';
+            optionsBtn.innerHTML = '&#8942;'; // Vertical Ellipsis
 
             const toolsPanel = document.createElement('div');
             toolsPanel.className = 'tools-panel';
@@ -4113,7 +4127,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     rContent.textContent = thread[lastMsgIdx].reasoning;
                     rContent.style.display = 'block';
                     const icon = msgDiv.querySelector('.toggle-icon');
-                    if (icon) icon.textContent = '▲';
+                    if (icon) icon.textContent = 'â–²';
                 }
                 // Also clear thinking placeholder if content hasn't arrived yet but reasoning has
                 const contentDiv = msgDiv.querySelector('.msg-content');
@@ -4343,7 +4357,7 @@ document.addEventListener('DOMContentLoaded', () => {
             
             const expandBtn = document.createElement('button');
             expandBtn.className = 'msg-btn';
-            expandBtn.textContent = 'View Sources ▼';
+            expandBtn.textContent = 'View Sources â–¼';
             
             headRow.appendChild(titleWrap);
             headRow.appendChild(expandBtn);
@@ -4360,7 +4374,7 @@ document.addEventListener('DOMContentLoaded', () => {
             expandBtn.onclick = () => {
                 const isHidden = sourcesDiv.style.display === 'none';
                 sourcesDiv.style.display = isHidden ? 'block' : 'none';
-                expandBtn.textContent = isHidden ? 'Hide Sources ▲' : 'View Sources ▼';
+                expandBtn.textContent = isHidden ? 'Hide Sources â–²' : 'View Sources â–¼';
             };
             
             card.appendChild(headRow);
@@ -4428,7 +4442,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     });
                     const d = await res.json();
                     if (d.success) {
-                        btn.textContent = "✅ Fix Applied";
+                        btn.textContent = "âœ… Fix Applied";
                         btn.style.background = "var(--accent)";
                     } else {
                         alert("Error applying fix: " + d.error);
@@ -4491,7 +4505,7 @@ document.addEventListener('DOMContentLoaded', () => {
             indicator.style.display = 'block';
             indicator.style.background = 'rgba(16, 185, 129, 0.2)';
             indicator.style.color = 'var(--accent)';
-            indicator.textContent = `✅ ${job.message}`;
+            indicator.textContent = `âœ… ${job.message}`;
             
             if (scanStatusInterval) {
                 clearInterval(scanStatusInterval);
@@ -4511,7 +4525,7 @@ document.addEventListener('DOMContentLoaded', () => {
             indicator.style.display = 'block';
             indicator.style.background = 'rgba(239, 68, 68, 0.2)';
             indicator.style.color = 'var(--danger)';
-            indicator.textContent = `❌ Error: ${job.message}`;
+            indicator.textContent = `âŒ Error: ${job.message}`;
             
             if (scanStatusInterval) {
                 clearInterval(scanStatusInterval);
@@ -4746,7 +4760,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         const ogText = btn.textContent;
-        btn.textContent = "⏳"; btn.disabled = true;
+        btn.textContent = "â³"; btn.disabled = true;
         try {
             const res = await fetch('/write_for_me', { 
                 method:'POST',
@@ -4915,7 +4929,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 info.innerHTML = `
                     <div style="font-weight:bold; color:white;">${modelName}</div>
                     <div style="font-size:0.75em; color:var(--text-dim); font-family:monospace;">${m.id}</div>
-                    <div style="font-size:0.8em; color:var(--accent); margin-top:4px;">Context: ${contextStr} • Price: ${pricingStr}</div>
+                    <div style="font-size:0.8em; color:var(--accent); margin-top:4px;">Context: ${contextStr} â€¢ Price: ${pricingStr}</div>
                 `;
 
                 const btn = document.createElement('button');
@@ -5239,16 +5253,16 @@ document.addEventListener('DOMContentLoaded', () => {
             html += `<strong>Last Payload Messages:</strong> <span style="color:var(--text-main)">${d.last_len}</span>\n</div>`;
 
             if (!d.divergence) {
-                html += `<div style="color:var(--accent); font-weight:bold; font-size:1.1em; margin-bottom:5px;">✅ PERFECT MATCH!</div>`;
+                html += `<div style="color:var(--accent); font-weight:bold; font-size:1.1em; margin-bottom:5px;">âœ… PERFECT MATCH!</div>`;
                 html += `<span style="color:var(--text-dim)">The previous payload is an exact prefix of the last payload. Token caching should have hit successfully for the entire previous context window.</span>`;
             } else {
                 const div = d.divergence;
-                html += `<div style="color:var(--danger); font-weight:bold; font-size:1.1em; margin-bottom:5px;">❌ CACHE BUSTED AT MESSAGE INDEX [${div.message_index}]</div>`;
+                html += `<div style="color:var(--danger); font-weight:bold; font-size:1.1em; margin-bottom:5px;">âŒ CACHE BUSTED AT MESSAGE INDEX [${div.message_index}]</div>`;
 
                 const cachedTokensNote = `<div style="background:rgba(16, 185, 129, 0.1); border-left:3px solid var(--accent); padding:8px; margin:10px 0; color:#ddd;"><strong>Optimal Caching:</strong> All messages before index ${div.message_index} were successfully cached!</div>`;
 
                 if (div.type === 'parameter_change') {
-                    html = html.replace(`❌ CACHE BUSTED AT MESSAGE INDEX [${div.message_index}]`, `❌ CACHE BUSTED BY PARAMETER CHANGE`);
+                    html = html.replace(`âŒ CACHE BUSTED AT MESSAGE INDEX [${div.message_index}]`, `âŒ CACHE BUSTED BY PARAMETER CHANGE`);
                     html += `<span style="color:var(--text-dim)">Parameter changed: <strong style="color:white">${div.parameter}</strong>\n`;
                     html += `Expected (Previous): <span style="color:var(--primary)">${JSON.stringify(div.expected)}</span>\n`;
                     html += `Got (Last): <span style="color:var(--danger)">${JSON.stringify(div.got)}</span>\n\n`;
@@ -5517,7 +5531,7 @@ safeBind('lock-scribe-btn', 'click', async () => {
             const lockBtn = document.getElementById('lock-scribe-btn');
             const editor = document.getElementById('blueprint-editor');
             if (currentPipelinePhase === 'scribe') {
-                if (lockBtn) lockBtn.textContent = '◀ Back to Architect';
+                if (lockBtn) lockBtn.textContent = 'â—€ Back to Architect';
                 if (editor) editor.readOnly = true;
             } else {
                 if (lockBtn) lockBtn.textContent = 'Lock & Scribe';
@@ -5527,7 +5541,7 @@ safeBind('lock-scribe-btn', 'click', async () => {
     } catch (e) { console.error(e); }
 });
 
-// --- DIFF LOGIC ---
+// --- LINE-BASED DIFF LOGIC (Simplified Myers-ish) ---
 let previousBlueprint = '';
 
 function updateBlueprintDiff(oldText, newText) {
@@ -5537,60 +5551,58 @@ function updateBlueprintDiff(oldText, newText) {
     const oldLines = oldText.split('\n');
     const newLines = newText.split('\n');
     
+    // Basic greedy line diff
     let html = '';
-    const maxLines = Math.max(oldLines.length, newLines.length);
-    
-    // Simple line-based diff (can be improved, but good for start)
-    // We'll use a basic approach: if line changed, show both. If new, show green. If removed, show red.
-    // For a more advanced diff, we'd use Myers or similar, but let's stick to line comparison.
-    
     let i = 0, j = 0;
+
     while (i < oldLines.length || j < newLines.length) {
         if (i < oldLines.length && j < newLines.length && oldLines[i] === newLines[j]) {
-            html += `<div>${escapeHtml(oldLines[i]) || '&nbsp;'}</div>`;
+            html += `<div class="diff-line-equal">${escapeHtml(oldLines[i]) || '&nbsp;'}</div>`;
             i++; j++;
         } else {
-            // Check if it's a replacement or just additions/deletions
-            // We'll look ahead a bit to see if we can resync
+            // Check for potential resync (look ahead)
             let foundResync = false;
-            for (let look = 1; look < 5; look++) {
-                if (i + look < oldLines.length && oldLines[i+look] === newLines[j]) {
-                    // Removed lines
-                    for (let k = 0; k < look; k++) {
-                        html += `<div style="background:#450a0a; color:#f87171;">- ${escapeHtml(oldLines[i+k]) || '&nbsp;'}</div>`;
+            let lookAhead = 10; // lines
+
+            for (let k = 1; k <= lookAhead; k++) {
+                // Deletion
+                if (i + k < oldLines.length && oldLines[i + k] === newLines[j]) {
+                    for (let m = 0; m < k; m++) {
+                        html += `<div class="diff-line-remove">- ${escapeHtml(oldLines[i + m]) || '&nbsp;'}</div>`;
                     }
-                    i += look;
+                    i += k;
                     foundResync = true;
                     break;
                 }
-                if (j + look < newLines.length && oldLines[i] === newLines[j+look]) {
-                    // Added lines
-                    for (let k = 0; k < look; k++) {
-                        html += `<div style="background:#064e3b; color:#4ade80;">+ ${escapeHtml(newLines[j+k]) || '&nbsp;'}</div>`;
+                // Addition
+                if (j + k < newLines.length && oldLines[i] === newLines[j + k]) {
+                    for (let m = 0; m < k; m++) {
+                        html += `<div class="diff-line-add">+ ${escapeHtml(newLines[j + m]) || '&nbsp;'}</div>`;
                     }
-                    j += look;
+                    j += k;
                     foundResync = true;
                     break;
                 }
             }
-            
+
             if (!foundResync) {
+                // If no resync, it's a replacement or end of text
                 if (i < oldLines.length && j < newLines.length) {
-                    html += `<div style="background:#450a0a; color:#f87171;">- ${escapeHtml(oldLines[i]) || '&nbsp;'}</div>`;
-                    html += `<div style="background:#064e3b; color:#4ade80;">+ ${escapeHtml(newLines[j]) || '&nbsp;'}</div>`;
+                    html += `<div class="diff-line-remove">- ${escapeHtml(oldLines[i]) || '&nbsp;'}</div>`;
+                    html += `<div class="diff-line-add">+ ${escapeHtml(newLines[j]) || '&nbsp;'}</div>`;
                     i++; j++;
                 } else if (i < oldLines.length) {
-                    html += `<div style="background:#450a0a; color:#f87171;">- ${escapeHtml(oldLines[i]) || '&nbsp;'}</div>`;
+                    html += `<div class="diff-line-remove">- ${escapeHtml(oldLines[i]) || '&nbsp;'}</div>`;
                     i++;
                 } else if (j < newLines.length) {
-                    html += `<div style="background:#064e3b; color:#4ade80;">+ ${escapeHtml(newLines[j]) || '&nbsp;'}</div>`;
+                    html += `<div class="diff-line-add">+ ${escapeHtml(newLines[j]) || '&nbsp;'}</div>`;
                     j++;
                 }
             }
         }
     }
     
-    diffView.innerHTML = html || '<div style="color:#666; font-style:italic;">No changes yet...</div>';
+    diffView.innerHTML = html || '<div style="color:#666; font-style:italic; padding: 20px;">No changes yet...</div>';
 }
 
 function escapeHtml(text) {

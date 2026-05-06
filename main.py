@@ -234,21 +234,44 @@ def log_tts_event(event_type, data):
     log_path = os.path.join(FILES["tts_logs_dir"], log_fn)
     write_json(log_path, data)
 
-def read_json(path, default):
+import copy
+FILE_CACHE = {}
+
+def read_json(path, default, use_cache=True):
     if not os.path.exists(path): return default
+    if use_cache:
+        mtime = os.path.getmtime(path)
+        if path in FILE_CACHE and FILE_CACHE[path]['mtime'] == mtime:
+            return copy.deepcopy(FILE_CACHE[path]['data'])
     try:
-        with open(path, 'r', encoding='utf-8') as f: return json.load(f)
+        with open(path, 'r', encoding='utf-8') as f: 
+            data = json.load(f)
+            if use_cache:
+                FILE_CACHE[path] = {'mtime': os.path.getmtime(path), 'data': data}
+            return copy.deepcopy(data) if use_cache else data
     except: return default
 
 def write_json(path, data):
     with open(path, 'w', encoding='utf-8') as f: json.dump(data, f, indent=4)
+    if path in FILE_CACHE:
+        del FILE_CACHE[path]
 
 def read_text(path, default=""):
     if not os.path.exists(path): return default
-    with open(path, 'r', encoding='utf-8') as f: return f.read().strip()
+    mtime = os.path.getmtime(path)
+    if path in FILE_CACHE and FILE_CACHE[path]['mtime'] == mtime:
+        return FILE_CACHE[path]['data']
+    try:
+        with open(path, 'r', encoding='utf-8') as f: 
+            data = f.read().strip()
+            FILE_CACHE[path] = {'mtime': mtime, 'data': data}
+            return data
+    except: return default
 
 def write_text(path, content):
     with open(path, 'w', encoding='utf-8') as f: f.write(content)
+    if path in FILE_CACHE:
+        del FILE_CACHE[path]
 
 os.makedirs(FILES["conversations_dir"], exist_ok=True)
 os.makedirs(FILES["uploads_dir"], exist_ok=True)
@@ -455,6 +478,18 @@ def load_chat_data(path):
     if "blueprint" not in raw: raw["blueprint"] = ""
     if "pipeline_settings" not in raw: raw["pipeline_settings"] = {}
 
+    # Initialize dual-track history for pipelines
+    if raw.get("chat_type") == "pipeline":
+        if "architect_messages" not in raw:
+            raw["architect_messages"] = raw.get("messages", [])
+        if "scribe_messages" not in raw:
+            # Scribe starts fresh with just the system prompt (which build_context handles)
+            raw["scribe_messages"] = []
+    else:
+        # For standard chats, ensure 'messages' is used
+        if "messages" not in raw:
+            raw["messages"] = []
+
     # CLEANUP: Strip accumulated directive duplicates from system prompt.
     # A prior bug caused build_context() to permanently append [LIVE INLINE SUMMARY
     # DIRECTIVE] and [AI SELF-MEMORY TOOL] instructions to the saved system prompt
@@ -490,7 +525,7 @@ def load_chat_data(path):
                     "type": "live"
                 })
                 modified = True
-    
+
     if modified:
         sums.sort(key=lambda x: x["start_index"])
         save_chat_data(path, raw)
@@ -564,7 +599,10 @@ def is_reasoning_model(model_id):
             if m.get('id') == model_id:
                 if 'REASONING' in m.get('tags', []) or 'Reasoning' in m.get('traits', ''):
                     return True
-                if 'reasoning effort' in m.get('description', '').lower():
+                desc = m.get('description', '').lower()
+                if 'reasoning effort' in desc or 'reasoning' in desc or 'thinking' in desc:
+                    return True
+                if any(x in model_id.lower() for x in ['deepseek-v', 'kimi-k2', 'glm-5', 'trinity-large']):
                     return True
                 return False
     return False
@@ -634,14 +672,16 @@ def process_summaries(chat_data):
                 r_sum.raise_for_status()
                 resp = r_sum.json()
 
-                # Log summarizer call to ledger
-                log_api_call(
-                    feature="Batch Summarizer",
-                    model=sum_model,
-                    usage=resp.get('usage'),
-                    balance_before=r_sum.headers.get('x-venice-balance-usd'),
-                    balance_after=fetch_real_balance()
-                )
+                # Log summarizer call to ledger in background
+                def log_sum_bg(u, b_before, m_id):
+                    log_api_call(
+                        feature="Batch Summarizer",
+                        model=m_id,
+                        usage=u,
+                        balance_before=b_before,
+                        balance_after=fetch_real_balance()
+                    )
+                threading.Thread(target=log_sum_bg, args=(resp.get('usage'), r_sum.headers.get('x-venice-balance-usd'), sum_model)).start()
 
                 if 'choices' not in resp or not resp['choices']:
                     break
@@ -665,8 +705,25 @@ def process_summaries(chat_data):
 def build_context(chat_data, user_query=None, current_model=None):
     s_set = read_json(FILES["summarizer_settings"], {"enabled": False})
     rag_set = read_json(FILES["rag_settings"], {"enabled": False, "k": 3})
-    msgs = chat_data.get("messages", [])
     vision_capable = is_vision_model(current_model) if current_model else False
+
+    # Story Pipeline Track Selection: Architect and Scribe now have completely separate histories
+    if chat_data.get("chat_type") == "pipeline":
+        phase = chat_data.get("pipeline_phase", "architect")
+        if phase == "scribe":
+            msgs = chat_data.get("scribe_messages", [])
+            # If scribe history is empty, initialize with system prompt
+            if not msgs:
+                msgs = [{"role": "system", "content": read_text(FILES["pipeline_scribe_prompt"])}]
+                chat_data["scribe_messages"] = msgs
+                # Don't save here to avoid mutation during context build, but ensure msgs is local
+        else:
+            msgs = chat_data.get("architect_messages", [])
+            if not msgs:
+                msgs = [{"role": "system", "content": read_text(FILES["pipeline_architect_prompt"])}]
+                chat_data["architect_messages"] = msgs
+    else:
+        msgs = chat_data.get("messages", [])
 
     if not msgs: return []
 
@@ -677,16 +734,14 @@ def build_context(chat_data, user_query=None, current_model=None):
                 break
 
     # CRITICAL: Deep copy the system prompt to prevent mutating the original
-    # chat_data dict. Without this, += operations on context[0]["content"]
-    # permanently append to the saved message, causing unbounded growth and
-    # 0% prompt cache hit rates (the first message changes every turn).
+    # chat_data dict.
     context = [{"role": msgs[0]["role"], "content": msgs[0].get("content", "")}]
 
     if chat_data.get("chat_type") == "pipeline":
         phase = chat_data.get("pipeline_phase", "architect")
         blueprint = chat_data.get("blueprint", "")
         settings = chat_data.get("pipeline_settings", {})
-        
+
         if phase == "architect":
             architect_sys = read_text(FILES["pipeline_architect_prompt"])
             if settings:
@@ -697,7 +752,7 @@ def build_context(chat_data, user_query=None, current_model=None):
             context[0]["content"] = architect_sys
         else:
             context[0]["content"] = read_text(FILES["pipeline_scribe_prompt"])
-            
+
         blueprint_text = blueprint if blueprint else "(Empty - Please start building the Story Blueprint!)"
         context.append({"role": "system", "content": f"--- CURRENT STORY BLUEPRINT ---\n{blueprint_text}"})
 
@@ -726,7 +781,7 @@ def build_context(chat_data, user_query=None, current_model=None):
                 "role": "system", 
                 "content": f"--- AI INTERNAL NOTEPAD (Your Persistent Self-Memory) ---\n{self_mem}"
             })
-        
+
         # Inject surgical tool instructions into the system prompt
         tool_instr = "\n\n[AI SELF-MEMORY TOOL]\nYou have a persistent 'Internal Notepad' at a fixed position near the start of your context. Note that while its position is static, its contents are dynamic and cumulative; the version you see always reflects the most up-to-date state resulting from all cumulative tool calls and manual edits, regardless of the chat chronology. Use it to track long-term facts, motivations, or user feedback that might otherwise be lost during summarization. To update it, output exactly this format at the VERY END of your response:\n\n[MEMORY_ACTION]\n[ADD]\nText to append to the end of the notepad.\n[/ADD]\n[REPLACE]\nExact text to find and remove.\n[WITH]\nNew text to replace it with.\n[/REPLACE]\n[/MEMORY_ACTION]"
         if context[0]["role"] == "system":
@@ -750,7 +805,7 @@ def build_context(chat_data, user_query=None, current_model=None):
         keep = int(s_set.get("recent_turns_to_keep", 12))
         batch_size = int(s_set.get("batch_size", 4))
         valid_indices = [i for i, m in enumerate(msgs) if i > 0 and not (isinstance(m.get('content', ''), str) and m.get('content', '').startswith('__IMG_JSON__'))]
-        
+
         V = len(valid_indices)
         summarizable_count = V - keep
         threshold_idx = 0
@@ -857,7 +912,7 @@ def update_files():
     # 1. Security Check
     if request.headers.get('X-Secret-Key') != SECRET_KEY:
         return "Unauthorized", 401
-    
+
     # 2. Get the raw text from the Shortcut
     content = request.get_data(as_text=True)
     if not content:
@@ -867,13 +922,13 @@ def update_files():
     # 3. The 'Scissors' Logic: Split text by the filename tags
     # regex matches the file header format (---F-I-L-E:path/to/file---)
     parts = re.split(r'---' + r'FILE:(.*?)---', content)
-    
+
     # parts[0] is everything before the first tag (usually empty)
     # The rest alternates: [filename, code, filename, code...]
     for i in range(1, len(parts), 2):
         filepath = parts[i].strip()
         code = parts[i+1].strip()
-        
+
         if not filepath:
             continue
 
@@ -881,7 +936,7 @@ def update_files():
         folder = os.path.dirname(filepath)
         if folder and not os.path.exists(folder):
             os.makedirs(folder, exist_ok=True)
-            
+
         # 4. Overwrite the file
         try:
             with open(filepath, 'w', encoding='utf-8') as f:
@@ -900,14 +955,14 @@ def update_files():
 def fetch_files():
     if request.headers.get('X-Secret-Key') != SECRET_KEY:
         return "Unauthorized", 401
-        
+
     data = request.json
     if not data or 'paths' not in data:
         return jsonify({"status": "error", "message": "No paths provided"}), 400
-        
+
     paths = data['paths']
     result_files = {}
-    
+
     def add_file(filepath):
         try:
             with open(filepath, 'r', encoding='utf-8') as f:
@@ -924,7 +979,7 @@ def fetch_files():
                     full_path = os.path.join(root, file)
                     full_path = full_path.replace('\\', '/')
                     add_file(full_path)
-                    
+
     return jsonify({
         "status": "success",
         "files": result_files
@@ -945,11 +1000,11 @@ def venice_discovery_proxy(endpoint):
             "balance": f"{VENICE_BASE_URL}/billing/balance",
             "rate_limits": f"{VENICE_BASE_URL}/api_keys/rate_limits"
         }
-        
+
         target_url = endpoint_map.get(endpoint)
         if not target_url:
             return jsonify({"error": f"Invalid discovery endpoint: {endpoint}"}), 400
-            
+
         r = requests.get(target_url, headers=headers)
         update_last_io(f"DISCOVERY: {endpoint}", None, f"Status {r.status_code}")
         r.raise_for_status()
@@ -963,15 +1018,15 @@ def venice_import_model():
     try:
         new_model = request.json
         category = request.args.get('category', 'Imported Models')
-        
+
         models_data = read_json('data/venice_models.json', {})
         if category not in models_data:
             models_data[category] = []
-            
+
         # Check for duplicates
         if any(m.get('id') == new_model.get('id') for m in models_data[category]):
             return jsonify({"success": False, "message": "Model already exists in this category."})
-            
+
         models_data[category].append(new_model)
         write_json('data/venice_models.json', models_data)
         return jsonify({"success": True})
@@ -1056,6 +1111,40 @@ def create_scenario_chat():
     return jsonify({"success": True, "filename": fn})
 
 
+def fuzzy_replace(text, find, replace):
+    """
+    Performs a robust replacement by ignoring differences in whitespace, 
+    newlines, and indentation.
+    """
+    if not find or not find.strip():
+        return text, False
+
+    # Escape special regex characters in the 'find' block, 
+    # but replace any whitespace sequence with a flexible whitespace regex
+    # Match any whitespace (including newlines) one or more times
+    pattern_str = re.escape(find.strip())
+    pattern_str = re.sub(r'\\ ', r'\\s+', pattern_str) # handle escaped spaces
+    pattern_str = re.sub(r'(\\\n|\\r|\\t)+', r'\\s+', pattern_str) # handle escaped newlines/tabs
+
+    # Also handle multiple spaces in the source regex
+    pattern_str = re.sub(r'(\\s\+)+', r'\\s+', pattern_str)
+
+    try:
+        # Use re.DOTALL to let '.' match newlines
+        pattern = re.compile(pattern_str, re.DOTALL | re.IGNORECASE)
+        match = pattern.search(text)
+        if match:
+            new_text = text[:match.start()] + replace + text[match.end():]
+            return new_text, True
+    except re.error:
+        pass
+
+    # Fallback to literal search if regex fails
+    if find.strip() in text:
+        return text.replace(find.strip(), replace), True
+
+    return text, False
+
 @app.route('/create_pipeline_chat', methods=['POST'])
 def create_pipeline_chat():
     settings = request.json.get('settings', {})
@@ -1066,7 +1155,7 @@ def create_pipeline_chat():
     fn = f"Pipeline_{ts}.json"
     path = os.path.join(FILES["conversations_dir"], fn)
 
-    messages = [
+    architect_msgs = [
         {"role": "system", "content": read_text(FILES["pipeline_architect_prompt"])},
         {"role": "user", "content": f'''I want to build a story blueprint.
 
@@ -1078,7 +1167,9 @@ def create_pipeline_chat():
     ]
 
     save_chat_data(path, {
-        "messages": messages,
+        "architect_messages": architect_msgs,
+        "scribe_messages": [],
+        "messages": [], # Fallback for other systems
         "summaries": [],
         "visual_memory": "",
         "chat_type": "pipeline",
@@ -1100,11 +1191,11 @@ def continue_generation():
 def continue_pipeline():
     path = get_active_chat_path()
     chat_data = load_chat_data(path)
-    
+
     # We want to continue the very last assistant message
     if not chat_data["messages"] or chat_data["messages"][-1]["role"] != "assistant":
         return jsonify({"error": "Last message is not from assistant"}), 400
-        
+
     idx = len(chat_data["messages"]) - 1
     model_to_use = chat_data["messages"][-1].get("model")
     if not model_to_use:
@@ -1116,18 +1207,18 @@ def continue_pipeline():
         nonlocal chat_data
         temp_data = {"messages": chat_data["messages"], "summaries": chat_data.get("summaries", []), "visual_memory": chat_data.get("visual_memory", "")}
         context = build_context(temp_data, user_query="", current_model=model_to_use)
-        
+
         # Init full with the existing content!
         full = chat_data["messages"][idx].get("content", "")
         reasoning = chat_data["messages"][idx].get("reasoning", "")
-        
+
         payload = {
             "model": model_to_use,
             "messages": context,
             "stream": True,
             "temperature": 0.8
         }
-        
+
         headers = {"Authorization": f"Bearer {VENICE_API_KEY}"}
         try:
             with requests.post(VENICE_URL, headers=headers, json=payload, stream=True, timeout=60) as r:
@@ -1135,7 +1226,7 @@ def continue_pipeline():
                 full_response_json = []
                 usage = None
                 chunk_buffer = ""
-                
+
                 # We skip live summarization and memory for now to keep the code simpler since this is just pipeline
                 for line in r.iter_lines():
                     if line:
@@ -1148,7 +1239,7 @@ def continue_pipeline():
                             if "usage" in chunk: usage = chunk["usage"]
                             if len(chunk['choices'])>0:
                                 delta = chunk['choices'][0]['delta']
-                                
+
                                 if 'reasoning_content' in delta and delta['reasoning_content']:
                                     r_part = delta['reasoning_content']
                                     reasoning += r_part
@@ -1161,7 +1252,7 @@ def continue_pipeline():
                                     yield f"data: {json.dumps({'content': c})}\n\n"
                         except:
                             pass
-                            
+
                 chat_data["messages"][idx]["content"] = full
                 save_chat_data(path, chat_data)
 
@@ -1169,7 +1260,7 @@ def continue_pipeline():
             if chat_data.get("chat_type") == "pipeline" and chat_data.get("pipeline_phase") == "architect":
                 current_bp = chat_data.get("blueprint", "")
                 bp_updated = False
-                
+
                 # 1. Rewrite Blueprint
                 rewrite_pattern = re.compile(r'\[REWRITE_BLUEPRINT\](.*?)\[/REWRITE_BLUEPRINT\]', re.DOTALL)
                 matches = list(rewrite_pattern.finditer(full))
@@ -1177,7 +1268,7 @@ def continue_pipeline():
                     current_bp = matches[-1].group(1).strip()
                     bp_updated = True
                     full = rewrite_pattern.sub('', full)
-                
+
                 # 2. Add to Blueprint
                 add_pattern = re.compile(r'\[ADD_TO_BLUEPRINT\](.*?)\[/ADD_TO_BLUEPRINT\]', re.DOTALL)
                 for match in add_pattern.finditer(full):
@@ -1186,7 +1277,7 @@ def continue_pipeline():
                         current_bp = current_bp + "\n\n" + addition if current_bp else addition
                         bp_updated = True
                 full = add_pattern.sub('', full)
-                
+
                 # 3. Edit Blueprint (Find/Replace)
                 edit_pattern = re.compile(r'\[EDIT_BLUEPRINT\]\s*<find>(.*?)</find>\s*<replace>(.*?)</replace>\s*\[/EDIT_BLUEPRINT\]', re.DOTALL)
                 edit_errors = []
@@ -1198,27 +1289,29 @@ def continue_pipeline():
                         bp_updated = True
                     elif old_text:
                         edit_errors.append(f"Failed to find exact text to replace: '{old_text[:50]}...'")
-                full = edit_pattern.sub('', full)
+
+                # [FIX] Use robust Python regex to strip all blueprint tags
+                full = re.sub(r'\[(?:ADD_TO|REWRITE|EDIT)_BLUEPRINT\].*?(\[\/(?:ADD_TO|REWRITE|EDIT)_BLUEPRINT\]|$)', '', full, flags=re.DOTALL)
 
                 if bp_updated:
                     chat_data["blueprint"] = current_bp.strip()
                     save_chat_data(path, chat_data)
                     yield f"data: {json.dumps({'blueprint_update': chat_data['blueprint']})}\n\n"
-                
+
                 # Collect the raw tool call text for display BEFORE stripping
                 raw_tool_calls_lines = []
                 for m in list(rewrite_pattern.finditer(full)) if 'rewrite_pattern' in dir() else []:
                     raw_tool_calls_lines.append(f"[REWRITE_BLUEPRINT]\n{m.group(1).strip()}\n[/REWRITE_BLUEPRINT]")
-                
+
                 # Re-scan original full for all tool call types for display
                 tool_calls_display = []
                 for m in re.finditer(r'\[REWRITE_BLUEPRINT\](.*?)\[/REWRITE_BLUEPRINT\]', full, re.DOTALL):
-                    tool_calls_display.append(f"🔄 REWRITE_BLUEPRINT:\n{m.group(1).strip()}")
+                    tool_calls_display.append(f"ðŸ”„ REWRITE_BLUEPRINT:\n{m.group(1).strip()}")
                 for m in re.finditer(r'\[ADD_TO_BLUEPRINT\](.*?)\[/ADD_TO_BLUEPRINT\]', full, re.DOTALL):
-                    tool_calls_display.append(f"➕ ADD_TO_BLUEPRINT:\n{m.group(1).strip()}")
+                    tool_calls_display.append(f"âž• ADD_TO_BLUEPRINT:\n{m.group(1).strip()}")
                 for m in re.finditer(r'\[EDIT_BLUEPRINT\]\s*<find>(.*?)</find>\s*<replace>(.*?)</replace>\s*\[/EDIT_BLUEPRINT\]', full, re.DOTALL):
-                    tool_calls_display.append(f"✏️ EDIT_BLUEPRINT:\n  FIND: {m.group(1).strip()}\n  REPLACE: {m.group(2).strip()}")
-                
+                    tool_calls_display.append(f"âœï¸ EDIT_BLUEPRINT:\n  FIND: {m.group(1).strip()}\n  REPLACE: {m.group(2).strip()}")
+
                 # Clean up tags from chat history
                 full = full.strip()
                 chat_data["messages"][idx]["content"] = full
@@ -1228,7 +1321,7 @@ def continue_pipeline():
                     yield f"data: {json.dumps({'tool_calls': tool_calls_text})}\n\n"
                 save_chat_data(path, chat_data)
                 yield f"data: {json.dumps({'content_overwrite': full})}\n\n"
-                
+
                 if edit_errors:
                     err_msg = "\n".join(edit_errors)
                     chat_data["messages"].append({"role": "system", "content": f"Automated Notice: Your targeted blueprint edit failed.\n{err_msg}\nPlease ensure the <find> block exactly matches the text currently in the document, including punctuation and whitespace. You may use [REWRITE_BLUEPRINT] if targeted editing fails."})
@@ -1242,29 +1335,84 @@ def continue_pipeline():
     return Response(stream_with_context(generate()), mimetype='text/event-stream')
 
 
+def process_blueprint_tools(chat_data, full_text):
+    """
+    Parses and executes blueprint tools from generated text.
+    Returns (cleaned_text, tool_calls_display_text, updated_blueprint)
+    """
+    current_bp = chat_data.get("blueprint", "")
+    bp_updated = False
+    tool_calls_display = []
+
+    # 1. Rewrite Blueprint
+    rewrite_pattern = re.compile(r'\[REWRITE_BLUEPRINT\](.*?)\[/REWRITE_BLUEPRINT\]', re.DOTALL)
+    for match in rewrite_pattern.finditer(full_text):
+        content = match.group(1).strip()
+        if content:
+            current_bp = content
+            bp_updated = True
+            tool_calls_display.append(f"🔄 REWRITE_BLUEPRINT:\n{content}")
+
+    # 2. Add to Blueprint
+    add_pattern = re.compile(r'\[ADD_TO_BLUEPRINT\](.*?)\[/ADD_TO_BLUEPRINT\]', re.DOTALL)
+    for match in add_pattern.finditer(full_text):
+        addition = match.group(1).strip()
+        if addition:
+            current_bp = current_bp + "\n\n" + addition if current_bp else addition
+            bp_updated = True
+            tool_calls_display.append(f"➕ ADD_TO_BLUEPRINT:\n{addition}")
+
+    # 3. Edit Blueprint (Fuzzy/Fuzzy-ish)
+    edit_pattern = re.compile(r'\[EDIT_BLUEPRINT\]\s*<find>(.*?)</find>\s*<replace>(.*?)</replace>\s*\[/EDIT_BLUEPRINT\]', re.DOTALL)
+    edit_errors = []
+    for match in edit_pattern.finditer(full_text):
+        old_text = match.group(1).strip()
+        new_text = match.group(2).strip()
+
+        # Try exact first
+        if old_text and old_text in current_bp:
+            current_bp = current_bp.replace(old_text, new_text)
+            bp_updated = True
+            tool_calls_display.append(f"✍️ EDIT_BLUEPRINT (Exact Match):\n  FIND: {old_text[:100]}...\n  REPLACE: {new_text[:100]}...")
+        elif old_text:
+            # Try fuzzy/normalized replace
+            new_bp, success = fuzzy_replace(current_bp, old_text, new_text)
+            if success:
+                current_bp = new_bp
+                bp_updated = True
+                tool_calls_display.append(f"✍️ EDIT_BLUEPRINT (Fuzzy Match):\n  FIND: {old_text[:100]}...\n  REPLACE: {new_text[:100]}...")
+            else:
+                edit_errors.append(f"Failed to find exact or fuzzy text to replace: '{old_text[:50]}...'")
+
+    # Clean tags from text
+    cleaned = re.sub(r'\[(?:ADD_TO|REWRITE|EDIT)_BLUEPRINT\].*?(\[\/(?:ADD_TO|REWRITE|EDIT)_BLUEPRINT\]|$)', '', full_text, flags=re.DOTALL).strip()
+
+    return cleaned, "\n\n---\n\n".join(tool_calls_display), current_bp, bp_updated, edit_errors
+
 @app.route('/toggle_pipeline_phase', methods=['POST'])
 def toggle_pipeline_phase():
     path = get_active_chat_path()
     chat_data = load_chat_data(path)
     if chat_data.get("chat_type") != "pipeline":
         return jsonify({"error": "Not a pipeline chat"}), 400
-    
+
     current = chat_data.get("pipeline_phase", "architect")
     new_phase = "scribe" if current == "architect" else "architect"
     chat_data["pipeline_phase"] = new_phase
-    
-    # Add a system message to note the phase change for context
+
     if new_phase == "scribe":
-        chat_data["messages"].append({
+        if "scribe_messages" not in chat_data: chat_data["scribe_messages"] = []
+        chat_data["scribe_messages"].append({
             "role": "system", 
             "content": "PHASE CHANGE: Now in SCRIBE mode. Your job as Architect is done. You are now the Scribe. Follow the [STORY BLUEPRINT] strictly. Use vivid prose. Do not use blueprint tools anymore; just write the story."
         })
     else:
-        chat_data["messages"].append({
+        if "architect_messages" not in chat_data: chat_data["architect_messages"] = []
+        chat_data["architect_messages"].append({
             "role": "system", 
             "content": "PHASE CHANGE: Now in ARCHITECT mode. Focus on building and refining the Story Blueprint. Use [ADD_TO_BLUEPRINT], [REWRITE_BLUEPRINT], or [EDIT_BLUEPRINT] tools."
         })
-    
+
     save_chat_data(path, chat_data)
     return jsonify({"success": True, "new_phase": new_phase})
 
@@ -1283,16 +1431,36 @@ def get_history():
     raw_data = read_json(path, {})
     if isinstance(raw_data, dict) and raw_data.get("is_arena"):
         return jsonify(raw_data)
-        
+
     data = load_chat_data(path)
-    if len(data["messages"]) > 0 and data["messages"][0]["role"] == "system":
-        if data.get("chat_type") == "pipeline":
-            if data.get("pipeline_phase") == "architect":
-                data["messages"][0]["content"] = read_text(FILES["pipeline_architect_prompt"])
+
+    is_pipeline = data.get("chat_type") == "pipeline"
+    phase = data.get("pipeline_phase", "architect")
+
+    if is_pipeline:
+        history_key = "scribe_messages" if phase == "scribe" else "architect_messages"
+        msgs = data.get(history_key, [])
+        if not msgs:
+            # First time scribe load
+            if phase == "scribe":
+                msgs = [{"role": "system", "content": read_text(FILES["pipeline_scribe_prompt"])}]
+                data["scribe_messages"] = msgs
+                save_chat_data(path, data)
             else:
-                data["messages"][0]["content"] = read_text(FILES["pipeline_scribe_prompt"])
+                msgs = [{"role": "system", "content": read_text(FILES["pipeline_architect_prompt"])}]
+                data["architect_messages"] = msgs
+                save_chat_data(path, data)
+    else:
+        msgs = data.get("messages", [])
+
+    if len(msgs) > 0 and msgs[0]["role"] == "system":
+        if is_pipeline:
+            if phase == "architect":
+                msgs[0]["content"] = read_text(FILES["pipeline_architect_prompt"])
+            else:
+                msgs[0]["content"] = read_text(FILES["pipeline_scribe_prompt"])
         else:
-            data["messages"][0]["content"] = read_text(FILES["main_prompt"])
+            msgs[0]["content"] = read_text(FILES["main_prompt"])
 
     has_backup = False
     if "backup_summaries" in data and data["backup_summaries"] is not None:
@@ -1300,7 +1468,7 @@ def get_history():
             has_backup = True
 
     return jsonify({
-        "history": data["messages"], 
+        "history": msgs, 
         "summaries": data["summaries"], 
         "visual_memory": data["visual_memory"], 
         "self_memory": data.get("self_memory", ""),
@@ -1489,14 +1657,30 @@ def branch_chat():
         path = get_active_chat_path()
         data = load_chat_data(path)
 
-        sliced_msgs = data["messages"][:idx + 1]
+        is_pipeline = data.get("chat_type") == "pipeline"
+        phase = data.get("pipeline_phase", "architect")
+        history_key = "scribe_messages" if phase == "scribe" else "architect_messages"
+
+        sliced_msgs = data.get(history_key, [])[:idx + 1]
         sliced_sums = [s for s in data.get("summaries", []) if s["end_index"] <= idx]
 
         new_data = {
-            "messages": sliced_msgs,
             "summaries": sliced_sums,
             "visual_memory": data.get("visual_memory", "")
         }
+
+        if is_pipeline:
+            new_data["chat_type"] = "pipeline"
+            new_data["pipeline_phase"] = phase
+            new_data["blueprint"] = data.get("blueprint", "")
+            new_data["pipeline_settings"] = data.get("pipeline_settings", {})
+            new_data[history_key] = sliced_msgs
+            # Keep other track empty or copy it? Separation suggests keeping it empty or as is
+            other_key = "architect_messages" if phase == "scribe" else "scribe_messages"
+            new_data[other_key] = data.get(other_key, [])
+            new_data["messages"] = sliced_msgs
+        else:
+            new_data["messages"] = sliced_msgs
 
         ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
         old_name = os.path.basename(path).replace('.json', '')
@@ -1666,7 +1850,7 @@ def ai_refine_message():
 
         if 'choices' in resp and resp['choices']:
             raw_response = resp['choices'][0]['message']['content'].strip()
-            
+
             if raw_response == "NO CHANGES REQUIRED":
                 return jsonify({"success": True, "no_changes": True})
 
@@ -1674,7 +1858,7 @@ def ai_refine_message():
             import re
             pattern = re.compile(r'\[REPLACE\](.*?)\[WITH\](.*?)\[/REPLACE\]', re.DOTALL)
             matches = pattern.findall(raw_response)
-            
+
             if not matches:
                 # Fallback: if model failed to use tool and just gave full text
                 refined_text = raw_response
@@ -1757,7 +1941,7 @@ def find_replace_message():
                         msg["original_content"] = json.loads(json.dumps(content))
                     part["text"] = part["text"].replace(find_str, replace_str)
                     changed = True
-            
+
             if changed:
                 save_chat_data(path, data)
                 return jsonify({"success": True, "new_content": content})
@@ -1975,19 +2159,19 @@ def get_balance_route():
 def open_audit():
     parent_fn = request.json.get('filename')
     if not parent_fn: return jsonify({"error": "No filename provided"}), 400
-    
+
     audit_fn = parent_fn.replace('.json', '.audit.json')
     if parent_fn.endswith('.audit.json'):
         audit_fn = parent_fn
-        
+
     audit_path = os.path.join(FILES["conversations_dir"], audit_fn)
-    
+
     if not os.path.exists(audit_path):
         write_json(audit_path, {
             "messages": [{"role": "system", "content": read_text(FILES["audit_prompt"])}],
             "parent_file": parent_fn
         })
-        
+
     write_json(FILES["active_meta"], {"filename": audit_fn})
     return jsonify({"success": True, "filename": audit_fn})
 
@@ -1997,11 +2181,11 @@ def get_parent_context():
     data = load_chat_data(path)
     if "parent_file" not in data:
         return jsonify({"error": "Not an audit chat"}), 400
-        
+
     p_path = os.path.join(FILES["conversations_dir"], data["parent_file"])
     if not os.path.exists(p_path):
         return jsonify({"error": "Parent chat not found"}), 404
-        
+
     p_data = load_chat_data(p_path)
     return jsonify({"success": True, "summaries": p_data.get("summaries", [])})
 
@@ -2018,16 +2202,16 @@ def apply_audit_fix():
     req = request.json
     idx = int(req.get('index'))
     new_text = req.get('new_text')
-    
+
     path = get_active_chat_path()
     data = load_chat_data(path)
     if "parent_file" not in data: return jsonify({"error": "Not an audit chat"}), 400
-    
+
     p_path = os.path.join(FILES["conversations_dir"], data["parent_file"])
     if not os.path.exists(p_path): return jsonify({"error": "Parent chat not found"}), 404
-    
+
     p_data = load_chat_data(p_path)
-    
+
     if 0 <= idx < len(p_data.get("summaries", [])):
         p_data["backup_summaries"] = json.loads(json.dumps(p_data.get("summaries", [])))
         p_data["summaries"][idx]["content"] = new_text
@@ -2107,39 +2291,40 @@ def chat():
                 if part.get('type') == 'image_url':
                     part['image_url']['url'] = save_base64_image(part['image_url']['url'])
 
-        chat_data["messages"].append({"role": "user", "content": message_content})
+        # Dual track saving
+        if chat_data.get("chat_type") == "pipeline":
+            phase = chat_data.get("pipeline_phase", "architect")
+            track_key = "scribe_messages" if phase == "scribe" else "architect_messages"
+            if track_key not in chat_data: chat_data[track_key] = []
+            chat_data[track_key].append({"role": "user", "content": message_content, "timestamp": datetime.datetime.now().isoformat()})
+        else:
+            chat_data["messages"].append({"role": "user", "content": message_content, "timestamp": datetime.datetime.now().isoformat()})
 
-    chat_data["messages"].append({"role": "assistant", "content": "", "model": model_to_use})
+    # Prepare assistant placeholder
+    ast_msg = {"role": "assistant", "content": "", "model": model_to_use, "timestamp": datetime.datetime.now().isoformat()}
+    if chat_data.get("chat_type") == "pipeline":
+        phase = chat_data.get("pipeline_phase", "architect")
+        track_key = "scribe_messages" if phase == "scribe" else "architect_messages"
+        chat_data[track_key].append(ast_msg)
+        idx = len(chat_data[track_key]) - 1
+    else:
+        chat_data["messages"].append(ast_msg)
+        idx = len(chat_data["messages"]) - 1
+
     save_chat_data(path, chat_data)
-
-    idx = len(chat_data["messages"]) - 1
 
     def generate():
         nonlocal chat_data
+        track_key = "messages"
+        if chat_data.get("chat_type") == "pipeline":
+            phase = chat_data.get("pipeline_phase", "architect")
+            track_key = "scribe_messages" if phase == "scribe" else "architect_messages"
 
-        # 1. Summarization Check
-        if chat_data.get("chat_type") != "pipeline":
-            s_set = read_json(FILES["summarizer_settings"], {"enabled": False})
-            if s_set.get("enabled"):
-                for status_msg in process_summaries(chat_data):
-                    yield f"data: {json.dumps({'status': status_msg})}\n\n"
+        # Immediate yield to keep connection alive
+        yield f"data: {json.dumps({'status': 'Connecting to Venice...'})}\n\n"
 
-        save_chat_data(path, chat_data)
-
-        # Build context AFTER summarization is complete
-        temp_data = {
-            "messages": chat_data["messages"][:-1],
-            "summaries": chat_data.get("summaries", []),
-            "visual_memory": chat_data.get("visual_memory", ""),
-            "chat_type": chat_data.get("chat_type"),
-            "pipeline_phase": chat_data.get("pipeline_phase"),
-            "blueprint": chat_data.get("blueprint")
-        }
-        query_text = data.get('message', '')
-        if isinstance(query_text, list):
-            query_text = get_text_content({"content": query_text})
-
-        context = build_context(temp_data, user_query=query_text, current_model=model_to_use)
+        # Build context from appropriate track
+        context = build_context(chat_data, user_query=get_text_content({"content": data.get('message', '')}), current_model=model_to_use)
 
         # Handle Audit Context Injection
         audit_ctx_req = data.get('audit_context')
@@ -2149,7 +2334,7 @@ def chat():
                 p_data = load_chat_data(p_path)
                 sel_batches = audit_ctx_req.get('batches', [])
                 inc_raw = audit_ctx_req.get('include_raw', True)
-                
+
                 ctx_text = "--- SYSTEM: PROVIDED AUDIT CONTEXT FROM ORIGINAL CHAT ---\n\n"
                 for b_idx in sel_batches:
                     if 0 <= b_idx < len(p_data.get("summaries", [])):
@@ -2162,7 +2347,7 @@ def chat():
                                 if rm['role'] != 'system':
                                     ctx_text += f"{rm['role'].upper()}: {get_text_content(rm)}\n\n"
                 ctx_text += "---------------------------------------------------------\n"
-                
+
                 # Insert right before the user's latest message
                 if len(context) >= 2:
                     context.insert(-1, {"role": "system", "content": ctx_text})
@@ -2251,10 +2436,10 @@ def chat():
         # Memory parsing variables
         capturing_memory = False
         memory_buffer = ""
-        
+
         capturing_live_sum = False
         live_sum_buffer = ""
-        
+
         chunk_buffer = ""
 
         try:
@@ -2274,7 +2459,7 @@ def chat():
                             if "usage" in chunk: usage = chunk["usage"]
                             if len(chunk['choices'])>0:
                                 delta = chunk['choices'][0]['delta']
-                                
+
                                 if 'reasoning_content' in delta and delta['reasoning_content']:
                                     r_part = delta['reasoning_content']
                                     reasoning += r_part
@@ -2284,7 +2469,7 @@ def chat():
                                 if 'content' in delta and delta['content']:
                                     c = delta['content']
                                     chunk_buffer += c
-                                    
+
                                     while True: # process buffer until no more tags can be resolved
                                         if capturing_live_sum:
                                             if '[/SUM]' in chunk_buffer:
@@ -2329,7 +2514,7 @@ def chat():
                                             # check for start tags
                                             sum_idx = chunk_buffer.find('[SUM]')
                                             mem_idx = chunk_buffer.find('[MEMORY_ACTION]')
-                                            
+
                                             first_tag = None
                                             first_idx = -1
                                             if sum_idx != -1 and mem_idx != -1:
@@ -2341,7 +2526,7 @@ def chat():
                                                 first_tag, first_idx = '[SUM]', sum_idx
                                             elif mem_idx != -1:
                                                 first_tag, first_idx = '[MEMORY_ACTION]', mem_idx
-                                                
+
                                             if first_tag == '[SUM]':
                                                 pre = chunk_buffer[:first_idx]
                                                 post = chunk_buffer[first_idx + len('[SUM]'):]
@@ -2374,11 +2559,11 @@ def chat():
                                                     chunk_buffer = chunk_buffer[safe_idx:]
                                                 break
 
-                                chat_data["messages"][idx]["content"] = full
+                                chat_data[track_key][idx]["content"] = full
                                 save_chat_data(path, chat_data)
                         except: pass
 
-            # Flush remaining buffer at end of stream
+            # Flush remaining buffer
             if chunk_buffer:
                 if capturing_live_sum:
                     live_sum_buffer += chunk_buffer
@@ -2388,24 +2573,33 @@ def chat():
                 else:
                     full += chunk_buffer
                     yield f"data: {json.dumps({'content': chunk_buffer, 'balance': balance})}\n\n"
-                    
-            chat_data["messages"][idx]["content"] = full
+
+            # 1. Store Prose
+            chat_data[track_key][idx]["content"] = full
+
+            # 2. Process Tools (If Architect)
+            if chat_data.get("chat_type") == "pipeline" and chat_data.get("pipeline_phase") == "architect":
+                cleaned_prose, tool_display, new_bp, bp_updated, edit_errors = process_blueprint_tools(chat_data, full)
+
+                chat_data[track_key][idx]["content"] = cleaned_prose
+                if tool_display:
+                    chat_data[track_key][idx]["blueprint_tool_calls"] = tool_display
+                    yield f"data: {json.dumps({'tool_calls': tool_display})}\n\n"
+
+                if bp_updated:
+                    chat_data["blueprint"] = new_bp
+                    yield f"data: {json.dumps({'blueprint_update': new_bp})}\n\n"
+
+                if edit_errors:
+                    err_msg = "\n".join(edit_errors)
+                    chat_data[track_key].append({"role": "system", "content": f"Automated Notice: Your targeted blueprint edit failed.\n{err_msg}\nPlease ensure the <find> block exactly matches the text currently in the document. You may use [REWRITE_BLUEPRINT] if targeted editing fails."})
+
+                yield f"data: {json.dumps({'content_overwrite': cleaned_prose})}\n\n"
+
+            # 3. Process Live Summary
             if live_sum_buffer:
-                chat_data["messages"][idx]["live_summary"] = live_sum_buffer.strip()
-                
-                # Append to standard summaries array for Memory Manager
-                start_idx = idx - 1 if idx > 0 else idx
-                while start_idx > 0 and chat_data["messages"][start_idx].get("role") != "user":
-                    start_idx -= 1
-                if start_idx < 1: start_idx = idx - 1 if idx > 0 else 1
-                
-                chat_data["summaries"].append({
-                    "start_index": start_idx,
-                    "end_index": idx,
-                    "content": live_sum_buffer.strip(),
-                    "usage": usage,
-                    "type": "live"
-                })
+                chat_data[track_key][idx]["live_summary"] = live_sum_buffer.strip()
+
             save_chat_data(path, chat_data)
 
             # Post-stream surgical memory update logic
@@ -2413,7 +2607,7 @@ def chat():
                 raw_actions = memory_buffer
                 if '[/MEMORY_ACTION]' in raw_actions:
                     raw_actions = raw_actions.split('[/MEMORY_ACTION]')[0]
-                
+
                 # Reload chat data right before update to ensure we aren't using a stale copy
                 fresh_data = load_chat_data(path)
                 updated_mem = fresh_data.get("self_memory", "")
@@ -2453,66 +2647,22 @@ def chat():
                     if "memory_logs" not in fresh_data: fresh_data["memory_logs"] = []
                     fresh_data["memory_logs"].insert(0, log_entry)
                     save_chat_data(path, fresh_data)
-                    
+
                     # Update local state for subsequent summary processing in same turn if needed
                     chat_data = fresh_data
-                    
+
                     yield f"data: {json.dumps({'memory_update': updated_mem.strip(), 'memory_logs': fresh_data['memory_logs']})}\n\n"
-
-            # Post-stream blueprint extraction
-            if chat_data.get("chat_type") == "pipeline" and chat_data.get("pipeline_phase") == "architect":
-                current_bp = chat_data.get("blueprint", "")
-                bp_updated = False
-                
-                # 1. Rewrite Blueprint
-                rewrite_pattern = re.compile(r'\[REWRITE_BLUEPRINT\](.*?)\[/REWRITE_BLUEPRINT\]', re.DOTALL)
-                matches = list(rewrite_pattern.finditer(full))
-                if matches:
-                    current_bp = matches[-1].group(1).strip()
-                    bp_updated = True
-                    full = rewrite_pattern.sub('', full)
-                
-                # 2. Add to Blueprint
-                add_pattern = re.compile(r'\[ADD_TO_BLUEPRINT\](.*?)\[/ADD_TO_BLUEPRINT\]', re.DOTALL)
-                for match in add_pattern.finditer(full):
-                    addition = match.group(1).strip()
-                    if addition:
-                        current_bp = current_bp + "\n\n" + addition if current_bp else addition
-                        bp_updated = True
-                full = add_pattern.sub('', full)
-                
-                # 3. Edit Blueprint (Find/Replace)
-                edit_pattern = re.compile(r'\[EDIT_BLUEPRINT\]\s*<find>(.*?)</find>\s*<replace>(.*?)</replace>\s*\[/EDIT_BLUEPRINT\]', re.DOTALL)
-                edit_errors = []
-                for match in edit_pattern.finditer(full):
-                    old_text = match.group(1).strip()
-                    new_text = match.group(2).strip()
-                    if old_text and old_text in current_bp:
-                        current_bp = current_bp.replace(old_text, new_text)
-                        bp_updated = True
-                    elif old_text:
-                        edit_errors.append(f"Failed to find exact text to replace: '{old_text[:50]}...'")
-                full = edit_pattern.sub('', full)
-
-                if bp_updated:
-                    chat_data["blueprint"] = current_bp.strip()
-                    save_chat_data(path, chat_data)
-                    yield f"data: {json.dumps({'blueprint_update': chat_data['blueprint']})}\n\n"
-                
-                # Clean up tags from chat history
-                full = full.strip()
-                full = re.sub(r'\[(?:ADD_TO|REWRITE|EDIT)_BLUEPRINT\].*?$', '', full, flags=re.DOTALL)
-                chat_data["messages"][idx]["content"] = full
-                save_chat_data(path, chat_data)
-                yield f"data: {json.dumps({'content_overwrite': full})}\n\n"
-                
-                if edit_errors:
-                    err_msg = "\n".join(edit_errors)
-                    chat_data["messages"].append({"role": "system", "content": f"Automated Notice: Your targeted blueprint edit failed.\n{err_msg}\nPlease ensure the <find> block exactly matches the text currently in the document, including punctuation and whitespace. You may use [REWRITE_BLUEPRINT] if targeted editing fails."})
-                    save_chat_data(path, chat_data)
 
             # Store final combined response
             update_last_io(VENICE_URL, payload, full_response_json)
+            chat_data["messages"][idx]["content"] = full
+            save_chat_data(path, chat_data)
+            yield f"data: {json.dumps({'content_overwrite': full})}\n\n"
+
+            if edit_errors:
+                err_msg = "\n".join(edit_errors)
+                chat_data["messages"].append({"role": "system", "content": f"Automated Notice: Your targeted blueprint edit failed.\n{err_msg}\nPlease ensure the <find> block exactly matches the text currently in the document, including punctuation and whitespace. You may use [REWRITE_BLUEPRINT] if targeted editing fails."})
+                save_chat_data(path, chat_data)
 
             if usage:
                 prompt_tokens = usage.get("prompt_tokens", 0)
@@ -2527,20 +2677,38 @@ def chat():
                 save_chat_data(path, chat_data)
                 yield f"data: {json.dumps({'usage': usage, 'balance': balance})}\n\n"
 
-            # Post-stream: fetch REAL balance and log to ledger
-            real_balance = fetch_real_balance()
-            if real_balance:
-                save_persisted_balance(real_balance)
-                yield f"data: {json.dumps({'balance_refresh': real_balance})}\n\n"
+            # Post-stream: log to ledger and handle summarization in background
+            def background_tasks(u, b_before, m_id, p_path, c_data):
+                # 1. Throttle balance fetching (only fetch real balance every 5 calls)
+                ledger_data = read_json(FILES["api_ledger"], {"calls": []})
+                call_count = len(ledger_data.get("calls", []))
 
-            log_api_call(
-                feature="Chat Response",
-                model=model_to_use,
-                chat_file=os.path.basename(path),
-                usage=usage,
-                balance_before=balance,
-                balance_after=real_balance
-            )
+                real_bal = None
+                if call_count % 5 == 0:
+                    real_bal = fetch_real_balance()
+                    if real_bal:
+                        save_persisted_balance(real_bal)
+
+                # 2. Log API call
+                log_api_call(
+                    feature="Chat Response",
+                    model=m_id,
+                    chat_file=os.path.basename(p_path),
+                    usage=u,
+                    balance_before=b_before,
+                    balance_after=real_bal
+                )
+
+                # 3. Post-response Summarization (moved here to prevent blocking start of stream)
+                if c_data.get("chat_type") != "pipeline":
+                    s_set = read_json(FILES["summarizer_settings"], {"enabled": False})
+                    if s_set.get("enabled"):
+                        # Exhaust the generator to perform the summary work
+                        for _ in process_summaries(c_data):
+                            pass
+                        save_chat_data(p_path, c_data)
+
+            threading.Thread(target=background_tasks, args=(usage, balance, model_to_use, path, chat_data)).start()
 
         except Exception as e:
             if not full and not reasoning:
@@ -2612,17 +2780,20 @@ def generate_image():
             p_res = p_res_raw.json()
             debug_logs["prompt_generation"] = {"payload": context_str, "response": p_res}
 
-            # Log image prompt generation to ledger
+            # Log image prompt generation to ledger in background
+            def log_img_bg(u, b_before, m_id, p_path):
+                log_api_call(
+                    feature="Image Prompt Gen",
+                    model=m_id,
+                    chat_file=os.path.basename(p_path),
+                    usage=u,
+                    balance_before=b_before,
+                    balance_after=fetch_real_balance()
+                )
+
             img_usage = p_res.get('usage') if 'choices' in p_res else None
             img_balance = p_res_raw.headers.get('x-venice-balance-usd')
-            log_api_call(
-                feature="Image Prompt Gen",
-                model=prompt_model,
-                chat_file=os.path.basename(path),
-                usage=img_usage,
-                balance_before=img_balance,
-                balance_after=fetch_real_balance()
-            )
+            threading.Thread(target=log_img_bg, args=(img_usage, img_balance, prompt_model, path)).start()
 
             if 'choices' not in p_res:
                 error_msg = p_res.get('error', {}).get('message', 'Unknown Error')
@@ -2681,11 +2852,11 @@ def background_scan_task(chat_path, model_id, start_num, end_num):
     try:
         filename = os.path.basename(chat_path)
         SCAN_JOBS[filename] = {"status": "running", "message": "Initiating background scan..."}
-        
+
         chat_data = load_chat_data(chat_path)
         msgs = clean_for_api(chat_data["messages"])
         content_msgs = [m for m in msgs if m["role"] != "system"]
-        
+
         if start_num is not None or end_num is not None:
             start_idx = (int(start_num) - 1) if start_num else 0
             end_idx = int(end_num) if end_num else len(content_msgs)
@@ -2695,9 +2866,9 @@ def background_scan_task(chat_path, model_id, start_num, end_num):
 
         blob = "\n".join([f"{m['role'].upper()}: {get_text_content(m)}" for m in target_msgs])
         existing_mem = chat_data.get("visual_memory", "")
-        
+
         system_instr = read_text(FILES["visual_prompt"])
-        
+
         # Reinforced Payload: System Prompt at Start and End
         context = [
             {"role": "system", "content": system_instr},
@@ -2723,14 +2894,14 @@ def background_scan_task(chat_path, model_id, start_num, end_num):
         res = r.json()
         if 'choices' in res and res['choices']:
             raw_output = res['choices'][0]['message']['content'].strip()
-            
+
             if raw_output == "NO CHANGES REQUIRED":
                 SCAN_JOBS[filename] = {"status": "completed", "message": "Scan finished: No changes required."}
                 return
 
             # Surgical Application Logic
             updated_mem = existing_mem
-            
+
             # Process [REPLACE] blocks
             replace_pattern = re.compile(r'\[REPLACE\](.*?)\[WITH\](.*?)\[/REPLACE\]', re.DOTALL)
             for old_text, new_text in replace_pattern.findall(raw_output):
@@ -2755,7 +2926,7 @@ def background_scan_task(chat_path, model_id, start_num, end_num):
             SCAN_JOBS[filename] = {"status": "completed", "message": "Scan finished: Memory updated."}
         else:
             SCAN_JOBS[filename] = {"status": "error", "message": "API returned empty response."}
-            
+
     except Exception as e:
         print(f"[SCANNER ERROR] {traceback.format_exc()}")
         SCAN_JOBS[os.path.basename(chat_path)] = {"status": "error", "message": str(e)}
@@ -2764,7 +2935,7 @@ def background_scan_task(chat_path, model_id, start_num, end_num):
 def scan_visuals():
     req = request.json
     path = get_active_chat_path()
-    
+
     # Check if a job is already running
     filename = os.path.basename(path)
     if SCAN_JOBS.get(filename, {}).get("status") == "running":
@@ -2773,7 +2944,7 @@ def scan_visuals():
     start_num = req.get('start')
     end_num = req.get('end')
     model_id = req.get('model')
-    
+
     if not model_id:
         p_set = read_json(FILES["venice_img_settings"], {})
         model_id = p_set.get("visual_scan_model", p_set.get("model", "venice-uncensored"))
@@ -2796,9 +2967,21 @@ def check_scan_status():
 def update_history():
     path = get_active_chat_path()
     data = load_chat_data(path)
-    data["messages"] = request.json.get('history')
-    if len(data["messages"]) < (data.get("summaries", [])[-1]["end_index"] if data.get("summaries") else 0):
+
+    new_history = request.json.get('history')
+
+    if data.get("chat_type") == "pipeline":
+        phase = data.get("pipeline_phase", "architect")
+        history_key = "scribe_messages" if phase == "scribe" else "architect_messages"
+        data[history_key] = new_history
+        # Keep 'messages' in sync if needed or just use it as fallback
+        data["messages"] = new_history
+    else:
+        data["messages"] = new_history
+
+    if len(new_history) < (data.get("summaries", [])[-1]["end_index"] if data.get("summaries") else 0):
         data["summaries"] = [] 
+
     save_chat_data(path, data)
     return jsonify({"success": True})
 
@@ -2808,7 +2991,7 @@ def update_visual_memory():
     data = load_chat_data(path)
     mem_type = request.json.get('type', 'visual')
     content = request.json.get('memory')
-    
+
     if mem_type == 'self':
         data["self_memory"] = content
         snip = f"{content[:15]}...{content[-15:]}" if len(content) > 30 else content
@@ -2819,17 +3002,17 @@ def update_visual_memory():
         })
     else:
         data["visual_memory"] = content
-        
+
     save_chat_data(path, data)
     return jsonify({"success": True})
 
 @app.route('/sidebar_data')
 def sidebar_data():
     files = []
-    for f in os.listdir(FILES["conversations_dir"]):
-        if f.endswith(".json"):
-            fp = os.path.join(FILES["conversations_dir"], f)
-            files.append({"name": f, "time": os.path.getmtime(fp), "is_audit": f.endswith(".audit.json")})
+    with os.scandir(FILES["conversations_dir"]) as entries:
+        for entry in entries:
+            if entry.is_file() and entry.name.endswith(".json"):
+                files.append({"name": entry.name, "time": entry.stat().st_mtime, "is_audit": entry.name.endswith(".audit.json")})
     files.sort(key=lambda x: x["time"], reverse=True)
     meta = read_json(FILES["active_meta"], {})
     return jsonify({"chats": [f["name"] for f in files], "active_chat": meta.get("filename")})
@@ -2903,16 +3086,16 @@ def generate_chat_title():
         data = request.json
         model_id = data.get('model', 'venice-uncensored')
         range_data = data.get('range', {"start": 1, "end": 15})
-        
+
         path = get_active_chat_path()
         chat_data = load_chat_data(path)
 
         # Get text messages
         all_text_msgs = [m for m in chat_data["messages"] if m["role"] != "system" and not (isinstance(m.get('content', ''), str) and m.get('content', '').startswith("__IMG_JSON__"))]
-        
+
         start = max(0, range_data.get('start', 1) - 1)
         end = min(len(all_text_msgs), range_data.get('end', 15))
-        
+
         history = all_text_msgs[start:end]
         history_text = "\n".join([f"{m['role'].upper()}: {get_text_content(m)[:500]}" for m in history])
 
@@ -3312,7 +3495,7 @@ def analyze_chat():
 
         clean_text = re.sub(r'\[.*?\]\(.*?\)', '', full_text)
         clean_text = clean_text.lower()
-        clean_text = clean_text.replace("’", "'").replace("‘", "'")
+        clean_text = clean_text.replace("â€™", "'").replace("â€˜", "'")
         clean_text = re.sub(r'[^a-z0-9\s\'.,!?;]', ' ', clean_text)
         words = clean_text.split()
 
@@ -3643,25 +3826,25 @@ def debug_cache():
 def create_arena():
     models = request.json.get('models', [])
     if len(models) < 2: return jsonify({"error": "Need at least 2 models"}), 400
-    
+
     ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
     fn = f"Arena_{ts}.json"
     path = os.path.join(FILES["conversations_dir"], fn)
-    
+
     sys_prompt = read_text(FILES["main_prompt"])
     eval_prompt = read_text(FILES["evaluator_prompt"])
-    
+
     threads = {}
     for m in models:
         threads[m['id']] = [{"role": "system", "content": sys_prompt}]
-        
+
     write_json(path, {
         "is_arena": True,
         "models": models,
         "threads": threads,
         "evaluator": [{"role": "system", "content": eval_prompt}]
     })
-    
+
     write_json(FILES["active_meta"], {"filename": fn})
     return jsonify({"success": True, "filename": fn})
 
@@ -3671,10 +3854,10 @@ def branch_to_arena():
         req = request.json
         idx = req.get('index')
         models = req.get('models', [])
-        
+
         if idx is None or not models:
             return jsonify({"error": "Missing index or models"}), 400
-            
+
         path = get_active_chat_path()
         data = load_chat_data(path)
 
@@ -3688,7 +3871,7 @@ def branch_to_arena():
         new_path = os.path.join(FILES["conversations_dir"], new_fn)
 
         eval_prompt = read_text(FILES["evaluator_prompt"])
-        
+
         threads = {}
         for m in models:
             # Deep copy history into each model thread
@@ -3716,21 +3899,21 @@ def arena_chat():
     path = get_active_chat_path()
     chat_data = read_json(path, {})
     if not chat_data.get('is_arena'): return jsonify({"error": "Not an arena chat"}), 400
-    
+
     msg = data.get('message')
     target = data.get('target', 'all')
-    
+
     models_to_run = [m['id'] for m in chat_data['models']] if target == 'all' else [target]
     send_time = datetime.datetime.now().isoformat()
-    
+
     for m_id in models_to_run:
         chat_data['threads'][m_id].append({"role": "user", "content": msg, "timestamp": send_time})
         chat_data['threads'][m_id].append({"role": "assistant", "content": "", "model": m_id})
-        
+
     write_json(path, chat_data)
-    
+
     q = queue.Queue()
-    
+
     def fetch_model(m_id):
         # Correctly build context for Arena model based on its specific thread
         # This allows summaries and visual memory to be used even in Arena
@@ -3739,14 +3922,14 @@ def arena_chat():
             "summaries": chat_data.get("summaries", []),
             "visual_memory": chat_data.get("visual_memory", "")
         }
-        
+
         # Determine query text for RAG etc
         query_text = msg
         if isinstance(query_text, list):
             query_text = get_text_content({"content": query_text})
 
         ctx = build_context(temp_thread_data, user_query=query_text, current_model=m_id)
-        
+
         headers = {"Authorization": f"Bearer {VENICE_API_KEY}"}
         payload = {
             "model": m_id,
@@ -3778,10 +3961,10 @@ def arena_chat():
         except Exception as e:
             q.put((m_id, {"error": str(e)}))
         q.put((m_id, "[DONE]"))
-        
+
     for m_id in models_to_run:
         threading.Thread(target=fetch_model, args=(m_id,)).start()
-        
+
     def generate():
         done_count = 0
         contents = {m_id: "" for m_id in models_to_run}
@@ -3798,14 +3981,14 @@ def arena_chat():
                 if "usage" in d:
                     usages[m_id] = d["usage"]
                 yield f"data: {json.dumps({m_id: d})}\n\n"
-                
+
         for m_id in models_to_run:
             chat_data['threads'][m_id][-1]["content"] = contents[m_id]
             chat_data['threads'][m_id][-1]["reasoning"] = reasonings[m_id]
             if usages[m_id]:
                 chat_data['threads'][m_id][-1]["usage"] = usages[m_id]
         write_json(path, chat_data)
-        
+
     return Response(stream_with_context(generate()), mimetype='text/event-stream')
 
 @app.route('/arena_eval', methods=['POST'])
@@ -3813,11 +3996,11 @@ def arena_eval():
     data = request.json
     path = get_active_chat_path()
     chat_data = read_json(path, {})
-    
+
     msg = data.get('message')
     hide_names = data.get('hide_names', True)
     eval_model = data.get('model')
-    
+
     if not eval_model:
         v_set = read_json(FILES["venice_settings"], {})
         eval_model = v_set.get("model", "venice-uncensored")
@@ -3828,25 +4011,25 @@ def arena_eval():
         m_id = m_info['id']
         m_name = m_info['name']
         display_name = "Model [REDACTED]" if hide_names else f"Model: {m_name} ({m_id})"
-        
+
         context_report += f"=== CONVERSATION THREAD FOR {display_name} ===\n"
         thread = chat_data['threads'].get(m_id, [])
         # Filter out system messages for the report
         roleplay_thread = [m for m in thread if m['role'] != 'system']
-        
+
         for i, m in enumerate(roleplay_thread):
             is_latest = (i == len(roleplay_thread) - 1)
             prefix = "Latest " if is_latest else ""
-            
+
             if m['role'] == 'user':
                 label = f"{prefix}User Prompt"
             else:
                 label = f"{prefix}Comparison Model Response"
-            
+
             content = get_text_content(m)
             context_report += f"[{label}]: {content}\n\n"
         context_report += f"=== END THREAD FOR {display_name} ===\n\n"
-    
+
     context_report += "--- ARENA COMPARISON CONTEXT (END) ---\n\n"
 
     # Now label the evaluator's own previous thoughts clearly
@@ -3856,16 +4039,16 @@ def arena_eval():
     for i, m in enumerate(eval_roleplay[:-2]):
         is_latest = (i == len(eval_roleplay) - 3) # -2 is the new user msg, -3 is the previous assistant msg
         prefix = "Latest " if is_latest else ""
-        
+
         if m['role'] == 'user':
             label = f"{prefix}User's Evaluator Query"
         else:
             label = f"{prefix}Evaluator Previous Response"
-            
+
         eval_history_str += f"[{label}]: {get_text_content(m)}\n\n"
 
     user_prompt_str = f"{context_report}\n--- PREVIOUS EVALUATOR HISTORY ---\n{eval_history_str}\n\nUSER'S CURRENT EVALUATION REQUEST:\n{msg}"
-    
+
     # 1. Persist the user message and a placeholder assistant message before streaming
     send_time = datetime.datetime.now().isoformat()
     chat_data['evaluator'].append({"role": "user", "content": msg, "timestamp": send_time})
@@ -3879,7 +4062,7 @@ def arena_eval():
         api_msgs = chat_data['evaluator'][:-1].copy()
         # Replace the last user message content with the enriched context report
         api_msgs[-1] = {"role": "user", "content": final_prompt}
-        
+
         headers = {"Authorization": f"Bearer {VENICE_API_KEY}"}
         payload = {
             "model": eval_model,
@@ -3887,7 +4070,7 @@ def arena_eval():
             "stream": True,
             "venice_parameters": {"include_venice_system_prompt": False}
         }
-        
+
         full = ""
         reasoning = ""
         usage = None
@@ -3914,19 +4097,19 @@ def arena_eval():
                                     r_part = delta['reasoning_content']
                                     reasoning += r_part
                                     res_chunk['reasoning'] = r_part
-                                
+
                                 if res_chunk:
                                     yield f"data: {json.dumps(res_chunk)}\n\n"
                         except: pass
         except Exception as e:
             yield f"data: {json.dumps({'error': str(e)})}\n\n"
-            
+
         chat_data['evaluator'][-1]["content"] = full
         chat_data['evaluator'][-1]["reasoning"] = reasoning
         if usage:
             chat_data['evaluator'][-1]["usage"] = usage
         write_json(path, chat_data)
-        
+
     return Response(stream_with_context(generate(user_prompt_str)), mimetype='text/event-stream')
 
 if __name__ == '__main__':

@@ -19,6 +19,31 @@
         <button id="new-arena-btn"
             style="background:var(--purple); color:white; border:none; padding:15px; cursor:pointer; font-weight:bold; width:100%; border-bottom:1px solid var(--border);">⚔️
             New Arena (Compare Models)</button>
+        
+        <details id="sidebar-utilities">
+            <summary>Advanced Utilities</summary>
+            <div id="sidebar-utilities-content">
+                <button id="open-architect-btn" class="action full-btn"
+                    style="background:var(--purple); height:40px; font-size:0.9em; margin-bottom:10px;">⚡ Scenario Architect</button>
+                <button id="open-api-explorer-btn" class="action full-btn"
+                    style="background:#4338ca; height:40px; font-size:0.9em; margin-bottom:10px;">🌍 API Explorer</button>
+                <button id="open-ledger-btn" class="action full-btn"
+                    style="background:#10b981; height:40px; font-size:0.9em; margin-bottom:10px;">📊 API Cost Ledger</button>
+                <button id="open-analytics-btn" class="action full-btn"
+                    style="background:#0284c7; height:40px; font-size:0.9em; margin-bottom:10px;">📈 Chat Analytics</button>
+                <button id="open-lore-extractor-btn" class="action full-btn"
+                    style="background:#059669; height:40px; font-size:0.9em; margin-bottom:10px;">📖 Lore Extractor</button>
+                <button id="open-cache-debugger-btn" class="action full-btn"
+                    style="background:#eab308; color:#111; height:40px; font-size:0.9em; margin-bottom:10px;">🔍 Cache
+                    Debugger</button>
+                <button id="open-memory-btn" class="action full-btn"
+                    style="background:#8b5cf6; color:white; height:40px; font-size:0.9em; margin-bottom:10px;">🧠 AI Internal
+                    Memory</button>
+                <button id="open-audit-btn" class="action full-btn"
+                    style="background:#f59e0b; color:#111; height:40px; font-size:0.9em;">🕵️ Audit Current Chat</button>
+            </div>
+        </details>
+
         <div id="sidebar-header">
             <span>Recent Chats</span>
             <button id="close-sidebar" class="icon-btn">✕</button>
@@ -27,27 +52,7 @@
             style="padding: 10px 15px; font-size: 0.85em; border-bottom: 1px solid var(--border); color: var(--accent); display: none;">
             Balance: <span id="balance-amount">$0.00</span>
         </div>
-        <div style="padding:10px; border-bottom:1px solid var(--border);">
-            <button id="open-architect-btn" class="action full-btn"
-                style="background:var(--purple); height:40px; font-size:0.9em;">⚡ Scenario Architect</button>
-            <button id="open-api-explorer-btn" class="action full-btn"
-                style="background:#4338ca; height:40px; font-size:0.9em; margin-top:10px;">🌐 API Explorer</button>
-            <button id="open-ledger-btn" class="action full-btn"
-                style="background:#10b981; height:40px; font-size:0.9em; margin-top:10px;">📊 API Cost Ledger</button>
-            <button id="open-analytics-btn" class="action full-btn"
-                style="background:#0284c7; height:40px; font-size:0.9em; margin-top:10px;">📈 Chat Analytics</button>
-            <button id="open-lore-extractor-btn" class="action full-btn"
-                style="background:#059669; height:40px; font-size:0.9em; margin-top:10px;">📖 Lore Extractor</button>
-            <button id="open-cache-debugger-btn" class="action full-btn"
-                style="background:#eab308; color:#111; height:40px; font-size:0.9em; margin-top:10px;">🔍 Cache
-                Debugger</button>
-            <button id="open-memory-btn" class="action full-btn"
-                style="background:#8b5cf6; color:white; height:40px; font-size:0.9em; margin-top:10px;">🧠 AI Internal
-                Memory</button>
-            <button id="open-audit-btn" class="action full-btn"
-                style="background:#f59e0b; color:#111; height:40px; font-size:0.9em; margin-top:10px;">🕵️ Audit Current
-                Chat</button>
-        </div>
+        
         <ul id="chat-list"></ul>
     </div>
 
@@ -56,10 +61,14 @@
         <div id="chat-header"
             style="display:none; height:50px; background:#1a1a1a; border-bottom:1px solid #333; align-items:center; justify-content:space-between; padding:0 15px; position:absolute; top:0; left:0; width:100%; z-index:40;">
             <div style="display:flex; align-items:center; gap:10px;">
-                <span style="font-size:1.2em;">📚</span>
+                <span style="font-size:1.2em;">📖</span>
                 <span id="header-chat-name"
                     style="font-weight:bold; font-size:0.9em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:200px;">Story
                     Pipeline</span>
+                <div id="pipeline-phase-badge"
+                    style="font-size:0.65em; font-weight:bold; background:var(--accent); color:white; padding:2px 8px; border-radius:10px; text-transform:uppercase; letter-spacing:0.5px;">
+                    ARCHITECT</div>
+                <div id="pipeline-track-indicator" style="font-size:0.7em; color:var(--text-dim); font-style:italic;">(Planning Chat)</div>
             </div>
             <button id="open-pipeline-panel-btn" class="action"
                 style="background:#0d9488; padding:6px 15px; font-size:0.85em; font-weight:bold; border-radius:6px; box-shadow:0 2px 5px rgba(0,0,0,0.2);">📜
@@ -83,7 +92,7 @@
         <div id="pipeline-setup-modal" class="modal" style="z-index: 5500;">
             <div class="modal-content" style="max-width:600px;">
                 <div class="modal-header">
-                    <h2>📚 New Story Pipeline</h2>
+                    <h2>📖 New Story Pipeline</h2>
                     <span id="close-pipeline-setup-x" class="close-x">×</span>
                 </div>
                 <p style="color:var(--text-dim); font-size:0.9em; margin-top:0;">Configure the groundwork for your new
@@ -335,10 +344,10 @@
         <div id="status-msg"></div>
 
         <div id="chat-nav-widget">
-            <button class="nav-btn" title="Jump to Chat Top" id="nav-top">⇈</button>
+            <button class="nav-btn" title="Jump to Chat Top" id="nav-top">⤒</button>
             <button class="nav-btn" title="Previous Message" id="nav-up">↑</button>
             <button class="nav-btn" title="Next Message" id="nav-down">↓</button>
-            <button class="nav-btn" title="Jump to Chat Bottom" id="nav-bottom">⇊</button>
+            <button class="nav-btn" title="Jump to Chat Bottom" id="nav-bottom">⤓</button>
         </div>
 
         <div id="guided-modal"
@@ -388,7 +397,7 @@
                     <img id="image-preview"
                         style="max-height:100px; max-width:100px; border-radius:4px; object-fit:cover;">
                     <button id="remove-image-btn" class="icon-btn"
-                        style="background:var(--danger); color:white; border-radius:50%; width:24px; height:24px; display:flex; align-items:center; justify-content:center; padding:0; position:absolute; top:-10px; right:-10px;">✕</button>
+                        style="background:var(--danger); color:white; border-radius:50%; width:24px; height:24px; display:flex; align-items:center; justify-content:center; padding:0; position:absolute; top:-10px; right:-10px;">×</button>
                 </div>
                 <button id="attachBtn" class="action" title="Attach Image"
                     style="display:none; background: #333; padding: 0 10px; font-size: 1.2em;">📎</button>
@@ -404,7 +413,7 @@
                 </label>
                 <button id="dismiss-compare-btn" class="icon-btn"
                     style="color:var(--danger); font-size: 0.8em; margin-left: auto; opacity: 1; border: 1px solid var(--danger); border-radius: 4px; padding: 2px 8px;"
-                    title="Dismiss/Clear Backups">✕ Dismiss</button>
+                    title="Dismiss/Clear Backups">× Dismiss</button>
             </div>
             <div class="btn-row">
                 <button id="writeForMeBtn" class="action" style="background:var(--purple); flex: 1;"
@@ -1338,7 +1347,7 @@ eyes widened in surprise"></textarea>
     <div id="api-explorer-modal" class="modal" style="z-index: 5200;">
         <div class="modal-content" style="max-width:1000px; height:90vh; display:flex; flex-direction:column;">
             <div class="modal-header">
-                <h2>🌐 Venice API Explorer</h2>
+                <h2>🌍 Venice API Explorer</h2>
                 <span id="close-api-explorer-x" class="close-x">×</span>
             </div>
 

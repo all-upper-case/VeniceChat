@@ -1,4 +1,8 @@
 [
+    "mistral-31-24b",
+    "aion-labs.aion-2-0",
+    "venice-uncensored-role-play",
+    "deepseek-v4-flash",
     "venice-uncensored",
     "deepseek-v3.2",
     "kimi-k2-6",
@@ -9,9 +13,5 @@
     "zai-org-glm-4.7",
     "kimi-k2-5",
     "zai-org-glm-5-1",
-    "minimax-m27",
-    "google.gemma-4-31b-it",
-    "qwen-3-6-plus",
-    "aion-labs.aion-2-0",
-    "grok-41-fast"
+    "minimax-m27"
 ]

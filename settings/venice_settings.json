@@ -1,5 +1,5 @@
 {
-    "model": "kimi-k2-6",
+    "model": "gemma-4-uncensored",
     "include_venice_system_prompt": false,
     "auto_memory_enabled": false,
     "vision_high_res": true,
