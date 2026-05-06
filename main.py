@@ -1211,6 +1211,7 @@ def continue_pipeline():
         # Init full with the existing content!
         full = chat_data["messages"][idx].get("content", "")
         reasoning = chat_data["messages"][idx].get("reasoning", "")
+        edit_errors = []
 
         payload = {
             "model": model_to_use,
@@ -2430,7 +2431,11 @@ def chat():
         full = ""
         reasoning = ""
         usage = None
+        edit_errors = []
+        edit_errors = []
+        edit_errors = []
         balance = None
+        edit_errors = []
         full_response_json = []
 
         # Memory parsing variables
@@ -2663,6 +2668,9 @@ def chat():
                 err_msg = "\n".join(edit_errors)
                 chat_data["messages"].append({"role": "system", "content": f"Automated Notice: Your targeted blueprint edit failed.\n{err_msg}\nPlease ensure the <find> block exactly matches the text currently in the document, including punctuation and whitespace. You may use [REWRITE_BLUEPRINT] if targeted editing fails."})
                 save_chat_data(path, chat_data)
+
+            # Store final combined response
+            update_last_io(VENICE_URL, payload, full_response_json)
 
             if usage:
                 prompt_tokens = usage.get("prompt_tokens", 0)
@@ -4074,6 +4082,8 @@ def arena_eval():
         full = ""
         reasoning = ""
         usage = None
+        edit_errors = []
+        edit_errors = []
         try:
             with requests.post(VENICE_URL, headers=headers, json=payload, stream=True) as r:
                 r.raise_for_status()
