@@ -1245,6 +1245,20 @@
             "actual_cost": null,
             "balance_before": "1.82710301",
             "balance_after": null
+        },
+        {
+            "timestamp": "2026-05-06T04:41:13.573785",
+            "feature": "Chat Response",
+            "model": "gemma-4-uncensored",
+            "chat_file": "can_u_pls_tell_me_a_sexy_0506_0441.json",
+            "prompt_tokens": 1651,
+            "completion_tokens": 489,
+            "cached_tokens": 0,
+            "cache_hit_rate": 0.0,
+            "estimated_cost": 0.000509,
+            "actual_cost": null,
+            "balance_before": "1.81128662",
+            "balance_after": null
         }
     ]
 }
