@@ -2671,15 +2671,6 @@ def chat():
                 yield f"data: {json.dumps({'content_overwrite': full})}\n\n"
             else:
                 save_chat_data(path, chat_data)
-$', '', full, flags=re.DOTALL)
-                chat_data["messages"][idx]["content"] = full
-                save_chat_data(path, chat_data)
-                yield f"data: {json.dumps({'content_overwrite': full})}\n\n"
-                
-                if edit_errors:
-                    err_msg = "\n".join(edit_errors)
-                    chat_data["messages"].append({"role": "system", "content": f"Automated Notice: Your targeted blueprint edit failed.\n{err_msg}\nPlease ensure the <find> block exactly matches the text currently in the document, including punctuation and whitespace. You may use [REWRITE_BLUEPRINT] if targeted editing fails."})
-                    save_chat_data(path, chat_data)
 
             # Store final combined response
             update_last_io(VENICE_URL, payload, full_response_json)
