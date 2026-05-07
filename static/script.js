@@ -2811,16 +2811,19 @@ document.addEventListener('DOMContentLoaded', () => {
             let liveSummary = "";
             let hasClearedPlaceholder = false;
             let inThinkTag = false;
+            let streamBuffer = "";
 
             while(true){
                 const {done, value} = await reader.read();
                 if(done) break;
-                const chunk = dec.decode(value);
+                streamBuffer += dec.decode(value, { stream: true });
+                const events = streamBuffer.split('\n\n');
+                streamBuffer = events.pop();
 
                 // Check if user is at bottom before updating content
                 const isAtBottom = chatbox.scrollHeight - chatbox.scrollTop <= chatbox.clientHeight + 100;
 
-                chunk.split('\n\n').forEach(l=>{
+                events.forEach(l=>{
                    if(l.startsWith('data: ')){
                        try{ 
                            const d = JSON.parse(l.substring(6)); 
@@ -3008,8 +3011,8 @@ document.addEventListener('DOMContentLoaded', () => {
                                        tcBlock.style.cssText = 'margin-top:8px; border:1px solid #2d4a2d; border-radius:6px; overflow:hidden; font-size:0.85em;';
                                        tcBlock.innerHTML = `
                                            <div class="tool-calls-header" style="display:flex; justify-content:space-between; align-items:center; padding:6px 12px; background:#1a2e1a; cursor:pointer; user-select:none;">
-                                               <span><i style="margin-right:5px;">ðŸ”§</i>Blueprint Tool Calls</span>
-                                               <span class="toggle-icon-tc">â–¼</span>
+                                               <span><i style="margin-right:5px;">🔧</i>Blueprint Tool Calls</span>
+                                               <span class="toggle-icon-tc">▼</span>
                                            </div>
                                            <div class="tool-calls-content" style="display:none; padding:12px; background:#111; white-space:pre-wrap; font-family:monospace; color:#a3e635; overflow-x:auto;"></div>
                                        `;
@@ -3018,7 +3021,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                            const ic = tcBlock.querySelector('.toggle-icon-tc');
                                            const isH = c.style.display === 'none';
                                            c.style.display = isH ? 'block' : 'none';
-                                           ic.textContent = isH ? 'â–²' : 'â–¼';
+                                           ic.textContent = isH ? '▲' : '▼';
                                        };
                                        div.appendChild(tcBlock);
                                    }
@@ -3032,7 +3035,65 @@ document.addEventListener('DOMContentLoaded', () => {
                                if (isAtBottom) chatbox.scrollTop = chatbox.scrollHeight;
                            }
 
+                           // These pipeline/finalization events may arrive without d.content.
+                           // They must be handled outside the if(d.content) block.
+                           if (!d.content) {
+                               if (d.blueprint_update) {
+                                   const docEditor = document.getElementById('blueprint-editor');
+                                   if (docEditor) {
+                                       const oldBp = previousBlueprint;
+                                       const newBp = d.blueprint_update;
+                                       docEditor.value = newBp;
+                                       updateBlueprintDiff(oldBp, newBp);
+                                       previousBlueprint = newBp;
+                                   }
+                               }
+                               if (d.tool_calls) {
+                                   if (!hasClearedPlaceholder) {
+                                       div.innerHTML = '';
+                                       hasClearedPlaceholder = true;
+                                   }
+                                   let tcBlock = div.querySelector('.tool-calls-block');
+                                   if (!tcBlock) {
+                                       tcBlock = document.createElement('div');
+                                       tcBlock.className = 'tool-calls-block';
+                                       tcBlock.style.cssText = 'margin-top:8px; border:1px solid #2d4a2d; border-radius:6px; overflow:hidden; font-size:0.85em;';
+                                       tcBlock.innerHTML = `
+                                           <div class="tool-calls-header" style="display:flex; justify-content:space-between; align-items:center; padding:6px 12px; background:#1a2e1a; cursor:pointer; user-select:none;">
+                                               <span><i style="margin-right:5px;">🔧</i>Blueprint Tool Calls</span>
+                                               <span class="toggle-icon-tc">▼</span>
+                                           </div>
+                                           <div class="tool-calls-content" style="display:none; padding:12px; background:#111; white-space:pre-wrap; font-family:monospace; color:#a3e635; overflow-x:auto;"></div>
+                                       `;
+                                       tcBlock.querySelector('.tool-calls-header').onclick = () => {
+                                           const c = tcBlock.querySelector('.tool-calls-content');
+                                           const ic = tcBlock.querySelector('.toggle-icon-tc');
+                                           const isH = c.style.display === 'none';
+                                           c.style.display = isH ? 'block' : 'none';
+                                           ic.textContent = isH ? '▲' : '▼';
+                                       };
+                                       div.appendChild(tcBlock);
+                                   }
+                                   tcBlock.querySelector('.tool-calls-content').textContent = d.tool_calls;
+                               }
+                               if (d.content_overwrite) {
+                                   if (statusMsg) statusMsg.innerHTML = '';
+                                   if (!hasClearedPlaceholder) {
+                                       div.innerHTML = '';
+                                       hasClearedPlaceholder = true;
+                                   }
+                                   full = d.content_overwrite;
+                                   if (!contentDiv) {
+                                       contentDiv = document.createElement('div');
+                                       contentDiv.style.cssText = "white-space:pre-wrap; font-family:inherit;";
+                                       div.insertBefore(contentDiv, div.firstChild);
+                                   }
+                                   contentDiv.innerHTML = typeof marked !== 'undefined' ? marked.parse(full) : full;
+                               }
+                               if (isAtBottom) chatbox.scrollTop = chatbox.scrollHeight;
+                           }
                            if(d.error) {
+
                                if (statusMsg) statusMsg.innerHTML = '';
                                console.error("Server Error:", d.error);
                                full += "\n\n**System Error:** " + d.error;

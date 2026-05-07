@@ -1211,7 +1211,6 @@ def continue_pipeline():
         # Init full with the existing content!
         full = chat_data["messages"][idx].get("content", "")
         reasoning = chat_data["messages"][idx].get("reasoning", "")
-        edit_errors = []
         
         payload = {
             "model": model_to_use,
@@ -1244,7 +1243,7 @@ def continue_pipeline():
                                 if 'reasoning_content' in delta and delta['reasoning_content']:
                                     r_part = delta['reasoning_content']
                                     reasoning += r_part
-                                    chat_data["messages"][idx]["reasoning"] = reasoning
+                                    chat_data[track_key][idx]["reasoning"] = reasoning
                                     yield f"data: {json.dumps({'reasoning': r_part})}\n\n"
 
                                 if 'content' in delta and delta['content']:
@@ -1290,9 +1289,7 @@ def continue_pipeline():
                         bp_updated = True
                     elif old_text:
                         edit_errors.append(f"Failed to find exact text to replace: '{old_text[:50]}...'")
-                
-                # [FIX] Use robust Python regex to strip all blueprint tags
-                full = re.sub(r'\[(?:ADD_TO|REWRITE|EDIT)_BLUEPRINT\].*?(\[\/(?:ADD_TO|REWRITE|EDIT)_BLUEPRINT\]|$)', '', full, flags=re.DOTALL)
+                full = edit_pattern.sub('', full)
 
                 if bp_updated:
                     chat_data["blueprint"] = current_bp.strip()
@@ -2296,6 +2293,7 @@ def chat():
         if chat_data.get("chat_type") == "pipeline":
             phase = chat_data.get("pipeline_phase", "architect")
             track_key = "scribe_messages" if phase == "scribe" else "architect_messages"
+            print(f"[PIPELINE STREAM] phase={phase}, track_key={track_key}, idx={idx}, track_len={len(chat_data.get(track_key, []))}, fallback_messages_len={len(chat_data.get('messages', []))}")
             if track_key not in chat_data: chat_data[track_key] = []
             chat_data[track_key].append({"role": "user", "content": message_content, "timestamp": datetime.datetime.now().isoformat()})
         else:
@@ -2320,6 +2318,7 @@ def chat():
         if chat_data.get("chat_type") == "pipeline":
             phase = chat_data.get("pipeline_phase", "architect")
             track_key = "scribe_messages" if phase == "scribe" else "architect_messages"
+            print(f"[PIPELINE STREAM] phase={phase}, track_key={track_key}, idx={idx}, track_len={len(chat_data.get(track_key, []))}, fallback_messages_len={len(chat_data.get('messages', []))}")
 
         # Immediate yield to keep connection alive
         yield f"data: {json.dumps({'status': 'Connecting to Venice...'})}\n\n"
@@ -2431,7 +2430,6 @@ def chat():
         full = ""
         reasoning = ""
         usage = None
-        edit_errors = []
         balance = None
         full_response_json = []
 
@@ -2465,7 +2463,7 @@ def chat():
                                 if 'reasoning_content' in delta and delta['reasoning_content']:
                                     r_part = delta['reasoning_content']
                                     reasoning += r_part
-                                    chat_data["messages"][idx]["reasoning"] = reasoning
+                                    chat_data[track_key][idx]["reasoning"] = reasoning
                                     yield f"data: {json.dumps({'reasoning': r_part})}\n\n"
 
                                 if 'content' in delta and delta['content']:
@@ -2655,15 +2653,19 @@ def chat():
                     
                     yield f"data: {json.dumps({'memory_update': updated_mem.strip(), 'memory_logs': fresh_data['memory_logs']})}\n\n"
 
-            # Store final combined response
+            # Store final combined response.
+            # In pipeline architect mode, the content may already have been cleaned by process_blueprint_tools(),
+            # so do not overwrite it with the raw full text containing blueprint tool tags.
             update_last_io(VENICE_URL, payload, full_response_json)
-            chat_data["messages"][idx]["content"] = full
-            save_chat_data(path, chat_data)
-            yield f"data: {json.dumps({'content_overwrite': full})}\n\n"
-            
-            if edit_errors:
-                err_msg = "\n".join(edit_errors)
-                chat_data["messages"].append({"role": "system", "content": f"Automated Notice: Your targeted blueprint edit failed.\n{err_msg}\nPlease ensure the <find> block exactly matches the text currently in the document, including punctuation and whitespace. You may use [REWRITE_BLUEPRINT] if targeted editing fails."})
+            is_pipeline_architect = (
+                chat_data.get("chat_type") == "pipeline"
+                and chat_data.get("pipeline_phase") == "architect"
+            )
+            if not is_pipeline_architect:
+                chat_data[track_key][idx]["content"] = full
+                save_chat_data(path, chat_data)
+                yield f"data: {json.dumps({'content_overwrite': full})}\n\n"
+            else:
                 save_chat_data(path, chat_data)
 
             # Store final combined response
@@ -2678,7 +2680,7 @@ def chat():
                         "raw": round(prompt_tokens * (char_raw / total_chars))
                     }
 
-                chat_data["messages"][idx]["usage"] = usage
+                chat_data[track_key][idx]["usage"] = usage
                 save_chat_data(path, chat_data)
                 yield f"data: {json.dumps({'usage': usage, 'balance': balance})}\n\n"
 
@@ -2716,10 +2718,13 @@ def chat():
             threading.Thread(target=background_tasks, args=(usage, balance, model_to_use, path, chat_data)).start()
 
         except Exception as e:
+            target_messages = chat_data.get(track_key, [])
             if not full and not reasoning:
-                chat_data["messages"].pop()
+                if 0 <= idx < len(target_messages):
+                    target_messages.pop(idx)
             else:
-                chat_data["messages"][idx]["content"] = full + f"\n\n*(Stream error: {str(e)})*"
+                if 0 <= idx < len(target_messages):
+                    target_messages[idx]["content"] = full + f"\n\n*(Stream error: {str(e)})*"
             save_chat_data(path, chat_data)
             yield f"data: {json.dumps({'error': str(e)})}\n\n"
 
@@ -4079,8 +4084,6 @@ def arena_eval():
         full = ""
         reasoning = ""
         usage = None
-        edit_errors = []
-        edit_errors = []
         try:
             with requests.post(VENICE_URL, headers=headers, json=payload, stream=True) as r:
                 r.raise_for_status()
