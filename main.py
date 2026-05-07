@@ -2293,8 +2293,9 @@ def chat():
         if chat_data.get("chat_type") == "pipeline":
             phase = chat_data.get("pipeline_phase", "architect")
             track_key = "scribe_messages" if phase == "scribe" else "architect_messages"
-            print(f"[PIPELINE STREAM] phase={phase}, track_key={track_key}, idx={idx}, track_len={len(chat_data.get(track_key, []))}, fallback_messages_len={len(chat_data.get('messages', []))}")
-            if track_key not in chat_data: chat_data[track_key] = []
+            if track_key not in chat_data:
+                chat_data[track_key] = []
+            print(f"[PIPELINE USER APPEND] phase={phase}, track_key={track_key}, track_len_before_user_append={len(chat_data.get(track_key, []))}, fallback_messages_len={len(chat_data.get('messages', []))}")
             chat_data[track_key].append({"role": "user", "content": message_content, "timestamp": datetime.datetime.now().isoformat()})
         else:
             chat_data["messages"].append({"role": "user", "content": message_content, "timestamp": datetime.datetime.now().isoformat()})
@@ -2304,8 +2305,11 @@ def chat():
     if chat_data.get("chat_type") == "pipeline":
         phase = chat_data.get("pipeline_phase", "architect")
         track_key = "scribe_messages" if phase == "scribe" else "architect_messages"
+        if track_key not in chat_data:
+            chat_data[track_key] = []
         chat_data[track_key].append(ast_msg)
         idx = len(chat_data[track_key]) - 1
+        print(f"[PIPELINE ASSISTANT PLACEHOLDER] phase={phase}, track_key={track_key}, idx={idx}, track_len_after_assistant_append={len(chat_data.get(track_key, []))}, fallback_messages_len={len(chat_data.get('messages', []))}")
     else:
         chat_data["messages"].append(ast_msg)
         idx = len(chat_data["messages"]) - 1
@@ -2667,6 +2671,15 @@ def chat():
                 yield f"data: {json.dumps({'content_overwrite': full})}\n\n"
             else:
                 save_chat_data(path, chat_data)
+$', '', full, flags=re.DOTALL)
+                chat_data["messages"][idx]["content"] = full
+                save_chat_data(path, chat_data)
+                yield f"data: {json.dumps({'content_overwrite': full})}\n\n"
+                
+                if edit_errors:
+                    err_msg = "\n".join(edit_errors)
+                    chat_data["messages"].append({"role": "system", "content": f"Automated Notice: Your targeted blueprint edit failed.\n{err_msg}\nPlease ensure the <find> block exactly matches the text currently in the document, including punctuation and whitespace. You may use [REWRITE_BLUEPRINT] if targeted editing fails."})
+                    save_chat_data(path, chat_data)
 
             # Store final combined response
             update_last_io(VENICE_URL, payload, full_response_json)

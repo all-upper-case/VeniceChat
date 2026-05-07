@@ -1259,6 +1259,34 @@
             "actual_cost": null,
             "balance_before": "1.81128662",
             "balance_after": null
+        },
+        {
+            "timestamp": "2026-05-07T22:45:53.729012",
+            "feature": "Chat Response",
+            "model": "deepseek-v4-flash",
+            "chat_file": "Can_you_please_tell_me_a_0507_2245.json",
+            "prompt_tokens": 0,
+            "completion_tokens": 0,
+            "cached_tokens": 0,
+            "cache_hit_rate": 0,
+            "estimated_cost": null,
+            "actual_cost": null,
+            "balance_before": "1.77559991",
+            "balance_after": null
+        },
+        {
+            "timestamp": "2026-05-07T22:48:50.601189",
+            "feature": "Chat Response",
+            "model": "qwen-3-6-plus",
+            "chat_file": "Can_you_please_tell_me_a_0507_2247.json",
+            "prompt_tokens": 1661,
+            "completion_tokens": 2853,
+            "cached_tokens": 0,
+            "cache_hit_rate": 0.0,
+            "estimated_cost": 0.011745,
+            "actual_cost": null,
+            "balance_before": "1.77559991",
+            "balance_after": null
         }
     ]
 }

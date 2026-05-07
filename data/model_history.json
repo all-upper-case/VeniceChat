@@ -1,4 +1,6 @@
 [
+    "mistral-small-2603",
+    "qwen-3-6-plus",
     "google.gemma-4-31b-it",
     "mistral-31-24b",
     "aion-labs.aion-2-0",
@@ -11,7 +13,5 @@
     "gemma-4-uncensored",
     "e2ee-gpt-oss-120b-p",
     "zai-org-glm-4.7-flash",
-    "zai-org-glm-4.7",
-    "kimi-k2-5",
-    "zai-org-glm-5-1"
+    "zai-org-glm-4.7"
 ]
