@@ -85,33 +85,9 @@ document.addEventListener('DOMContentLoaded', () => {
         selectors.forEach(select => {
             if (availableModels) {
                 const currentVal = select.dataset.currentValue || select.value;
-
-                // Only the main chat model selector should respond to the global
-                // search/filter controls. Utility/global selectors should keep their
-                // full lists so typing in search never silently changes saved models.
-                const isMainChatSelector = select.id === 'set-model-chat';
-                populateFilteredSelect(
-                    select,
-                    isMainChatSelector ? query : "",
-                    isMainChatSelector ? trait : "all",
-                    isMainChatSelector ? sort : "name",
-                    false,
-                    false
-                );
-
+                populateFilteredSelect(select, query, trait, sort, false, false);
                 if (currentVal && currentVal !== "Loading models...") {
                     select.value = currentVal;
-
-                    // If the current value is not present after filtering, preserve it
-                    // as a temporary selected option instead of letting the browser pick
-                    // the first filtered model.
-                    if (select.value !== currentVal) {
-                        const opt = document.createElement('option');
-                        opt.value = currentVal;
-                        opt.textContent = `Current: ${currentVal}`;
-                        opt.selected = true;
-                        select.insertBefore(opt, select.firstChild);
-                    }
                 }
             } else {
                 select.innerHTML = '<option value="">Loading models...</option>';
@@ -3340,10 +3316,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
 
-            const safeRenameDefaultModel = "mistral-small-2603";
-            if ([...modelSelect.options].some(opt => opt.value === safeRenameDefaultModel)) {
-                modelSelect.value = safeRenameDefaultModel;
-            } else if (!modelSelect.value && modelSelect.options.length > 0) {
+            if (!modelSelect.value && modelSelect.options.length > 0) {
                 modelSelect.selectedIndex = 0;
             }
         }

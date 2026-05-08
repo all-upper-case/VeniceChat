@@ -85,33 +85,9 @@ document.addEventListener('DOMContentLoaded', () => {
         selectors.forEach(select => {
             if (availableModels) {
                 const currentVal = select.dataset.currentValue || select.value;
-
-                // Only the main chat model selector should respond to the global
-                // search/filter controls. Utility/global selectors should keep their
-                // full lists so typing in search never silently changes saved models.
-                const isMainChatSelector = select.id === 'set-model-chat';
-                populateFilteredSelect(
-                    select,
-                    isMainChatSelector ? query : "",
-                    isMainChatSelector ? trait : "all",
-                    isMainChatSelector ? sort : "name",
-                    false,
-                    false
-                );
-
+                populateFilteredSelect(select, query, trait, sort, false, false);
                 if (currentVal && currentVal !== "Loading models...") {
                     select.value = currentVal;
-
-                    // If the current value is not present after filtering, preserve it
-                    // as a temporary selected option instead of letting the browser pick
-                    // the first filtered model.
-                    if (select.value !== currentVal) {
-                        const opt = document.createElement('option');
-                        opt.value = currentVal;
-                        opt.textContent = `Current: ${currentVal}`;
-                        opt.selected = true;
-                        select.insertBefore(opt, select.firstChild);
-                    }
                 }
             } else {
                 select.innerHTML = '<option value="">Loading models...</option>';
@@ -140,15 +116,10 @@ document.addEventListener('DOMContentLoaded', () => {
             let filteredGroup = availableModels[group].filter(m => {
                 const matchesQuery = m.name.toLowerCase().includes(lowQuery) || m.id.toLowerCase().includes(lowQuery);
                 let matchesTrait = true;
-                if (effectiveTrait === 'vision') {
-                    matchesTrait = !!(m.supportsVision || m.vision);
-                } else if (effectiveTrait === 'reasoning') {
-                    matchesTrait = !!(m.supportsReasoning || m.supportsReasoningEffort);
-                } else if (effectiveTrait === 'private') {
-                    matchesTrait = m.traits?.toLowerCase().includes('private');
-                } else if (effectiveTrait === 'beta') {
-                    matchesTrait = (m.tags && m.tags.includes('BETA')) || m.id.includes('beta');
-                }
+                if (effectiveTrait === 'vision') matchesTrait = m.vision;
+                else if (effectiveTrait === 'reasoning') matchesTrait = m.traits?.toLowerCase().includes('reasoning') || m.id.includes('reasoning') || m.id.includes('thinking');
+                else if (effectiveTrait === 'private') matchesTrait = m.traits?.toLowerCase().includes('private');
+                else if (effectiveTrait === 'beta') matchesTrait = (m.tags && m.tags.includes('BETA')) || m.id.includes('beta');
 
                 return matchesQuery && matchesTrait;
             });
@@ -3228,28 +3199,11 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!list) return;
             list.innerHTML = '';
             
-            const chatItems = data.chats.map(item => {
-                if (typeof item === 'string') {
-                    return {
-                        name: item,
-                        is_audit: item.endsWith('.audit.json'),
-                        chat_type: 'standard',
-                        is_pipeline: false
-                    };
-                }
-                return item;
-            });
-
-            const normalChats = chatItems.filter(f => !f.is_audit);
-            const auditChats = chatItems.filter(f => f.is_audit);
-            const auditNames = auditChats.map(f => f.name);
-            const normalNames = normalChats.map(f => f.name);
+            const normalChats = data.chats.filter(f => !f.endsWith('.audit.json'));
+            const auditChats = data.chats.filter(f => f.endsWith('.audit.json'));
             
-            normalChats.forEach(chat => {
-                const file = chat.name;
-                const li = document.createElement('li');
-                li.className = 'chat-item';
-                if (chat.is_pipeline || chat.chat_type === 'pipeline') li.classList.add('pipeline-chat-item');
+            normalChats.forEach(file => {
+                const li = document.createElement('li'); li.className = 'chat-item';
                 if (file === data.active_chat) li.classList.add('active-chat');
                 li.innerHTML = `<span class="chat-name">${file.replace('.json','').replace(/_/g,' ')}</span>
                                 <div><button class="icon-btn r-btn">&#9998;</button><button class="icon-btn d-btn">&#128465;</button></div>`;
@@ -3260,12 +3214,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 // Check if this chat has an audit child
                 const auditFile = file.replace('.json', '.audit.json');
-                if (auditNames.includes(auditFile)) {
+                if (auditChats.includes(auditFile)) {
                     const ali = document.createElement('li');
                     ali.className = 'chat-item audit-chat-item';
                     if (auditFile === data.active_chat) ali.classList.add('active-chat');
-                    ali.innerHTML = `<span class="chat-name">↳ 🕵️ Audit: ${file.replace('.json','').replace(/_/g,' ')}</span>
-                                    <div><button class="icon-btn d-btn">🗑</button></div>`;
+                    ali.innerHTML = `<span class="chat-name">â†³ ðŸ•µï¸ Audit: ${file.replace('.json','').replace(/_/g,' ')}</span>
+                                    <div><button class="icon-btn d-btn">ðŸ—‘</button></div>`;
                     ali.onclick = (e) => { if(!e.target.closest('.icon-btn')) loadChat(auditFile); };
                     ali.querySelector('.d-btn').onclick = () => deleteChat(auditFile);
                     list.appendChild(ali);
@@ -3273,15 +3227,14 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             
             // Render orphaned audit chats just in case parent was deleted
-            auditChats.forEach(chat => {
-                const aFile = chat.name;
+            auditChats.forEach(aFile => {
                 const parentExpected = aFile.replace('.audit.json', '.json');
-                if (!normalNames.includes(parentExpected)) {
+                if (!normalChats.includes(parentExpected)) {
                     const ali = document.createElement('li');
                     ali.className = 'chat-item audit-chat-item';
                     if (aFile === data.active_chat) ali.classList.add('active-chat');
-                    ali.innerHTML = `<span class="chat-name">↳ 🕵️ Orphaned Audit: ${aFile.replace('.audit.json','').replace(/_/g,' ')}</span>
-                                    <div><button class="icon-btn d-btn">🗑</button></div>`;
+                    ali.innerHTML = `<span class="chat-name">â†³ ðŸ•µï¸ Orphaned Audit: ${aFile.replace('.audit.json','').replace(/_/g,' ')}</span>
+                                    <div><button class="icon-btn d-btn">ðŸ—‘</button></div>`;
                     ali.onclick = (e) => { if(!e.target.closest('.icon-btn')) loadChat(aFile); };
                     ali.querySelector('.d-btn').onclick = () => deleteChat(aFile);
                     list.appendChild(ali);
@@ -3303,50 +3256,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const stats = document.getElementById('rename-stats');
         const startIn = document.getElementById('rename-start');
         const endIn = document.getElementById('rename-end');
-        const modelSelect = document.getElementById('rename-model-select');
 
         if (!modal || !input) return;
-
-        if (modelSelect) {
-            modelSelect.innerHTML = '';
-
-            let modelData = availableModels;
-            if (!modelData) {
-                try {
-                    const mRes = await fetch('/venice_models');
-                    modelData = await mRes.json();
-                    availableModels = modelData;
-                } catch (e) {
-                    console.warn("Failed to load rename models:", e);
-                }
-            }
-
-            if (modelData) {
-                for (const groupName in modelData) {
-                    const group = modelData[groupName];
-                    if (!Array.isArray(group)) continue;
-
-                    const optGroup = document.createElement('optgroup');
-                    optGroup.label = groupName;
-
-                    group.forEach(model => {
-                        const opt = document.createElement('option');
-                        opt.value = model.id;
-                        opt.textContent = model.name ? `${model.name} (${model.id})` : model.id;
-                        optGroup.appendChild(opt);
-                    });
-
-                    modelSelect.appendChild(optGroup);
-                }
-            }
-
-            const safeRenameDefaultModel = "mistral-small-2603";
-            if ([...modelSelect.options].some(opt => opt.value === safeRenameDefaultModel)) {
-                modelSelect.value = safeRenameDefaultModel;
-            } else if (!modelSelect.value && modelSelect.options.length > 0) {
-                modelSelect.selectedIndex = 0;
-            }
-        }
 
         title.textContent = `Rename: ${file.replace('.json', '').replace(/_/g, ' ')}`;
         input.value = file.replace('.json', '').replace(/_/g, ' ');
@@ -3413,6 +3324,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (!btn || !modelSelect || !activeRenameFile) return;
 
+        // Ensure we are operating on the chat being renamed
+        const activeMeta = await fetch('/sidebar_data').then(r => r.json());
+        if (activeMeta.active_chat !== activeRenameFile) {
+            if (confirm("AI Renaming requires loading the chat first. Load this chat now?")) {
+                await loadChat(activeRenameFile);
+                // After loading, the range might need adjustment
+                const textMsgCount = chatHistory.filter(m => m.role !== 'system' && !(typeof m.content === 'string' && m.content.startsWith('__IMG_JSON__'))).length;
+                if (startIn) startIn.value = 1;
+                if (endIn) endIn.value = Math.min(15, textMsgCount);
+            } else {
+                return;
+            }
+        }
+
         const ogText = btn.textContent;
         btn.textContent = "AI is thinking..."; btn.disabled = true;
 
@@ -3428,7 +3353,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ 
                     model: modelSelect.value,
-                    filename: activeRenameFile,
                     range: { start: startNum, end: endNum }
                 })
             });
@@ -3457,64 +3381,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         btn.textContent = ogText; btn.disabled = false;
     });
-
-    safeBind('bulk-ai-rename-submit', 'click', async () => {
-        const btn = document.getElementById('bulk-ai-rename-submit');
-        const modelSelect = document.getElementById('rename-model-select');
-        const countEl = document.getElementById('bulk-rename-count');
-        const limitEl = document.getElementById('bulk-rename-message-limit');
-        const resultsEl = document.getElementById('bulk-rename-results');
-
-        if (!btn || !modelSelect) return;
-
-        const count = parseInt(countEl?.value || '10');
-        const messageLimit = parseInt(limitEl?.value || '10');
-
-        if (!confirm(`AI rename the ${count} most recent non-audit chats using the first ${messageLimit} messages of each chat?`)) {
-            return;
-        }
-
-        const ogText = btn.textContent;
-        btn.textContent = "Renaming...";
-        btn.disabled = true;
-        if (resultsEl) {
-            resultsEl.style.display = 'block';
-            resultsEl.textContent = 'Working...';
-        }
-
-        try {
-            const res = await fetch('/bulk_generate_chat_titles', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({
-                    model: modelSelect.value,
-                    count: count,
-                    message_limit: messageLimit
-                })
-            });
-            const d = await res.json();
-
-            if (!d.success) {
-                alert("Bulk rename failed: " + (d.error || "Unknown error"));
-                if (resultsEl) resultsEl.textContent = JSON.stringify(d, null, 2);
-            } else {
-                const lines = d.results.map(r => {
-                    if (r.success) return `${r.file} → ${r.new_filename}`;
-                    return `${r.file} → ERROR: ${r.error || 'Unknown error'}`;
-                });
-                if (resultsEl) resultsEl.textContent = lines.join('\n');
-                await loadSidebar();
-            }
-        } catch (e) {
-            console.error(e);
-            alert("Bulk rename failed.");
-            if (resultsEl) resultsEl.textContent = String(e);
-        }
-
-        btn.textContent = ogText;
-        btn.disabled = false;
-    });
-
     window.deleteChat = async (file) => {
         if(confirm("Delete?")) { 
             await fetch('/delete_chat', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({filename:file})}); 

@@ -777,132 +777,20 @@ def is_vision_model(model_id):
                 return True
     return False
 
-def get_reasoning_effort_values_for_model(model_id, model_name=""):
-    """
-    Return the Venice-supported reasoning_effort values for known configurable
-    reasoning model families.
-
-    Empty list means either:
-    - the model is not a reasoning model, or
-    - the model has built-in reasoning but does not accept reasoning_effort.
-    """
-    haystack = f"{model_id or ''} {model_name or ''}".lower()
-
-    if any(x in haystack for x in ["openai-gpt-52", "gpt-5.2"]):
-        if "codex" in haystack:
-            return ["low", "medium", "high", "xhigh"]
-        return ["none", "low", "medium", "high", "xhigh"]
-
-    if any(x in haystack for x in ["claude-opus-4-6-fast", "claude opus 4.6 fast", "claude-opus-4-6", "claude opus 4.6"]):
-        return ["low", "medium", "high", "max"]
-
-    if any(x in haystack for x in ["claude-opus-4-5", "claude opus 4.5", "claude-sonnet-4-5", "claude sonnet 4.5", "claude-sonnet-4-6", "claude sonnet 4.6"]):
-        return ["low", "medium", "high"]
-
-    if any(x in haystack for x in ["google-gemini-3-pro", "gemini 3 pro"]):
-        return ["low", "high"]
-
-    if any(x in haystack for x in ["google-gemini-3-1-pro", "gemini 3.1 pro"]):
-        return ["low", "medium", "high"]
-
-    if any(x in haystack for x in ["google-gemini-3-flash", "gemini 3 flash"]):
-        return ["minimal", "low", "medium", "high"]
-
-    if any(x in haystack for x in [
-        "qwen-3-235b", "qwen 3 235b",
-        "qwen3-5-35b", "qwen 3.5 35b",
-        "qwen3-6", "qwen 3.6",
-        "kimi-k2-5", "kimi k2.5",
-        "minimax-m25", "minimax m2.5",
-        "minimax-m21", "minimax m2.1",
-    ]):
-        return ["low", "medium", "high"]
-
-    return []
-
-
-def model_reasoning_disable_supported(model_id, model_name=""):
-    """
-    Return True when Venice docs indicate reasoning can be disabled reliably.
-    This is separate from whether reasoning_effort is configurable.
-    """
-    haystack = f"{model_id or ''} {model_name or ''}".lower()
-
-    return any(x in haystack for x in [
-        "openai-gpt-52", "gpt-5.2",
-        "openai-gpt-53-codex", "gpt-5.3 codex",
-        "qwen-3-235b", "qwen 3 235b",
-        "qwen3-5-35b", "qwen 3.5 35b",
-        "zai-org-glm-5-1", "glm 5.1",
-    ])
-
-
-def get_local_model_metadata(model_id):
-    """
-    Find the best available metadata for a model.
-
-    Prefer the enriched cache written by /venice_models because it includes
-    live Venice capability fields such as supportsVision, supportsReasoning,
-    supportsReasoningEffort, availableContextTokens, and maxCompletionTokens.
-    Fall back to the curated static data/venice_models.json file if the cache
-    does not exist yet.
-    """
-    for models_path in ['data/venice_models.enriched.json', 'data/venice_models.json']:
-        models_data = read_json(models_path, {})
-        for group in models_data.values():
-            for model in group:
-                if model.get("id") == model_id:
-                    return model
-    return {}
-
-
 def is_reasoning_model(model_id):
-    """
-    Return True when the model is known to have reasoning capability.
-
-    Prefer explicit enriched metadata from Venice's /models endpoint. Fall back
-    to curated local tags and known model-family markers only when live metadata
-    is not available.
-    """
-    model = get_local_model_metadata(model_id)
-
-    if model.get("supportsReasoning") is True:
-        return True
-
-    if model.get("supportsReasoningEffort") is True:
-        return True
-
-    model_id_l = (model_id or "").lower()
-    model_name_l = str(model.get("name", "")).lower()
-
-    tags = [str(t).upper() for t in model.get('tags', [])]
-    traits = str(model.get('traits', '')).lower()
-
-    if 'REASONING' in tags:
-        return True
-
-    if any(marker in traits for marker in [
-        'reasoning model',
-        'reasoning-enabled',
-        'thinking model'
-    ]):
-        return True
-
-    if get_reasoning_effort_values_for_model(model_id_l, model_name_l):
-        return True
-
-    known_reasoning_id_markers = [
-        'deepseek-r',
-        'deepseek-v3.2',
-        'deepseek-v4',
-        'kimi-k2',
-        'glm-5',
-        'trinity-large-thinking',
-        'qwen3-5-35b',
-        'qwen3-vl-235b'
-    ]
-
-    return any(marker in model_id_l for marker in known_reasoning_id_markers)
+    models_data = read_json('data/venice_models.json', {})
+    for group in models_data.values():
+        for m in group:
+            if m.get('id') == model_id:
+                if 'REASONING' in m.get('tags', []) or 'Reasoning' in m.get('traits', ''):
+                    return True
+                desc = m.get('description', '').lower()
+                if 'reasoning effort' in desc or 'reasoning' in desc or 'thinking' in desc:
+                    return True
+                if any(x in model_id.lower() for x in ['deepseek-v', 'kimi-k2', 'glm-5', 'trinity-large']):
+                    return True
+                return False
+    return False
 
 # --- SUMMARIZATION ENGINE ---
 def process_summaries(chat_data):
@@ -1601,11 +1489,11 @@ def continue_pipeline():
                 # Re-scan original full for all tool call types for display
                 tool_calls_display = []
                 for m in re.finditer(r'\[REWRITE_BLUEPRINT\](.*?)\[/REWRITE_BLUEPRINT\]', full, re.DOTALL):
-                    tool_calls_display.append(f"🔄 REWRITE_BLUEPRINT:\n{m.group(1).strip()}")
+                    tool_calls_display.append(f"ðŸ”„ REWRITE_BLUEPRINT:\n{m.group(1).strip()}")
                 for m in re.finditer(r'\[ADD_TO_BLUEPRINT\](.*?)\[/ADD_TO_BLUEPRINT\]', full, re.DOTALL):
-                    tool_calls_display.append(f"➕ ADD_TO_BLUEPRINT:\n{m.group(1).strip()}")
+                    tool_calls_display.append(f"âž• ADD_TO_BLUEPRINT:\n{m.group(1).strip()}")
                 for m in re.finditer(r'\[EDIT_BLUEPRINT\]\s*<find>(.*?)</find>\s*<replace>(.*?)</replace>\s*\[/EDIT_BLUEPRINT\]', full, re.DOTALL):
-                    tool_calls_display.append(f"✏️ EDIT_BLUEPRINT:\n  FIND: {m.group(1).strip()}\n  REPLACE: {m.group(2).strip()}")
+                    tool_calls_display.append(f"âœï¸ EDIT_BLUEPRINT:\n  FIND: {m.group(1).strip()}\n  REPLACE: {m.group(2).strip()}")
                 
                 # Clean up tags from chat history
                 full = full.strip()
@@ -2578,10 +2466,7 @@ def chat():
         write_json(FILES["active_meta"], {"filename": new_fn})
         path = new_path
 
-    incoming_message_text = get_text_content({"content": data.get('message', '')})
-    is_empty_pipeline_continuation = chat_data.get("chat_type") == "pipeline" and not incoming_message_text.strip()
-
-    if data.get('message') and not is_empty_pipeline_continuation:
+    if data.get('message'):
         message_content = data['message']
         # If it's a vision message with base64, save image locally
         if isinstance(message_content, list):
@@ -2627,19 +2512,8 @@ def chat():
         # Immediate yield to keep connection alive
         yield f"data: {json.dumps({'status': 'Connecting to Venice...'})}\n\n"
 
-        # Build context from appropriate track.
-        # For a brand-new pipeline, /create_pipeline_chat already seeded the concept/settings
-        # as the first user message. The frontend calls triggerGen("") to start generation
-        # without appending a second artificial user message.
-        user_query_for_context = incoming_message_text
-        if is_empty_pipeline_continuation:
-            active_track = chat_data.get(track_key, [])
-            for prior_msg in reversed(active_track):
-                if prior_msg.get("role") == "user":
-                    user_query_for_context = get_text_content(prior_msg)
-                    break
-
-        context = build_context(chat_data, user_query=user_query_for_context, current_model=model_to_use)
+        # Build context from appropriate track
+        context = build_context(chat_data, user_query=get_text_content({"content": data.get('message', '')}), current_model=model_to_use)
 
         # Handle Audit Context Injection
         audit_ctx_req = data.get('audit_context')
@@ -2690,38 +2564,18 @@ def chat():
         headers = {"Authorization": f"Bearer {VENICE_API_KEY}"}
         cache_key = os.path.basename(path).replace('.json', '')
 
-        raw_reasoning_effort = v_set.get("reasoning_effort", "medium")
-        model_meta = get_local_model_metadata(model_to_use)
-        model_supports_reasoning = is_reasoning_model(model_to_use)
-        effort_values = model_meta.get("reasoningEffortValues") or get_reasoning_effort_values_for_model(model_to_use, model_meta.get("name", ""))
-        model_supports_reasoning_effort = bool(model_meta.get("supportsReasoningEffort") or effort_values)
-        model_can_disable_reasoning = bool(model_meta.get("canDisableReasoning") or model_reasoning_disable_supported(model_to_use, model_meta.get("name", "")))
+        reasoning_effort = v_set.get("reasoning_effort", "medium")
+        disable_thinking = False
+        if reasoning_effort == "none":
+            disable_thinking = True
+            reasoning_effort = "low" # Fallback depth, but thinking is disabled
 
         venice_params = {
             "include_venice_system_prompt": v_set.get("include_venice_system_prompt", True),
-            "strip_thinking_response": False
+            "strip_thinking_response": False,
+            "disable_thinking": disable_thinking,
+            "reasoning_effort": reasoning_effort
         }
-
-        reasoning_effort_to_send = None
-        disable_reasoning_for_payload = False
-
-        if model_supports_reasoning:
-            if raw_reasoning_effort == "none":
-                if model_can_disable_reasoning:
-                    disable_reasoning_for_payload = True
-                    venice_params["disable_thinking"] = True
-            elif model_supports_reasoning_effort:
-                reasoning_effort_to_send = raw_reasoning_effort
-                if effort_values and reasoning_effort_to_send not in effort_values:
-                    if "medium" in effort_values:
-                        reasoning_effort_to_send = "medium"
-                    elif "low" in effort_values:
-                        reasoning_effort_to_send = "low"
-                    else:
-                        reasoning_effort_to_send = effort_values[0]
-
-                venice_params["disable_thinking"] = False
-                venice_params["reasoning_effort"] = reasoning_effort_to_send
 
         if chat_data.get("character_slug"):
             venice_params["character_slug"] = chat_data["character_slug"]
@@ -2745,10 +2599,8 @@ def chat():
             "venice_parameters": venice_params
         }
 
-        if disable_reasoning_for_payload:
-            payload["reasoning"] = {"enabled": False}
-        elif reasoning_effort_to_send:
-            payload["reasoning_effort"] = reasoning_effort_to_send
+        if is_reasoning_model(model_to_use):
+            payload["reasoning_effort"] = v_set.get("reasoning_effort", "medium")
 
         # Store for the Last IO debugger
         update_last_io(VENICE_URL, payload, None)
@@ -3359,27 +3211,10 @@ def sidebar_data():
     with os.scandir(FILES["conversations_dir"]) as entries:
         for entry in entries:
             if entry.is_file() and entry.name.endswith(".json"):
-                chat_type = "standard"
-                is_pipeline = False
-
-                try:
-                    chat_preview = load_chat_data(os.path.join(FILES["conversations_dir"], entry.name))
-                    chat_type = chat_preview.get("chat_type", "standard")
-                    is_pipeline = chat_type == "pipeline"
-                except Exception:
-                    pass
-
-                files.append({
-                    "name": entry.name,
-                    "time": entry.stat().st_mtime,
-                    "is_audit": entry.name.endswith(".audit.json"),
-                    "chat_type": chat_type,
-                    "is_pipeline": is_pipeline
-                })
-
+                files.append({"name": entry.name, "time": entry.stat().st_mtime, "is_audit": entry.name.endswith(".audit.json")})
     files.sort(key=lambda x: x["time"], reverse=True)
     meta = read_json(FILES["active_meta"], {})
-    return jsonify({"chats": files, "active_chat": meta.get("filename")})
+    return jsonify({"chats": [f["name"] for f in files], "active_chat": meta.get("filename")})
 
 @app.route('/rename_chat', methods=['POST'])
 def rename_chat():
@@ -3450,44 +3285,18 @@ def generate_chat_title():
         data = request.json
         model_id = data.get('model', 'venice-uncensored')
         range_data = data.get('range', {"start": 1, "end": 15})
-        requested_filename = data.get('filename')
         
-        if requested_filename:
-            safe_filename = os.path.basename(requested_filename)
-            path = os.path.join(FILES["conversations_dir"], safe_filename)
-            if not os.path.exists(path):
-                return jsonify({"error": "Chat file not found"}), 404
-        else:
-            path = get_active_chat_path()
-
+        path = get_active_chat_path()
         chat_data = load_chat_data(path)
 
-        # Get text messages. Pipeline chats keep the real conversation in
-        # architect_messages / scribe_messages, not the fallback messages array.
-        if chat_data.get("chat_type") == "pipeline":
-            msgs_for_title = []
-            msgs_for_title.extend(chat_data.get("architect_messages", []))
-            msgs_for_title.extend(chat_data.get("scribe_messages", []))
-            if not msgs_for_title:
-                msgs_for_title = chat_data.get("messages", [])
-        else:
-            msgs_for_title = chat_data.get("messages", [])
-
-        all_text_msgs = [
-            m for m in msgs_for_title
-            if m.get("role") != "system"
-            and not (isinstance(m.get('content', ''), str) and m.get('content', '').startswith("__IMG_JSON__"))
-            and get_text_content(m).strip()
-        ]
+        # Get text messages
+        all_text_msgs = [m for m in chat_data["messages"] if m["role"] != "system" and not (isinstance(m.get('content', ''), str) and m.get('content', '').startswith("__IMG_JSON__"))]
         
         start = max(0, range_data.get('start', 1) - 1)
         end = min(len(all_text_msgs), range_data.get('end', 15))
         
         history = all_text_msgs[start:end]
-        if not history:
-            return jsonify({"error": "No text messages available to title."}), 400
-
-        history_text = "\n".join([f"{m.get('role', '').upper()}: {get_text_content(m)[:500]}" for m in history])
+        history_text = "\n".join([f"{m['role'].upper()}: {get_text_content(m)[:500]}" for m in history])
 
         prompt = f"Based on the conversation snippet below (messages {start+1} to {end}), output a short, descriptive four-word title that summarizes the topic. Output ONLY the four-word title. Do not include any formatting, preamble, or additional text.\n\nCONVERSATION SNIPPET:\n{history_text}"
 
@@ -3508,181 +3317,13 @@ def generate_chat_title():
             title = title.replace(" ", "_")
             title = "".join([c for c in title if c.isalnum() or c == '_'])
             return jsonify({"success": True, "title": title, "old_filename": os.path.basename(path)})
-        return jsonify({"error": "API Error", "details": resp}), 500
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-@app.route('/bulk_generate_chat_titles', methods=['POST'])
-def bulk_generate_chat_titles():
-    try:
-        data = request.json or {}
-        model_id = data.get('model', 'venice-uncensored')
-        count = max(1, min(int(data.get('count', 5)), 50))
-        message_limit = max(1, min(int(data.get('message_limit', 10)), 50))
-
-        all_files = []
-        with os.scandir(FILES["conversations_dir"]) as entries:
-            for entry in entries:
-                if entry.is_file() and entry.name.endswith(".json") and not entry.name.endswith(".audit.json"):
-                    all_files.append({"name": entry.name, "time": entry.stat().st_mtime})
-
-        all_files.sort(key=lambda x: x["time"], reverse=True)
-        target_files = all_files[:count]
-
-        headers = {"Authorization": f"Bearer {VENICE_API_KEY}"}
-        results = []
-
-        for file_info in target_files:
-            old_filename = file_info["name"]
-            path = os.path.join(FILES["conversations_dir"], old_filename)
-
-            try:
-                chat_data = load_chat_data(path)
-
-                if chat_data.get("chat_type") == "pipeline":
-                    msgs_for_title = []
-                    msgs_for_title.extend(chat_data.get("architect_messages", []))
-                    msgs_for_title.extend(chat_data.get("scribe_messages", []))
-                    if not msgs_for_title:
-                        msgs_for_title = chat_data.get("messages", [])
-                else:
-                    msgs_for_title = chat_data.get("messages", [])
-
-                all_text_msgs = [
-                    m for m in msgs_for_title
-                    if m.get("role") != "system"
-                    and not (isinstance(m.get('content', ''), str) and m.get('content', '').startswith("__IMG_JSON__"))
-                    and get_text_content(m).strip()
-                ]
-
-                history = all_text_msgs[:message_limit]
-                if not history:
-                    results.append({"file": old_filename, "success": False, "error": "No text messages available."})
-                    continue
-
-                history_text = "\n".join([f"{m.get('role', '').upper()}: {get_text_content(m)[:500]}" for m in history])
-
-                prompt = f"Based on the conversation snippet below, output a short, descriptive four-word title that summarizes the topic. Output ONLY the four-word title. Do not include any formatting, preamble, or additional text.\n\nCONVERSATION SNIPPET:\n{history_text}"
-
-                payload = {
-                    "model": model_id,
-                    "messages": [{"role": "user", "content": prompt}],
-                    "temperature": 0.1,
-                    "venice_parameters": {"include_venice_system_prompt": False, "strip_thinking_response": True}
-                }
-
-                r = requests.post(VENICE_URL, headers=headers, json=payload)
-                resp = r.json()
-
-                if 'choices' not in resp:
-                    results.append({"file": old_filename, "success": False, "error": "API Error", "details": resp})
-                    continue
-
-                title = resp['choices'][0]['message']['content'].strip()
-                title = title.replace(" ", "_")
-                title = "".join([c for c in title if c.isalnum() or c == '_'])
-                if not title:
-                    results.append({"file": old_filename, "success": False, "error": "Empty generated title."})
-                    continue
-
-                new_name = title + ".json"
-                counter = 1
-                while os.path.exists(os.path.join(FILES["conversations_dir"], new_name)):
-                    new_name = f"{title}_{counter}.json"
-                    counter += 1
-
-                os.rename(path, os.path.join(FILES["conversations_dir"], new_name))
-
-                meta = read_json(FILES["active_meta"], {})
-                if meta.get("filename") == old_filename:
-                    write_json(FILES["active_meta"], {"filename": new_name})
-
-                results.append({"file": old_filename, "success": True, "new_filename": new_name})
-
-            except Exception as inner_e:
-                results.append({"file": old_filename, "success": False, "error": str(inner_e)})
-
-        renamed = len([r for r in results if r.get("success")])
-        return jsonify({"success": True, "renamed": renamed, "results": results})
-
+        return jsonify({"error": "API Error"}), 500
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 @app.route('/venice_models')
 def venice_models():
-    local_models = read_json('data/venice_models.json', {})
-
-    live_by_id = {}
-    try:
-        headers = {"Authorization": f"Bearer {VENICE_API_KEY}"}
-        res = requests.get(
-            "https://api.venice.ai/api/v1/models",
-            headers=headers,
-            params={"type": "text"},
-            timeout=12
-        )
-        if res.ok:
-            live_data = res.json().get("data", [])
-            live_by_id = {m.get("id"): m for m in live_data if m.get("id")}
-        else:
-            print(f"[VENICE MODELS] Live model fetch failed: {res.status_code} {res.text[:300]}")
-    except Exception as e:
-        print(f"[VENICE MODELS] Live model fetch error: {e}")
-
-    enriched = {}
-    for group_name, group_models in local_models.items():
-        enriched[group_name] = []
-        for local_model in group_models:
-            model = dict(local_model)
-            live_model = live_by_id.get(model.get("id"), {})
-            spec = live_model.get("model_spec", {}) if isinstance(live_model, dict) else {}
-            caps = spec.get("capabilities", {}) if isinstance(spec, dict) else {}
-
-            model_name = model.get("name") or spec.get("name") or live_model.get("id") or model.get("id")
-            effort_values = get_reasoning_effort_values_for_model(model.get("id"), model_name)
-
-            supports_vision = bool(caps.get("supportsVision", model.get("supportsVision", model.get("vision", False))))
-            supports_reasoning = bool(caps.get("supportsReasoning", model.get("supportsReasoning", is_reasoning_model(model.get("id")))))
-            supports_reasoning_effort = bool(caps.get("supportsReasoningEffort", model.get("supportsReasoningEffort", bool(effort_values))))
-
-            model["supportsVision"] = supports_vision
-            model["vision"] = supports_vision
-            model["supportsReasoning"] = supports_reasoning
-            model["supportsReasoningEffort"] = supports_reasoning_effort
-            model["reasoningEffortValues"] = effort_values
-            model["canDisableReasoning"] = model_reasoning_disable_supported(model.get("id"), model_name)
-
-            for cap_key in [
-                "supportsFunctionCalling",
-                "supportsLogProbs",
-                "supportsMultipleImages",
-                "supportsResponseSchema",
-                "supportsTeeAttestation",
-                "supportsE2EE",
-                "supportsVideoInput",
-                "supportsWebSearch",
-                "supportsXSearch",
-            ]:
-                if cap_key in caps:
-                    model[cap_key] = caps[cap_key]
-
-            if "availableContextTokens" in spec:
-                model["availableContextTokens"] = spec["availableContextTokens"]
-            if "maxCompletionTokens" in spec:
-                model["maxCompletionTokens"] = spec["maxCompletionTokens"]
-            if live_model.get("offline") is not None:
-                model["offline"] = live_model.get("offline")
-            if live_model.get("type"):
-                model["type"] = live_model.get("type")
-
-            enriched[group_name].append(model)
-
-    try:
-        write_json('data/venice_models.enriched.json', enriched)
-    except Exception as e:
-        print(f"[VENICE MODELS] Could not save enriched model cache: {e}")
-
-    return jsonify(enriched)
+    return jsonify(read_json('data/venice_models.json', {}))
 
 @app.route('/rebuild_index', methods=['POST'])
 def rebuild_index_route():

@@ -1,5 +1,5 @@
 {
-    "model": "mistral-small-2603",
+    "model": "kimi-k2-6",
     "include_venice_system_prompt": false,
     "auto_memory_enabled": false,
     "vision_high_res": true,

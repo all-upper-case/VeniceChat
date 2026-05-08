@@ -85,33 +85,9 @@ document.addEventListener('DOMContentLoaded', () => {
         selectors.forEach(select => {
             if (availableModels) {
                 const currentVal = select.dataset.currentValue || select.value;
-
-                // Only the main chat model selector should respond to the global
-                // search/filter controls. Utility/global selectors should keep their
-                // full lists so typing in search never silently changes saved models.
-                const isMainChatSelector = select.id === 'set-model-chat';
-                populateFilteredSelect(
-                    select,
-                    isMainChatSelector ? query : "",
-                    isMainChatSelector ? trait : "all",
-                    isMainChatSelector ? sort : "name",
-                    false,
-                    false
-                );
-
+                populateFilteredSelect(select, query, trait, sort, false, false);
                 if (currentVal && currentVal !== "Loading models...") {
                     select.value = currentVal;
-
-                    // If the current value is not present after filtering, preserve it
-                    // as a temporary selected option instead of letting the browser pick
-                    // the first filtered model.
-                    if (select.value !== currentVal) {
-                        const opt = document.createElement('option');
-                        opt.value = currentVal;
-                        opt.textContent = `Current: ${currentVal}`;
-                        opt.selected = true;
-                        select.insertBefore(opt, select.firstChild);
-                    }
                 }
             } else {
                 select.innerHTML = '<option value="">Loading models...</option>';
@@ -140,15 +116,10 @@ document.addEventListener('DOMContentLoaded', () => {
             let filteredGroup = availableModels[group].filter(m => {
                 const matchesQuery = m.name.toLowerCase().includes(lowQuery) || m.id.toLowerCase().includes(lowQuery);
                 let matchesTrait = true;
-                if (effectiveTrait === 'vision') {
-                    matchesTrait = !!(m.supportsVision || m.vision);
-                } else if (effectiveTrait === 'reasoning') {
-                    matchesTrait = !!(m.supportsReasoning || m.supportsReasoningEffort);
-                } else if (effectiveTrait === 'private') {
-                    matchesTrait = m.traits?.toLowerCase().includes('private');
-                } else if (effectiveTrait === 'beta') {
-                    matchesTrait = (m.tags && m.tags.includes('BETA')) || m.id.includes('beta');
-                }
+                if (effectiveTrait === 'vision') matchesTrait = m.vision;
+                else if (effectiveTrait === 'reasoning') matchesTrait = m.traits?.toLowerCase().includes('reasoning') || m.id.includes('reasoning') || m.id.includes('thinking');
+                else if (effectiveTrait === 'private') matchesTrait = m.traits?.toLowerCase().includes('private');
+                else if (effectiveTrait === 'beta') matchesTrait = (m.tags && m.tags.includes('BETA')) || m.id.includes('beta');
 
                 return matchesQuery && matchesTrait;
             });
@@ -3340,10 +3311,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
 
-            const safeRenameDefaultModel = "mistral-small-2603";
-            if ([...modelSelect.options].some(opt => opt.value === safeRenameDefaultModel)) {
-                modelSelect.value = safeRenameDefaultModel;
-            } else if (!modelSelect.value && modelSelect.options.length > 0) {
+            if (!modelSelect.value && modelSelect.options.length > 0) {
                 modelSelect.selectedIndex = 0;
             }
         }
@@ -3413,6 +3381,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (!btn || !modelSelect || !activeRenameFile) return;
 
+        // Ensure we are operating on the chat being renamed
+        const activeMeta = await fetch('/sidebar_data').then(r => r.json());
+        if (activeMeta.active_chat !== activeRenameFile) {
+            if (confirm("AI Renaming requires loading the chat first. Load this chat now?")) {
+                await loadChat(activeRenameFile);
+                // After loading, the range might need adjustment
+                const textMsgCount = chatHistory.filter(m => m.role !== 'system' && !(typeof m.content === 'string' && m.content.startsWith('__IMG_JSON__'))).length;
+                if (startIn) startIn.value = 1;
+                if (endIn) endIn.value = Math.min(15, textMsgCount);
+            } else {
+                return;
+            }
+        }
+
         const ogText = btn.textContent;
         btn.textContent = "AI is thinking..."; btn.disabled = true;
 
@@ -3428,7 +3410,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ 
                     model: modelSelect.value,
-                    filename: activeRenameFile,
                     range: { start: startNum, end: endNum }
                 })
             });
@@ -3457,64 +3438,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         btn.textContent = ogText; btn.disabled = false;
     });
-
-    safeBind('bulk-ai-rename-submit', 'click', async () => {
-        const btn = document.getElementById('bulk-ai-rename-submit');
-        const modelSelect = document.getElementById('rename-model-select');
-        const countEl = document.getElementById('bulk-rename-count');
-        const limitEl = document.getElementById('bulk-rename-message-limit');
-        const resultsEl = document.getElementById('bulk-rename-results');
-
-        if (!btn || !modelSelect) return;
-
-        const count = parseInt(countEl?.value || '10');
-        const messageLimit = parseInt(limitEl?.value || '10');
-
-        if (!confirm(`AI rename the ${count} most recent non-audit chats using the first ${messageLimit} messages of each chat?`)) {
-            return;
-        }
-
-        const ogText = btn.textContent;
-        btn.textContent = "Renaming...";
-        btn.disabled = true;
-        if (resultsEl) {
-            resultsEl.style.display = 'block';
-            resultsEl.textContent = 'Working...';
-        }
-
-        try {
-            const res = await fetch('/bulk_generate_chat_titles', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({
-                    model: modelSelect.value,
-                    count: count,
-                    message_limit: messageLimit
-                })
-            });
-            const d = await res.json();
-
-            if (!d.success) {
-                alert("Bulk rename failed: " + (d.error || "Unknown error"));
-                if (resultsEl) resultsEl.textContent = JSON.stringify(d, null, 2);
-            } else {
-                const lines = d.results.map(r => {
-                    if (r.success) return `${r.file} → ${r.new_filename}`;
-                    return `${r.file} → ERROR: ${r.error || 'Unknown error'}`;
-                });
-                if (resultsEl) resultsEl.textContent = lines.join('\n');
-                await loadSidebar();
-            }
-        } catch (e) {
-            console.error(e);
-            alert("Bulk rename failed.");
-            if (resultsEl) resultsEl.textContent = String(e);
-        }
-
-        btn.textContent = ogText;
-        btn.disabled = false;
-    });
-
     window.deleteChat = async (file) => {
         if(confirm("Delete?")) { 
             await fetch('/delete_chat', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({filename:file})}); 

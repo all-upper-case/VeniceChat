@@ -1,4 +1,5 @@
 [
+    "olafangensan-glm-4.7-flash-heretic",
     "mistral-small-2603",
     "qwen-3-6-plus",
     "google.gemma-4-31b-it",
@@ -12,6 +13,5 @@
     "e2ee-venice-uncensored-24b-p",
     "gemma-4-uncensored",
     "e2ee-gpt-oss-120b-p",
-    "zai-org-glm-4.7-flash",
-    "zai-org-glm-4.7"
+    "zai-org-glm-4.7-flash"
 ]

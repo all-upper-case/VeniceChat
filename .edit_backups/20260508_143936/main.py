@@ -839,20 +839,17 @@ def model_reasoning_disable_supported(model_id, model_name=""):
 
 def get_local_model_metadata(model_id):
     """
-    Find the best available metadata for a model.
+    Find the model entry in data/venice_models.json.
 
-    Prefer the enriched cache written by /venice_models because it includes
-    live Venice capability fields such as supportsVision, supportsReasoning,
-    supportsReasoningEffort, availableContextTokens, and maxCompletionTokens.
-    Fall back to the curated static data/venice_models.json file if the cache
-    does not exist yet.
+    /venice_models enriches these entries before sending them to the frontend,
+    but chat() may run before the frontend has requested that endpoint. This
+    helper therefore works with either raw local metadata or enriched metadata.
     """
-    for models_path in ['data/venice_models.enriched.json', 'data/venice_models.json']:
-        models_data = read_json(models_path, {})
-        for group in models_data.values():
-            for model in group:
-                if model.get("id") == model_id:
-                    return model
+    models_data = read_json('data/venice_models.json', {})
+    for group in models_data.values():
+        for model in group:
+            if model.get("id") == model_id:
+                return model
     return {}
 
 
@@ -3676,11 +3673,6 @@ def venice_models():
                 model["type"] = live_model.get("type")
 
             enriched[group_name].append(model)
-
-    try:
-        write_json('data/venice_models.enriched.json', enriched)
-    except Exception as e:
-        print(f"[VENICE MODELS] Could not save enriched model cache: {e}")
 
     return jsonify(enriched)
 

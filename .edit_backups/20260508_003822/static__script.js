@@ -85,33 +85,9 @@ document.addEventListener('DOMContentLoaded', () => {
         selectors.forEach(select => {
             if (availableModels) {
                 const currentVal = select.dataset.currentValue || select.value;
-
-                // Only the main chat model selector should respond to the global
-                // search/filter controls. Utility/global selectors should keep their
-                // full lists so typing in search never silently changes saved models.
-                const isMainChatSelector = select.id === 'set-model-chat';
-                populateFilteredSelect(
-                    select,
-                    isMainChatSelector ? query : "",
-                    isMainChatSelector ? trait : "all",
-                    isMainChatSelector ? sort : "name",
-                    false,
-                    false
-                );
-
+                populateFilteredSelect(select, query, trait, sort, false, false);
                 if (currentVal && currentVal !== "Loading models...") {
                     select.value = currentVal;
-
-                    // If the current value is not present after filtering, preserve it
-                    // as a temporary selected option instead of letting the browser pick
-                    // the first filtered model.
-                    if (select.value !== currentVal) {
-                        const opt = document.createElement('option');
-                        opt.value = currentVal;
-                        opt.textContent = `Current: ${currentVal}`;
-                        opt.selected = true;
-                        select.insertBefore(opt, select.firstChild);
-                    }
                 }
             } else {
                 select.innerHTML = '<option value="">Loading models...</option>';
@@ -140,15 +116,10 @@ document.addEventListener('DOMContentLoaded', () => {
             let filteredGroup = availableModels[group].filter(m => {
                 const matchesQuery = m.name.toLowerCase().includes(lowQuery) || m.id.toLowerCase().includes(lowQuery);
                 let matchesTrait = true;
-                if (effectiveTrait === 'vision') {
-                    matchesTrait = !!(m.supportsVision || m.vision);
-                } else if (effectiveTrait === 'reasoning') {
-                    matchesTrait = !!(m.supportsReasoning || m.supportsReasoningEffort);
-                } else if (effectiveTrait === 'private') {
-                    matchesTrait = m.traits?.toLowerCase().includes('private');
-                } else if (effectiveTrait === 'beta') {
-                    matchesTrait = (m.tags && m.tags.includes('BETA')) || m.id.includes('beta');
-                }
+                if (effectiveTrait === 'vision') matchesTrait = m.vision;
+                else if (effectiveTrait === 'reasoning') matchesTrait = m.traits?.toLowerCase().includes('reasoning') || m.id.includes('reasoning') || m.id.includes('thinking');
+                else if (effectiveTrait === 'private') matchesTrait = m.traits?.toLowerCase().includes('private');
+                else if (effectiveTrait === 'beta') matchesTrait = (m.tags && m.tags.includes('BETA')) || m.id.includes('beta');
 
                 return matchesQuery && matchesTrait;
             });
@@ -160,7 +131,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 filteredGroup.forEach(m => {
                     const opt = document.createElement('option');
                     opt.value = m.id;
-                    opt.textContent = (m.vision ? '👁️ ' : '') + m.name;
+                    opt.textContent = (m.vision ? 'ðŸ‘ï¸ ' : '') + m.name;
                     if (m.id === currentVal) opt.selected = true;
                     optgroup.appendChild(opt);
                 });
@@ -182,7 +153,7 @@ document.addEventListener('DOMContentLoaded', () => {
             allFiltered.forEach(m => {
                 const opt = document.createElement('option');
                 opt.value = m.id;
-                opt.textContent = (m.vision ? '👁️ ' : '') + m.name;
+                opt.textContent = (m.vision ? 'ðŸ‘ï¸ ' : '') + m.name;
                 if (m.id === currentVal) opt.selected = true;
                 select.appendChild(opt);
             });
@@ -377,12 +348,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 btn.classList.add('tts-ready');
                 if (currentTTS.msgIndex === idx && currentTTS.contentHash === hash) {
                     if (currentTTS.audio && !currentTTS.audio.paused) {
-                        btn.innerHTML = '⏹ Stop';
+                        btn.innerHTML = 'â¹ Stop';
                     } else {
-                        btn.innerHTML = '▶ Play';
+                        btn.innerHTML = 'â–¶ Play';
                     }
                 } else {
-                    btn.innerHTML = '▶ Play';
+                    btn.innerHTML = 'â–¶ Play';
                 }
             }
         });
@@ -433,7 +404,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 ppBtn.textContent = 'â¸';
             } else {
                 currentTTS.audio.pause();
-                ppBtn.textContent = '▶';
+                ppBtn.textContent = 'â–¶';
             }
             updateTTSButtonStates();
         };
@@ -447,7 +418,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const pct = (currentTTS.audio.currentTime / currentTTS.audio.duration) * 100;
                 if (bar) bar.style.width = pct + '%';
             };
-            ppBtn.textContent = currentTTS.audio.paused ? '▶' : 'â¸';
+            ppBtn.textContent = currentTTS.audio.paused ? 'â–¶' : 'â¸';
         }
     }
 
@@ -504,7 +475,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // 1. GENERATION PHASE (If not in cache)
         if (!ttsCache[hash]) {
-            btn.innerHTML = '⌛ Generating...';
+            btn.innerHTML = 'âŒ› Generating...';
             btn.disabled = true;
 
             try {
@@ -530,7 +501,7 @@ document.addEventListener('DOMContentLoaded', () => {
             } catch (e) {
                 console.error("TTS Error:", e);
                 alert("TTS Error: " + e.message);
-                btn.innerHTML = '❌ Error';
+                btn.innerHTML = 'âŒ Error';
                 return;
             } finally {
                 btn.disabled = false;
@@ -1044,7 +1015,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             info.innerHTML = `
                 <div style="font-weight:bold; color:white; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-size:1.1em;">${char.name} ${ratingHtml}</div>
-                <div style="font-size:0.75em; color:var(--text-dim);">@${char.slug} • by ${char.author || 'Anonymous'}</div>
+                <div style="font-size:0.75em; color:var(--text-dim);">@${char.slug} â€¢ by ${char.author || 'Anonymous'}</div>
                 <div style="font-size:0.7em; color:var(--primary); margin-top:2px;">Opt: ${char.modelId || 'Universal'}</div>
             `;
 
@@ -1068,7 +1039,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const peekBtn = document.createElement('button');
             peekBtn.className = 'msg-btn';
             peekBtn.style.cssText = 'padding: 4px 8px; border-color: #555; font-size: 0.75em;';
-            peekBtn.innerHTML = '👁️ Logic';
+            peekBtn.innerHTML = 'ðŸ‘ï¸ Logic';
             peekBtn.title = "View the character's System Prompt / Instructions";
             peekBtn.onclick = (e) => {
                 e.stopPropagation();
@@ -1295,13 +1266,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 // Sync Content to Modal
                 const editor = document.getElementById('blueprint-editor');
-                const activeBlueprint = data.blueprint || '';
                 if (editor) {
-                    editor.value = activeBlueprint;
-                    editor.readOnly = (data.pipeline_phase || 'architect') === 'scribe';
+                    editor.value = data.blueprint || '';
+                    previousBlueprint = data.blueprint || '';
                 }
-                previousBlueprint = activeBlueprint;
-                updateBlueprintDiff(activeBlueprint, activeBlueprint);
                 
                 currentPipelinePhase = data.pipeline_phase || 'architect';
                 
@@ -1331,7 +1299,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const lockBtn = document.getElementById('lock-scribe-btn');
                 if (lockBtn) {
                     if (currentPipelinePhase === 'scribe') {
-                        lockBtn.textContent = '← Back to Architect';
+                        lockBtn.textContent = 'â—€ Back to Architect';
                         if (editor) editor.readOnly = true;
                     } else {
                         lockBtn.textContent = 'Lock & Scribe';
@@ -1497,7 +1465,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     const delGenBtn = document.createElement('button');
                     delGenBtn.className = 'msg-btn';
                     delGenBtn.style.cssText = 'background:var(--danger); color:white; border:none; margin-top:10px; padding:6px 12px;';
-                    delGenBtn.textContent = '🗑️ Delete Image';
+                    delGenBtn.textContent = 'ðŸ—‘ï¸ Delete Image';
                     delGenBtn.onclick = async (e) => {
                         e.stopPropagation();
                         if (confirm("Permanently delete this generated image?")) {
@@ -1525,8 +1493,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         rBlock.className = 'reasoning-block';
                         rBlock.innerHTML = `
                             <div class="reasoning-header">
-                                <span><i style="margin-right:5px;">💭</i> Thought Process</span>
-                                <span class="toggle-icon">▼</span>
+                                <span><i style="margin-right:5px;">ðŸ’­</i> Thought Process</span>
+                                <span class="toggle-icon">â–¼</span>
                             </div>
                             <div class="reasoning-content" style="display:none;">${msg.reasoning}</div>
                         `;
@@ -1535,7 +1503,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             const icon = rBlock.querySelector('.toggle-icon');
                             const isHidden = content.style.display === 'none';
                             content.style.display = isHidden ? 'block' : 'none';
-                            icon.textContent = isHidden ? '▲' : '▼';
+                            icon.textContent = isHidden ? 'â–²' : 'â–¼';
                         };
                         div.appendChild(rBlock);
                     }
@@ -1546,8 +1514,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         sBlock.className = 'summary-block';
                         sBlock.innerHTML = `
                             <div class="summary-header">
-                                <span><i style="margin-right:5px;">📝</i> Live Inline Summary</span>
-                                <span class="toggle-icon-sum">▼</span>
+                                <span><i style="margin-right:5px;">ðŸ“</i> Live Inline Summary</span>
+                                <span class="toggle-icon-sum">â–¼</span>
                             </div>
                             <div class="summary-content" style="display:none;">${msg.live_summary}</div>
                         `;
@@ -1556,7 +1524,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             const icon = sBlock.querySelector('.toggle-icon-sum');
                             const isHidden = content.style.display === 'none';
                             content.style.display = isHidden ? 'block' : 'none';
-                            icon.textContent = isHidden ? '▲' : '▼';
+                            icon.textContent = isHidden ? 'â–²' : 'â–¼';
                         };
                         div.appendChild(sBlock);
                     }
@@ -1647,7 +1615,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                                     const delBtn = document.createElement('button');
                                     delBtn.className = 'img-action-btn delete';
-                                    delBtn.textContent = '🗑️';
+                                    delBtn.textContent = 'ðŸ—‘ï¸';
                                     delBtn.title = 'Delete Image';
                                     delBtn.onclick = async () => {
                                         if (confirm("Permanently delete this input image from the message?")) {
@@ -1731,7 +1699,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 ttsBtn.dataset.index = idx;
                 ttsBtn.style.borderColor = 'var(--accent)';
                 ttsBtn.style.color = 'var(--accent)';
-                ttsBtn.textContent = '▶ Narrate';
+                ttsBtn.textContent = 'â–¶ Narrate';
                 ttsBtn.onclick = () => handleTTS(idx);
                 btnRow.append(ttsBtn);
             }
@@ -1899,8 +1867,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 return `
                     <div class="reasoning-block">
                         <div class="reasoning-header">
-                            <span><i style="margin-right:5px;">💭</i> Summary Thought Process</span>
-                            <span class="toggle-icon">▼</span>
+                            <span><i style="margin-right:5px;">ðŸ’­</i> Summary Thought Process</span>
+                            <span class="toggle-icon">â–¼</span>
                         </div>
                         <div class="reasoning-content" style="display:none;">${thinking}</div>
                     </div>
@@ -1953,7 +1921,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const i = contentDiv.querySelector('.toggle-icon');
                 const isH = c.style.display === 'none';
                 c.style.display = isH ? 'block' : 'none';
-                i.textContent = isH ? '▲' : '▼';
+                i.textContent = isH ? 'â–²' : 'â–¼';
             };
         }
 
@@ -2111,7 +2079,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     const i = content.querySelector('.toggle-icon');
                     const isH = c.style.display === 'none';
                     c.style.display = isH ? 'block' : 'none';
-                    i.textContent = isH ? '▲' : '▼';
+                    i.textContent = isH ? 'â–²' : 'â–¼';
                 };
             }
 
@@ -2877,8 +2845,8 @@ document.addEventListener('DOMContentLoaded', () => {
                                    rBlock.className = 'reasoning-block';
                                    rBlock.innerHTML = `
                                        <div class="reasoning-header">
-                                           <span><i style="margin-right:5px;">💭</i> Thought Process</span>
-                                           <span class="toggle-icon">▲</span>
+                                           <span><i style="margin-right:5px;">ðŸ’­</i> Thought Process</span>
+                                           <span class="toggle-icon">â–²</span>
                                        </div>
                                        <div class="reasoning-content" style="display:block;"></div>
                                    `;
@@ -2898,8 +2866,8 @@ document.addEventListener('DOMContentLoaded', () => {
                                    sBlock.className = 'summary-block';
                                    sBlock.innerHTML = `
                                        <div class="summary-header">
-                                           <span><i style="margin-right:5px;">📝</i> Live Inline Summary</span>
-                                           <span class="toggle-icon-sum">▲</span>
+                                           <span><i style="margin-right:5px;">ðŸ“</i> Live Inline Summary</span>
+                                           <span class="toggle-icon-sum">â–²</span>
                                        </div>
                                        <div class="summary-content" style="display:block;"></div>
                                    `;
@@ -2908,7 +2876,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                        const i = sBlock.querySelector('.toggle-icon-sum');
                                        const isH = c.style.display === 'none';
                                        c.style.display = isH ? 'block' : 'none';
-                                       i.textContent = isH ? '▲' : '▼';
+                                       i.textContent = isH ? 'â–²' : 'â–¼';
                                    };
                                    if (rBlock && rBlock.nextSibling) {
                                        div.insertBefore(sBlock, rBlock.nextSibling);
@@ -2946,8 +2914,8 @@ document.addEventListener('DOMContentLoaded', () => {
                                        rBlock.className = 'reasoning-block';
                                        rBlock.innerHTML = `
                                            <div class="reasoning-header">
-                                               <span><i style="margin-right:5px;">💭</i> Thought Process</span>
-                                               <span class="toggle-icon">▲</span>
+                                               <span><i style="margin-right:5px;">ðŸ’­</i> Thought Process</span>
+                                               <span class="toggle-icon">â–²</span>
                                            </div>
                                            <div class="reasoning-content" style="display:block;"></div>
                                        `;
@@ -2956,7 +2924,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                            const i = rBlock.querySelector('.toggle-icon');
                                            const isH = c.style.display === 'none';
                                            c.style.display = isH ? 'block' : 'none';
-                                           i.textContent = isH ? '▲' : '▼';
+                                           i.textContent = isH ? 'â–²' : 'â–¼';
                                        };
                                        div.appendChild(rBlock); // Append instead of insertBefore so it flows naturally
                                    }
@@ -3009,11 +2977,11 @@ document.addEventListener('DOMContentLoaded', () => {
                                        // Collapse reasoning/summary if we just created the content block
                                        if(rBlock && rBlock.querySelector('.reasoning-content').style.display !== 'none') {
                                            rBlock.querySelector('.reasoning-content').style.display = 'none';
-                                           rBlock.querySelector('.toggle-icon').textContent = '▼';
+                                           rBlock.querySelector('.toggle-icon').textContent = 'â–¼';
                                        }
                                        if(sBlock && sBlock.querySelector('.summary-content').style.display !== 'none') {
                                            sBlock.querySelector('.summary-content').style.display = 'none';
-                                           sBlock.querySelector('.toggle-icon-sum').textContent = '▼';
+                                           sBlock.querySelector('.toggle-icon-sum').textContent = 'â–¼';
                                        }
                                    }
                                    full += d.content;
@@ -3228,28 +3196,11 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!list) return;
             list.innerHTML = '';
             
-            const chatItems = data.chats.map(item => {
-                if (typeof item === 'string') {
-                    return {
-                        name: item,
-                        is_audit: item.endsWith('.audit.json'),
-                        chat_type: 'standard',
-                        is_pipeline: false
-                    };
-                }
-                return item;
-            });
-
-            const normalChats = chatItems.filter(f => !f.is_audit);
-            const auditChats = chatItems.filter(f => f.is_audit);
-            const auditNames = auditChats.map(f => f.name);
-            const normalNames = normalChats.map(f => f.name);
+            const normalChats = data.chats.filter(f => !f.endsWith('.audit.json'));
+            const auditChats = data.chats.filter(f => f.endsWith('.audit.json'));
             
-            normalChats.forEach(chat => {
-                const file = chat.name;
-                const li = document.createElement('li');
-                li.className = 'chat-item';
-                if (chat.is_pipeline || chat.chat_type === 'pipeline') li.classList.add('pipeline-chat-item');
+            normalChats.forEach(file => {
+                const li = document.createElement('li'); li.className = 'chat-item';
                 if (file === data.active_chat) li.classList.add('active-chat');
                 li.innerHTML = `<span class="chat-name">${file.replace('.json','').replace(/_/g,' ')}</span>
                                 <div><button class="icon-btn r-btn">&#9998;</button><button class="icon-btn d-btn">&#128465;</button></div>`;
@@ -3260,12 +3211,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 // Check if this chat has an audit child
                 const auditFile = file.replace('.json', '.audit.json');
-                if (auditNames.includes(auditFile)) {
+                if (auditChats.includes(auditFile)) {
                     const ali = document.createElement('li');
                     ali.className = 'chat-item audit-chat-item';
                     if (auditFile === data.active_chat) ali.classList.add('active-chat');
-                    ali.innerHTML = `<span class="chat-name">↳ 🕵️ Audit: ${file.replace('.json','').replace(/_/g,' ')}</span>
-                                    <div><button class="icon-btn d-btn">🗑</button></div>`;
+                    ali.innerHTML = `<span class="chat-name">â†³ ðŸ•µï¸ Audit: ${file.replace('.json','').replace(/_/g,' ')}</span>
+                                    <div><button class="icon-btn d-btn">ðŸ—‘</button></div>`;
                     ali.onclick = (e) => { if(!e.target.closest('.icon-btn')) loadChat(auditFile); };
                     ali.querySelector('.d-btn').onclick = () => deleteChat(auditFile);
                     list.appendChild(ali);
@@ -3273,15 +3224,14 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             
             // Render orphaned audit chats just in case parent was deleted
-            auditChats.forEach(chat => {
-                const aFile = chat.name;
+            auditChats.forEach(aFile => {
                 const parentExpected = aFile.replace('.audit.json', '.json');
-                if (!normalNames.includes(parentExpected)) {
+                if (!normalChats.includes(parentExpected)) {
                     const ali = document.createElement('li');
                     ali.className = 'chat-item audit-chat-item';
                     if (aFile === data.active_chat) ali.classList.add('active-chat');
-                    ali.innerHTML = `<span class="chat-name">↳ 🕵️ Orphaned Audit: ${aFile.replace('.audit.json','').replace(/_/g,' ')}</span>
-                                    <div><button class="icon-btn d-btn">🗑</button></div>`;
+                    ali.innerHTML = `<span class="chat-name">â†³ ðŸ•µï¸ Orphaned Audit: ${aFile.replace('.audit.json','').replace(/_/g,' ')}</span>
+                                    <div><button class="icon-btn d-btn">ðŸ—‘</button></div>`;
                     ali.onclick = (e) => { if(!e.target.closest('.icon-btn')) loadChat(aFile); };
                     ali.querySelector('.d-btn').onclick = () => deleteChat(aFile);
                     list.appendChild(ali);
@@ -3303,50 +3253,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const stats = document.getElementById('rename-stats');
         const startIn = document.getElementById('rename-start');
         const endIn = document.getElementById('rename-end');
-        const modelSelect = document.getElementById('rename-model-select');
 
         if (!modal || !input) return;
-
-        if (modelSelect) {
-            modelSelect.innerHTML = '';
-
-            let modelData = availableModels;
-            if (!modelData) {
-                try {
-                    const mRes = await fetch('/venice_models');
-                    modelData = await mRes.json();
-                    availableModels = modelData;
-                } catch (e) {
-                    console.warn("Failed to load rename models:", e);
-                }
-            }
-
-            if (modelData) {
-                for (const groupName in modelData) {
-                    const group = modelData[groupName];
-                    if (!Array.isArray(group)) continue;
-
-                    const optGroup = document.createElement('optgroup');
-                    optGroup.label = groupName;
-
-                    group.forEach(model => {
-                        const opt = document.createElement('option');
-                        opt.value = model.id;
-                        opt.textContent = model.name ? `${model.name} (${model.id})` : model.id;
-                        optGroup.appendChild(opt);
-                    });
-
-                    modelSelect.appendChild(optGroup);
-                }
-            }
-
-            const safeRenameDefaultModel = "mistral-small-2603";
-            if ([...modelSelect.options].some(opt => opt.value === safeRenameDefaultModel)) {
-                modelSelect.value = safeRenameDefaultModel;
-            } else if (!modelSelect.value && modelSelect.options.length > 0) {
-                modelSelect.selectedIndex = 0;
-            }
-        }
 
         title.textContent = `Rename: ${file.replace('.json', '').replace(/_/g, ' ')}`;
         input.value = file.replace('.json', '').replace(/_/g, ' ');
@@ -3413,6 +3321,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (!btn || !modelSelect || !activeRenameFile) return;
 
+        // Ensure we are operating on the chat being renamed
+        const activeMeta = await fetch('/sidebar_data').then(r => r.json());
+        if (activeMeta.active_chat !== activeRenameFile) {
+            if (confirm("AI Renaming requires loading the chat first. Load this chat now?")) {
+                await loadChat(activeRenameFile);
+                // After loading, the range might need adjustment
+                const textMsgCount = chatHistory.filter(m => m.role !== 'system' && !(typeof m.content === 'string' && m.content.startsWith('__IMG_JSON__'))).length;
+                if (startIn) startIn.value = 1;
+                if (endIn) endIn.value = Math.min(15, textMsgCount);
+            } else {
+                return;
+            }
+        }
+
         const ogText = btn.textContent;
         btn.textContent = "AI is thinking..."; btn.disabled = true;
 
@@ -3428,7 +3350,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ 
                     model: modelSelect.value,
-                    filename: activeRenameFile,
                     range: { start: startNum, end: endNum }
                 })
             });
@@ -3457,64 +3378,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         btn.textContent = ogText; btn.disabled = false;
     });
-
-    safeBind('bulk-ai-rename-submit', 'click', async () => {
-        const btn = document.getElementById('bulk-ai-rename-submit');
-        const modelSelect = document.getElementById('rename-model-select');
-        const countEl = document.getElementById('bulk-rename-count');
-        const limitEl = document.getElementById('bulk-rename-message-limit');
-        const resultsEl = document.getElementById('bulk-rename-results');
-
-        if (!btn || !modelSelect) return;
-
-        const count = parseInt(countEl?.value || '10');
-        const messageLimit = parseInt(limitEl?.value || '10');
-
-        if (!confirm(`AI rename the ${count} most recent non-audit chats using the first ${messageLimit} messages of each chat?`)) {
-            return;
-        }
-
-        const ogText = btn.textContent;
-        btn.textContent = "Renaming...";
-        btn.disabled = true;
-        if (resultsEl) {
-            resultsEl.style.display = 'block';
-            resultsEl.textContent = 'Working...';
-        }
-
-        try {
-            const res = await fetch('/bulk_generate_chat_titles', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({
-                    model: modelSelect.value,
-                    count: count,
-                    message_limit: messageLimit
-                })
-            });
-            const d = await res.json();
-
-            if (!d.success) {
-                alert("Bulk rename failed: " + (d.error || "Unknown error"));
-                if (resultsEl) resultsEl.textContent = JSON.stringify(d, null, 2);
-            } else {
-                const lines = d.results.map(r => {
-                    if (r.success) return `${r.file} → ${r.new_filename}`;
-                    return `${r.file} → ERROR: ${r.error || 'Unknown error'}`;
-                });
-                if (resultsEl) resultsEl.textContent = lines.join('\n');
-                await loadSidebar();
-            }
-        } catch (e) {
-            console.error(e);
-            alert("Bulk rename failed.");
-            if (resultsEl) resultsEl.textContent = String(e);
-        }
-
-        btn.textContent = ogText;
-        btn.disabled = false;
-    });
-
     window.deleteChat = async (file) => {
         if(confirm("Delete?")) { 
             await fetch('/delete_chat', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({filename:file})}); 
@@ -4136,10 +3999,10 @@ document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('pipeline-phase-badge').textContent = `PHASE: ${currentPipelinePhase.toUpperCase()}`;
             
             if (currentPipelinePhase === 'scribe') {
-                document.getElementById('pipeline-lock-btn').textContent = '← Back to Architect';
+                document.getElementById('pipeline-lock-btn').textContent = 'â—€ Back to Architect';
                 document.getElementById('pipeline-lock-btn').style.background = '#444';
             } else {
-                document.getElementById('pipeline-lock-btn').textContent = 'Lock Blueprint & Move to Scribe ▶';
+                document.getElementById('pipeline-lock-btn').textContent = 'Lock Blueprint & Move to Scribe â–¶';
                 document.getElementById('pipeline-lock-btn').style.background = 'var(--purple)';
             }
             
@@ -4199,11 +4062,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 // If it's the last message and it's generating, keep it expanded
                 const isGeneratingMsg = (idx === msgs.length - 1 && msg.role === 'assistant');
                 const displayStyle = isGeneratingMsg ? 'block' : 'none';
-                const toggleChar = isGeneratingMsg ? '▲' : '▼';
+                const toggleChar = isGeneratingMsg ? 'â–²' : 'â–¼';
                 
                 rBlock.innerHTML = `
                     <div class="reasoning-header">
-                        <span><i style="margin-right:5px;">💭</i> Thought Process</span>
+                        <span><i style="margin-right:5px;">ðŸ’­</i> Thought Process</span>
                         <span class="toggle-icon">${toggleChar}</span>
                     </div>
                     <div class="reasoning-content" style="display:${displayStyle};"></div>
@@ -4214,7 +4077,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     const icon = rBlock.querySelector('.toggle-icon');
                     const isHidden = content.style.display === 'none';
                     content.style.display = isHidden ? 'block' : 'none';
-                    icon.textContent = isHidden ? '▲' : '▼';
+                    icon.textContent = isHidden ? 'â–²' : 'â–¼';
                 };
                 div.appendChild(rBlock);
             }
@@ -4226,8 +4089,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 tcBlock.style.cssText = 'margin-top:8px; border:1px solid #2d4a2d; border-radius:6px; overflow:hidden; font-size:0.85em;';
                 tcBlock.innerHTML = `
                     <div class="tool-calls-header" style="display:flex; justify-content:space-between; align-items:center; padding:6px 12px; background:#1a2e1a; cursor:pointer; user-select:none;">
-                        <span><i style="margin-right:5px;">🔧</i>Blueprint Tool Calls</span>
-                        <span class="toggle-icon-tc">▼</span>
+                        <span><i style="margin-right:5px;">ðŸ”§</i>Blueprint Tool Calls</span>
+                        <span class="toggle-icon-tc">â–¼</span>
                     </div>
                     <div class="tool-calls-content" style="display:none; padding:12px; background:#111; white-space:pre-wrap; font-family:monospace; color:#a3e635; overflow-x:auto;"></div>
                 `;
@@ -4237,7 +4100,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     const ic = tcBlock.querySelector('.toggle-icon-tc');
                     const isH = c.style.display === 'none';
                     c.style.display = isH ? 'block' : 'none';
-                    ic.textContent = isH ? '▲' : '▼';
+                    ic.textContent = isH ? 'â–²' : 'â–¼';
                 };
                 div.appendChild(tcBlock);
             }
@@ -4325,7 +4188,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     rContent.textContent = thread[lastMsgIdx].reasoning;
                     rContent.style.display = 'block';
                     const icon = msgDiv.querySelector('.toggle-icon');
-                    if (icon) icon.textContent = '▲';
+                    if (icon) icon.textContent = 'â–²';
                 }
                 // Also clear thinking placeholder if content hasn't arrived yet but reasoning has
                 const contentDiv = msgDiv.querySelector('.msg-content');
@@ -4555,7 +4418,7 @@ document.addEventListener('DOMContentLoaded', () => {
             
             const expandBtn = document.createElement('button');
             expandBtn.className = 'msg-btn';
-            expandBtn.textContent = 'View Sources ▼';
+            expandBtn.textContent = 'View Sources â–¼';
             
             headRow.appendChild(titleWrap);
             headRow.appendChild(expandBtn);
@@ -4572,7 +4435,7 @@ document.addEventListener('DOMContentLoaded', () => {
             expandBtn.onclick = () => {
                 const isHidden = sourcesDiv.style.display === 'none';
                 sourcesDiv.style.display = isHidden ? 'block' : 'none';
-                expandBtn.textContent = isHidden ? 'Hide Sources ▲' : 'View Sources ▼';
+                expandBtn.textContent = isHidden ? 'Hide Sources â–²' : 'View Sources â–¼';
             };
             
             card.appendChild(headRow);
@@ -4640,7 +4503,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     });
                     const d = await res.json();
                     if (d.success) {
-                        btn.textContent = "✅ Fix Applied";
+                        btn.textContent = "âœ… Fix Applied";
                         btn.style.background = "var(--accent)";
                     } else {
                         alert("Error applying fix: " + d.error);
@@ -4703,7 +4566,7 @@ document.addEventListener('DOMContentLoaded', () => {
             indicator.style.display = 'block';
             indicator.style.background = 'rgba(16, 185, 129, 0.2)';
             indicator.style.color = 'var(--accent)';
-            indicator.textContent = `✅ ${job.message}`;
+            indicator.textContent = `âœ… ${job.message}`;
             
             if (scanStatusInterval) {
                 clearInterval(scanStatusInterval);
@@ -4723,7 +4586,7 @@ document.addEventListener('DOMContentLoaded', () => {
             indicator.style.display = 'block';
             indicator.style.background = 'rgba(239, 68, 68, 0.2)';
             indicator.style.color = 'var(--danger)';
-            indicator.textContent = `❌ Error: ${job.message}`;
+            indicator.textContent = `âŒ Error: ${job.message}`;
             
             if (scanStatusInterval) {
                 clearInterval(scanStatusInterval);
@@ -5127,7 +4990,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 info.innerHTML = `
                     <div style="font-weight:bold; color:white;">${modelName}</div>
                     <div style="font-size:0.75em; color:var(--text-dim); font-family:monospace;">${m.id}</div>
-                    <div style="font-size:0.8em; color:var(--accent); margin-top:4px;">Context: ${contextStr} • Price: ${pricingStr}</div>
+                    <div style="font-size:0.8em; color:var(--accent); margin-top:4px;">Context: ${contextStr} â€¢ Price: ${pricingStr}</div>
                 `;
 
                 const btn = document.createElement('button');
@@ -5451,16 +5314,16 @@ document.addEventListener('DOMContentLoaded', () => {
             html += `<strong>Last Payload Messages:</strong> <span style="color:var(--text-main)">${d.last_len}</span>\n</div>`;
 
             if (!d.divergence) {
-                html += `<div style="color:var(--accent); font-weight:bold; font-size:1.1em; margin-bottom:5px;">✅ PERFECT MATCH!</div>`;
+                html += `<div style="color:var(--accent); font-weight:bold; font-size:1.1em; margin-bottom:5px;">âœ… PERFECT MATCH!</div>`;
                 html += `<span style="color:var(--text-dim)">The previous payload is an exact prefix of the last payload. Token caching should have hit successfully for the entire previous context window.</span>`;
             } else {
                 const div = d.divergence;
-                html += `<div style="color:var(--danger); font-weight:bold; font-size:1.1em; margin-bottom:5px;">❌ CACHE BUSTED AT MESSAGE INDEX [${div.message_index}]</div>`;
+                html += `<div style="color:var(--danger); font-weight:bold; font-size:1.1em; margin-bottom:5px;">âŒ CACHE BUSTED AT MESSAGE INDEX [${div.message_index}]</div>`;
 
                 const cachedTokensNote = `<div style="background:rgba(16, 185, 129, 0.1); border-left:3px solid var(--accent); padding:8px; margin:10px 0; color:#ddd;"><strong>Optimal Caching:</strong> All messages before index ${div.message_index} were successfully cached!</div>`;
 
                 if (div.type === 'parameter_change') {
-                    html = html.replace(`❌ CACHE BUSTED AT MESSAGE INDEX [${div.message_index}]`, `❌ CACHE BUSTED BY PARAMETER CHANGE`);
+                    html = html.replace(`âŒ CACHE BUSTED AT MESSAGE INDEX [${div.message_index}]`, `âŒ CACHE BUSTED BY PARAMETER CHANGE`);
                     html += `<span style="color:var(--text-dim)">Parameter changed: <strong style="color:white">${div.parameter}</strong>\n`;
                     html += `Expected (Previous): <span style="color:var(--primary)">${JSON.stringify(div.expected)}</span>\n`;
                     html += `Got (Last): <span style="color:var(--danger)">${JSON.stringify(div.got)}</span>\n\n`;
@@ -5733,16 +5596,12 @@ safeBind('lock-scribe-btn', 'click', async () => {
             const lockBtn = document.getElementById('lock-scribe-btn');
             const editor = document.getElementById('blueprint-editor');
             if (currentPipelinePhase === 'scribe') {
-                if (lockBtn) lockBtn.textContent = '← Back to Architect';
+                if (lockBtn) lockBtn.textContent = 'â—€ Back to Architect';
                 if (editor) editor.readOnly = true;
             } else {
                 if (lockBtn) lockBtn.textContent = 'Lock & Scribe';
                 if (editor) editor.readOnly = false;
             }
-
-            // Reload the active pipeline track immediately so the visible chat switches
-            // between architect_messages and scribe_messages without needing a page refresh.
-            await loadHistory();
         }
     } catch (e) { console.error(e); }
 });

@@ -97,24 +97,6 @@ body {
     background: var(--bg-card);
     border-left: 3px solid var(--primary);
 }
-
-.pipeline-chat-item {
-    background: rgba(139, 92, 246, 0.08);
-    border-left: 2px solid var(--purple);
-}
-
-.pipeline-chat-item:hover {
-    background: rgba(139, 92, 246, 0.14);
-}
-
-.pipeline-chat-item .chat-name {
-    color: #ddd6fe;
-}
-
-.pipeline-chat-item.active-chat {
-    background: rgba(139, 92, 246, 0.18);
-    border-left: 3px solid var(--purple);
-}
 .icon-btn {
     background: none; border: none; color: var(--text-dim);
     cursor: pointer; font-size: 1.1em; padding: 4px; opacity: 0.7;

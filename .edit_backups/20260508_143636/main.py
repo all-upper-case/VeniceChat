@@ -777,119 +777,34 @@ def is_vision_model(model_id):
                 return True
     return False
 
-def get_reasoning_effort_values_for_model(model_id, model_name=""):
-    """
-    Return the Venice-supported reasoning_effort values for known configurable
-    reasoning model families.
-
-    Empty list means either:
-    - the model is not a reasoning model, or
-    - the model has built-in reasoning but does not accept reasoning_effort.
-    """
-    haystack = f"{model_id or ''} {model_name or ''}".lower()
-
-    if any(x in haystack for x in ["openai-gpt-52", "gpt-5.2"]):
-        if "codex" in haystack:
-            return ["low", "medium", "high", "xhigh"]
-        return ["none", "low", "medium", "high", "xhigh"]
-
-    if any(x in haystack for x in ["claude-opus-4-6-fast", "claude opus 4.6 fast", "claude-opus-4-6", "claude opus 4.6"]):
-        return ["low", "medium", "high", "max"]
-
-    if any(x in haystack for x in ["claude-opus-4-5", "claude opus 4.5", "claude-sonnet-4-5", "claude sonnet 4.5", "claude-sonnet-4-6", "claude sonnet 4.6"]):
-        return ["low", "medium", "high"]
-
-    if any(x in haystack for x in ["google-gemini-3-pro", "gemini 3 pro"]):
-        return ["low", "high"]
-
-    if any(x in haystack for x in ["google-gemini-3-1-pro", "gemini 3.1 pro"]):
-        return ["low", "medium", "high"]
-
-    if any(x in haystack for x in ["google-gemini-3-flash", "gemini 3 flash"]):
-        return ["minimal", "low", "medium", "high"]
-
-    if any(x in haystack for x in [
-        "qwen-3-235b", "qwen 3 235b",
-        "qwen3-5-35b", "qwen 3.5 35b",
-        "qwen3-6", "qwen 3.6",
-        "kimi-k2-5", "kimi k2.5",
-        "minimax-m25", "minimax m2.5",
-        "minimax-m21", "minimax m2.1",
-    ]):
-        return ["low", "medium", "high"]
-
-    return []
-
-
-def model_reasoning_disable_supported(model_id, model_name=""):
-    """
-    Return True when Venice docs indicate reasoning can be disabled reliably.
-    This is separate from whether reasoning_effort is configurable.
-    """
-    haystack = f"{model_id or ''} {model_name or ''}".lower()
-
-    return any(x in haystack for x in [
-        "openai-gpt-52", "gpt-5.2",
-        "openai-gpt-53-codex", "gpt-5.3 codex",
-        "qwen-3-235b", "qwen 3 235b",
-        "qwen3-5-35b", "qwen 3.5 35b",
-        "zai-org-glm-5-1", "glm 5.1",
-    ])
-
-
-def get_local_model_metadata(model_id):
-    """
-    Find the best available metadata for a model.
-
-    Prefer the enriched cache written by /venice_models because it includes
-    live Venice capability fields such as supportsVision, supportsReasoning,
-    supportsReasoningEffort, availableContextTokens, and maxCompletionTokens.
-    Fall back to the curated static data/venice_models.json file if the cache
-    does not exist yet.
-    """
-    for models_path in ['data/venice_models.enriched.json', 'data/venice_models.json']:
-        models_data = read_json(models_path, {})
-        for group in models_data.values():
-            for model in group:
-                if model.get("id") == model_id:
-                    return model
-    return {}
-
-
 def is_reasoning_model(model_id):
     """
-    Return True when the model is known to have reasoning capability.
+    Return True only for models that are known to accept Venice reasoning controls.
 
-    Prefer explicit enriched metadata from Venice's /models endpoint. Fall back
-    to curated local tags and known model-family markers only when live metadata
-    is not available.
+    Do not infer this from ordinary description text like "good at reasoning";
+    many non-reasoning models mention reasoning ability but reject the actual
+    reasoning_effort / disable_thinking parameters.
     """
-    model = get_local_model_metadata(model_id)
-
-    if model.get("supportsReasoning") is True:
-        return True
-
-    if model.get("supportsReasoningEffort") is True:
-        return True
-
     model_id_l = (model_id or "").lower()
-    model_name_l = str(model.get("name", "")).lower()
+    models_data = read_json('data/venice_models.json', {})
 
-    tags = [str(t).upper() for t in model.get('tags', [])]
-    traits = str(model.get('traits', '')).lower()
+    for group in models_data.values():
+        for m in group:
+            if m.get('id') == model_id:
+                tags = [str(t).upper() for t in m.get('tags', [])]
+                traits = str(m.get('traits', '')).lower()
 
-    if 'REASONING' in tags:
-        return True
+                if 'REASONING' in tags:
+                    return True
 
-    if any(marker in traits for marker in [
-        'reasoning model',
-        'reasoning-enabled',
-        'thinking model'
-    ]):
-        return True
+                if any(marker in traits for marker in [
+                    'reasoning model',
+                    'reasoning-enabled',
+                    'thinking model'
+                ]):
+                    return True
 
-    if get_reasoning_effort_values_for_model(model_id_l, model_name_l):
-        return True
+                break
 
     known_reasoning_id_markers = [
         'deepseek-r',
@@ -2691,37 +2606,22 @@ def chat():
         cache_key = os.path.basename(path).replace('.json', '')
 
         raw_reasoning_effort = v_set.get("reasoning_effort", "medium")
-        model_meta = get_local_model_metadata(model_to_use)
         model_supports_reasoning = is_reasoning_model(model_to_use)
-        effort_values = model_meta.get("reasoningEffortValues") or get_reasoning_effort_values_for_model(model_to_use, model_meta.get("name", ""))
-        model_supports_reasoning_effort = bool(model_meta.get("supportsReasoningEffort") or effort_values)
-        model_can_disable_reasoning = bool(model_meta.get("canDisableReasoning") or model_reasoning_disable_supported(model_to_use, model_meta.get("name", "")))
 
         venice_params = {
             "include_venice_system_prompt": v_set.get("include_venice_system_prompt", True),
             "strip_thinking_response": False
         }
 
-        reasoning_effort_to_send = None
-        disable_reasoning_for_payload = False
-
         if model_supports_reasoning:
-            if raw_reasoning_effort == "none":
-                if model_can_disable_reasoning:
-                    disable_reasoning_for_payload = True
-                    venice_params["disable_thinking"] = True
-            elif model_supports_reasoning_effort:
-                reasoning_effort_to_send = raw_reasoning_effort
-                if effort_values and reasoning_effort_to_send not in effort_values:
-                    if "medium" in effort_values:
-                        reasoning_effort_to_send = "medium"
-                    elif "low" in effort_values:
-                        reasoning_effort_to_send = "low"
-                    else:
-                        reasoning_effort_to_send = effort_values[0]
+            reasoning_effort = raw_reasoning_effort
+            disable_thinking = False
+            if reasoning_effort == "none":
+                disable_thinking = True
+                reasoning_effort = "low" # Fallback depth, but thinking is disabled
 
-                venice_params["disable_thinking"] = False
-                venice_params["reasoning_effort"] = reasoning_effort_to_send
+            venice_params["disable_thinking"] = disable_thinking
+            venice_params["reasoning_effort"] = reasoning_effort
 
         if chat_data.get("character_slug"):
             venice_params["character_slug"] = chat_data["character_slug"]
@@ -2745,10 +2645,8 @@ def chat():
             "venice_parameters": venice_params
         }
 
-        if disable_reasoning_for_payload:
-            payload["reasoning"] = {"enabled": False}
-        elif reasoning_effort_to_send:
-            payload["reasoning_effort"] = reasoning_effort_to_send
+        if model_supports_reasoning and raw_reasoning_effort != "none":
+            payload["reasoning_effort"] = raw_reasoning_effort
 
         # Store for the Last IO debugger
         update_last_io(VENICE_URL, payload, None)
@@ -3610,79 +3508,7 @@ def bulk_generate_chat_titles():
 
 @app.route('/venice_models')
 def venice_models():
-    local_models = read_json('data/venice_models.json', {})
-
-    live_by_id = {}
-    try:
-        headers = {"Authorization": f"Bearer {VENICE_API_KEY}"}
-        res = requests.get(
-            "https://api.venice.ai/api/v1/models",
-            headers=headers,
-            params={"type": "text"},
-            timeout=12
-        )
-        if res.ok:
-            live_data = res.json().get("data", [])
-            live_by_id = {m.get("id"): m for m in live_data if m.get("id")}
-        else:
-            print(f"[VENICE MODELS] Live model fetch failed: {res.status_code} {res.text[:300]}")
-    except Exception as e:
-        print(f"[VENICE MODELS] Live model fetch error: {e}")
-
-    enriched = {}
-    for group_name, group_models in local_models.items():
-        enriched[group_name] = []
-        for local_model in group_models:
-            model = dict(local_model)
-            live_model = live_by_id.get(model.get("id"), {})
-            spec = live_model.get("model_spec", {}) if isinstance(live_model, dict) else {}
-            caps = spec.get("capabilities", {}) if isinstance(spec, dict) else {}
-
-            model_name = model.get("name") or spec.get("name") or live_model.get("id") or model.get("id")
-            effort_values = get_reasoning_effort_values_for_model(model.get("id"), model_name)
-
-            supports_vision = bool(caps.get("supportsVision", model.get("supportsVision", model.get("vision", False))))
-            supports_reasoning = bool(caps.get("supportsReasoning", model.get("supportsReasoning", is_reasoning_model(model.get("id")))))
-            supports_reasoning_effort = bool(caps.get("supportsReasoningEffort", model.get("supportsReasoningEffort", bool(effort_values))))
-
-            model["supportsVision"] = supports_vision
-            model["vision"] = supports_vision
-            model["supportsReasoning"] = supports_reasoning
-            model["supportsReasoningEffort"] = supports_reasoning_effort
-            model["reasoningEffortValues"] = effort_values
-            model["canDisableReasoning"] = model_reasoning_disable_supported(model.get("id"), model_name)
-
-            for cap_key in [
-                "supportsFunctionCalling",
-                "supportsLogProbs",
-                "supportsMultipleImages",
-                "supportsResponseSchema",
-                "supportsTeeAttestation",
-                "supportsE2EE",
-                "supportsVideoInput",
-                "supportsWebSearch",
-                "supportsXSearch",
-            ]:
-                if cap_key in caps:
-                    model[cap_key] = caps[cap_key]
-
-            if "availableContextTokens" in spec:
-                model["availableContextTokens"] = spec["availableContextTokens"]
-            if "maxCompletionTokens" in spec:
-                model["maxCompletionTokens"] = spec["maxCompletionTokens"]
-            if live_model.get("offline") is not None:
-                model["offline"] = live_model.get("offline")
-            if live_model.get("type"):
-                model["type"] = live_model.get("type")
-
-            enriched[group_name].append(model)
-
-    try:
-        write_json('data/venice_models.enriched.json', enriched)
-    except Exception as e:
-        print(f"[VENICE MODELS] Could not save enriched model cache: {e}")
-
-    return jsonify(enriched)
+    return jsonify(read_json('data/venice_models.json', {}))
 
 @app.route('/rebuild_index', methods=['POST'])
 def rebuild_index_route():
