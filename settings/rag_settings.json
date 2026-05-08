@@ -3,5 +3,5 @@
     "k": 3,
     "max_chars": 1200,
     "min_chars": 200,
-    "extraction_model": "gemma-4-uncensored"
+    "extraction_model": "google.gemma-4-31b-it"
 }

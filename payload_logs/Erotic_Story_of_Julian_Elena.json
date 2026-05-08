@@ -22,6 +22,14 @@
         },
         {
             "role": "assistant",
+            "content": "They live in a sprawling loft in the old meatpacking district of the city, on the fourth floor of a converted warehouse where the freight elevator still clanks and the brick walls are scarred with rust and old machinery hooks. The building smells of history\u2014iron, dry timber, and the faint ghost of salted beef\u2014but their unit has been gutted and rebuilt with floor-to-ceiling windows that face west, so every evening the sunset pours across the exposed ductwork and the wide-plank pine floors like a slow spill of copper. The balcony where Julian found her is a narrow iron ledge just wide enough for two, bolted to the facade above a cobblestone alley where delivery trucks rumble past at dawn."
+        },
+        {
+            "role": "user",
+            "content": "And what do they look like?"
+        },
+        {
+            "role": "assistant",
             "content": ""
         }
     ],
@@ -53,6 +61,14 @@
         {
             "role": "user",
             "content": "And what do they look like?"
+        },
+        {
+            "role": "assistant",
+            "content": "Elena has skin the color of cream mixed with a drop of honey, with a constellation of pale freckles that only emerge across her nose and cheeks when the light hits them. Her hair is a wild, dark mahogany, curling in thick, unruly spirals that often catch in the thin gold chain she wears around her neck. She has wide, almond shaped eyes the color of polished amber, framed by lashes so heavy they cast soft shadows on her cheekbones when she looks down. Her body is a series of soft curves and sudden dips, with a narrow waist that flares out into rounded hips and thighs that feel like warm velvet under a touch.\n\nJulian is built like a man who spends his hours moving heavy things, with broad, square shoulders that stretch the seams of his shirts and a lean, hard stomach. His skin is a shade paler than hers, though his forearms are tanned from the sun, crisscrossed with a few thin, silver scars and the faint blue maps of veins that pulse under the surface. He has a jawline that looks like it was carved from gray granite, always shadowed by a rough, dark stubble that scratches the sensitive skin of Elena's neck. His eyes are a sharp, piercing slate gray, hooded and focused, and his hands are large, with long fingers and calloused pads that leave a lingering heat wherever they touch.\n\n"
+        },
+        {
+            "role": "user",
+            "content": "You can't see any images in this chat can you?"
         },
         {
             "role": "assistant",

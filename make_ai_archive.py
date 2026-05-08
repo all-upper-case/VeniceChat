@@ -5,7 +5,7 @@ from datetime import datetime
 ROOT = Path.cwd()
 
 OUTPUT_ZIP = ROOT / "ai_code_archive.zip"
-PATH_SEPARATOR = "___PATH___"
+PATH_SEPARATOR = "/"
 
 TEXT_EXTENSIONS = {
     ".txt",
@@ -22,10 +22,15 @@ SKIP_DIRS = {
     ".git",
     ".cache",
     ".config",
+    "conversations",
+    ".local",
+    ".edit_backups",
     ".upm",
+    "payload_logs",
     ".pythonlibs",
     "__pycache__",
     "node_modules",
+    "tts_logs",
     ".venv",
     "venv",
     "env",

@@ -70,47 +70,6 @@ document.addEventListener('DOMContentLoaded', () => {
         return 0;
     }
 
-    const FAVORITE_MODELS_STORAGE_KEY = 'veniceFavoriteModelIds';
-
-    function getFavoriteModelIds() {
-        try {
-            const raw = localStorage.getItem(FAVORITE_MODELS_STORAGE_KEY);
-            const parsed = raw ? JSON.parse(raw) : [];
-            return Array.isArray(parsed) ? parsed.filter(Boolean) : [];
-        } catch (e) {
-            return [];
-        }
-    }
-
-    function saveFavoriteModelIds(ids) {
-        const cleanIds = [...new Set((ids || []).filter(Boolean))];
-        localStorage.setItem(FAVORITE_MODELS_STORAGE_KEY, JSON.stringify(cleanIds));
-    }
-
-    function isFavoriteModel(modelId) {
-        return getFavoriteModelIds().includes(modelId);
-    }
-
-    function toggleFavoriteModel(modelId) {
-        if (!modelId) return;
-        let ids = getFavoriteModelIds();
-        if (ids.includes(modelId)) {
-            ids = ids.filter(id => id !== modelId);
-        } else {
-            ids.unshift(modelId);
-        }
-        saveFavoriteModelIds(ids);
-    }
-
-    function findModelById(modelId) {
-        if (!availableModels || !modelId) return null;
-        for (const group in availableModels) {
-            const found = availableModels[group].find(m => m.id === modelId);
-            if (found) return found;
-        }
-        return null;
-    }
-
     function parseContext(contextStr) {
         if (!contextStr || contextStr === 'N/A') return 0;
         return parseInt(contextStr.replace(/[^0-9]/g, '')) || 0;
@@ -166,8 +125,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const lowQuery = forceAll ? "" : query.toLowerCase();
         const effectiveTrait = forceAll ? "all" : trait;
         const currentVal = select.dataset.currentValue || select.value;
-        const isMainChatSelector = select.id === 'set-model-chat';
-        const favoriteIds = isMainChatSelector ? getFavoriteModelIds() : [];
         
         select.innerHTML = '';
         if (showDefault) {
@@ -177,57 +134,36 @@ document.addEventListener('DOMContentLoaded', () => {
             select.appendChild(defOpt);
         }
 
-        const modelMatches = (m) => {
-            const matchesQuery = m.name.toLowerCase().includes(lowQuery) || m.id.toLowerCase().includes(lowQuery);
-            let matchesTrait = true;
-            if (effectiveTrait === 'vision') {
-                matchesTrait = !!(m.supportsVision || m.vision);
-            } else if (effectiveTrait === 'reasoning') {
-                matchesTrait = !!(m.supportsReasoning || m.supportsReasoningEffort);
-            } else if (effectiveTrait === 'private') {
-                matchesTrait = m.traits?.toLowerCase().includes('private');
-            } else if (effectiveTrait === 'beta') {
-                matchesTrait = (m.tags && m.tags.includes('BETA')) || m.id.includes('beta');
-            }
-            return matchesQuery && matchesTrait;
-        };
-
-        const makeOption = (m) => {
-            const opt = document.createElement('option');
-            opt.value = m.id;
-            const favoritePrefix = isFavoriteModel(m.id) ? '★ ' : '';
-            const visionPrefix = (m.supportsVision || m.vision) ? '👁️ ' : '';
-            opt.textContent = favoritePrefix + visionPrefix + m.name;
-            if (m.id === currentVal) opt.selected = true;
-            return opt;
-        };
-
-        if (isMainChatSelector && favoriteIds.length > 0) {
-            const favoriteModels = favoriteIds
-                .map(id => findModelById(id))
-                .filter(m => m && modelMatches(m));
-
-            if (favoriteModels.length > 0) {
-                const favGroup = document.createElement('optgroup');
-                favGroup.label = '★ Favorite Models';
-                favoriteModels.forEach(m => favGroup.appendChild(makeOption(m)));
-                select.appendChild(favGroup);
-            }
-        }
-
         let allFiltered = [];
 
         for (const group in availableModels) {
             let filteredGroup = availableModels[group].filter(m => {
-                if (isMainChatSelector && favoriteIds.includes(m.id)) return false;
-                return modelMatches(m);
+                const matchesQuery = m.name.toLowerCase().includes(lowQuery) || m.id.toLowerCase().includes(lowQuery);
+                let matchesTrait = true;
+                if (effectiveTrait === 'vision') {
+                    matchesTrait = !!(m.supportsVision || m.vision);
+                } else if (effectiveTrait === 'reasoning') {
+                    matchesTrait = !!(m.supportsReasoning || m.supportsReasoningEffort);
+                } else if (effectiveTrait === 'private') {
+                    matchesTrait = m.traits?.toLowerCase().includes('private');
+                } else if (effectiveTrait === 'beta') {
+                    matchesTrait = (m.tags && m.tags.includes('BETA')) || m.id.includes('beta');
+                }
+
+                return matchesQuery && matchesTrait;
             });
 
             if (sort === 'name' && filteredGroup.length > 0) {
                 filteredGroup.sort((a, b) => a.name.localeCompare(b.name));
                 const optgroup = document.createElement('optgroup');
                 optgroup.label = group;
-                filteredGroup.forEach(m => optgroup.appendChild(makeOption(m)));
+                filteredGroup.forEach(m => {
+                    const opt = document.createElement('option');
+                    opt.value = m.id;
+                    opt.textContent = (m.vision ? '👁️ ' : '') + m.name;
+                    if (m.id === currentVal) opt.selected = true;
+                    optgroup.appendChild(opt);
+                });
                 select.appendChild(optgroup);
             } else if (sort !== 'name' && filteredGroup.length > 0) {
                 allFiltered.push(...filteredGroup);
@@ -243,7 +179,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 return 0;
             });
 
-            allFiltered.forEach(m => select.appendChild(makeOption(m)));
+            allFiltered.forEach(m => {
+                const opt = document.createElement('option');
+                opt.value = m.id;
+                opt.textContent = (m.vision ? '👁️ ' : '') + m.name;
+                if (m.id === currentVal) opt.selected = true;
+                select.appendChild(opt);
+            });
         }
     }
 
@@ -3608,38 +3550,6 @@ document.addEventListener('DOMContentLoaded', () => {
             const setCheck = (id, val) => { const el = document.getElementById(id); if (el) el.checked = val; };
             const setVal = (id, val) => { const el = document.getElementById(id); if (el) el.value = val; };
 
-            const ensureFavoriteModelButton = () => {
-                const select = document.getElementById('set-model-chat');
-                if (!select || document.getElementById('favorite-current-model-btn')) return;
-
-                const btn = document.createElement('button');
-                btn.id = 'favorite-current-model-btn';
-                btn.type = 'button';
-                btn.className = 'msg-btn';
-                btn.style.marginLeft = '8px';
-                btn.style.whiteSpace = 'nowrap';
-
-                const updateButton = () => {
-                    btn.textContent = isFavoriteModel(select.value) ? '★ Favorited' : '☆ Favorite';
-                    btn.title = isFavoriteModel(select.value)
-                        ? 'Remove this model from favorites'
-                        : 'Add this model to favorites';
-                };
-
-                btn.addEventListener('click', () => {
-                    toggleFavoriteModel(select.value);
-                    updateButton();
-                    filterAllModelSelectors();
-                });
-
-                select.addEventListener('change', updateButton);
-
-                if (select.parentElement) {
-                    select.parentElement.appendChild(btn);
-                    updateButton();
-                }
-            };
-
             const populateAllSyncSelectors = (currentSettings) => {
                 const mappings = {
                     'set-model-chat': currentSettings.venice.model,
@@ -3660,8 +3570,6 @@ document.addEventListener('DOMContentLoaded', () => {
                         populateFilteredSelect(select);
                     }
                 }
-
-                ensureFavoriteModelButton();
             };
 
             populateAllSyncSelectors(d);

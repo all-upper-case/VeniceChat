@@ -1,1 +1,0 @@
-Hello from Antigravity! This is a test file to verify the push_to_replit.py script is working correctly.
