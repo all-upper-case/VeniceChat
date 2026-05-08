@@ -2693,15 +2693,8 @@ def chat():
         raw_reasoning_effort = v_set.get("reasoning_effort", "medium")
         model_meta = get_local_model_metadata(model_to_use)
         model_supports_reasoning = is_reasoning_model(model_to_use)
-
-        # Be deliberately conservative here. Some cached/live metadata may say a
-        # model supports reasoning effort, but Venice/upstream providers can still
-        # reject a stale or unsupported reasoning_effort value. Only send
-        # reasoning_effort when this app has an explicit allowlist of valid values
-        # for the selected model family.
-        effort_values = get_reasoning_effort_values_for_model(model_to_use, model_meta.get("name", ""))
-        model_supports_reasoning_effort = bool(effort_values)
-
+        effort_values = model_meta.get("reasoningEffortValues") or get_reasoning_effort_values_for_model(model_to_use, model_meta.get("name", ""))
+        model_supports_reasoning_effort = bool(model_meta.get("supportsReasoningEffort") or effort_values)
         model_can_disable_reasoning = bool(model_meta.get("canDisableReasoning") or model_reasoning_disable_supported(model_to_use, model_meta.get("name", "")))
 
         venice_params = {

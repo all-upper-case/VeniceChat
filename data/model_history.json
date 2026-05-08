@@ -1,4 +1,5 @@
 [
+    "openai-gpt-4o-mini-2024-07-18",
     "e2ee-gpt-oss-20b-p",
     "olafangensan-glm-4.7-flash-heretic",
     "mistral-small-2603",
@@ -12,6 +13,5 @@
     "deepseek-v3.2",
     "kimi-k2-6",
     "e2ee-venice-uncensored-24b-p",
-    "gemma-4-uncensored",
-    "e2ee-gpt-oss-120b-p"
+    "gemma-4-uncensored"
 ]
