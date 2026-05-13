@@ -3,8 +3,6 @@ document.addEventListener('DOMContentLoaded', () => {
     let summaries = [];
     let currentVisualMemory = "";
     let currentSelfMemory = "";
-    let currentNotepadToolGuidance = "";
-    let currentNotepadChatInstructions = "";
     let memoryLogs = [];
     let isGenerating = false;
     let guidedModeEnabled = false;
@@ -1415,8 +1413,6 @@ document.addEventListener('DOMContentLoaded', () => {
             if (vmTextarea) vmTextarea.value = currentVisualMemory;
 
             currentSelfMemory = data.self_memory || "";
-            currentNotepadToolGuidance = data.notepad_tool_guidance || "";
-            currentNotepadChatInstructions = data.notepad_chat_instructions || "";
             memoryLogs = data.memory_logs || [];
             if (document.getElementById('memory-modal')?.style.display === 'block') {
                 renderMemoryManagerUI();
@@ -1488,31 +1484,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!chunk) return;
             const wrapper = document.createElement('div');
             wrapper.className = 'notepad-text-chunk';
-            let html = typeof marked !== 'undefined' ? marked.parse(chunk) : chunk;
-
-            const auditRegex = /\[UPDATE_SUMMARY index=["&quot;]*(\d+)["&quot;]*\]([\s\S]*?)\[\/UPDATE_SUMMARY\]/gi;
-            html = html.replace(auditRegex, (match, idx, newText) => {
-                const cleanNew = newText.trim();
-                let oldTextHTML = `<div style="color:#888; font-style:italic;">(Original summary data not loaded. Open Evidence Drawer to sync.)</div>`;
-                
-                const bIdx = parseInt(idx);
-                if (parentSummariesCache && parentSummariesCache[bIdx]) {
-                    const oldText = parentSummariesCache[bIdx].content.replace(/<think>.*?<\/think>/gs, '').trim();
-                    oldTextHTML = `<div><strong>Original Summary:</strong><br><div class="audit-comparison-panel">${oldText}</div></div>`;
-                }
-                
-                return `<div class="audit-tool-card">
-                    <div class="audit-tool-header">🛠️ Proposed Summary Update (Batch #${bIdx + 1})</div>
-                    ${oldTextHTML}
-                    <div><strong>Proposed Fix:</strong><br><div class="audit-comparison-panel" style="border-left-color:#10b981;">${cleanNew}</div></div>
-                    <div style="display:flex; gap:10px; margin-top:12px;">
-                        <button class="msg-btn" style="flex:1; background:#333; border:1px solid #555;" onclick="document.getElementById('audit-top-bar').click();">View Sources</button>
-                        <button class="msg-btn apply-audit-btn" data-index="${idx}" data-text="${encodeURIComponent(cleanNew)}" style="flex:2; background:#2563eb; color:white; border:none; font-weight:bold;">Approve & Apply to Original Chat</button>
-                    </div>
-                </div>`;
-            });
-
-            wrapper.innerHTML = html;
+            wrapper.innerHTML = typeof marked !== 'undefined' ? marked.parse(chunk) : chunk;
             target.appendChild(wrapper);
         };
 
@@ -1522,18 +1494,8 @@ document.addEventListener('DOMContentLoaded', () => {
             block.style.cssText = 'margin:10px 0; border:1px solid #365d46; border-radius:6px; overflow:hidden; font-size:0.86em;';
 
             let opLabel = 'edit';
-            const jsonMatch = rawBlock.match(/<notepad_tool_call>\s*([\s\S]*?)\s*<\/notepad_tool_call>/i);
-            if (jsonMatch) {
-                try {
-                    const parsed = JSON.parse(jsonMatch[1]);
-                    if (parsed && parsed.operation) opLabel = parsed.operation;
-                } catch(e) {
-                    opLabel = 'invalid json';
-                }
-            } else {
-                if (rawBlock.includes('[ADD]') || rawBlock.includes('[APPEND]')) opLabel = 'append';
-                if (rawBlock.includes('[REPLACE]')) opLabel = 'replace';
-            }
+            if (rawBlock.includes('[ADD]')) opLabel = 'add';
+            if (rawBlock.includes('[REPLACE]')) opLabel = 'replace';
 
             block.innerHTML = `
                 <div class="notepad-tool-call-header" style="display:flex; justify-content:space-between; align-items:center; padding:6px 12px; background:#13251b; color:#86efac; cursor:pointer; user-select:none;">
@@ -1555,7 +1517,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return block;
         };
 
-        const regex = /(?:<notepad_tool_call>[\s\S]*?<\/notepad_tool_call>|\[MEMORY_ACTION\][\s\S]*?\[\/MEMORY_ACTION\])/gi;
+        const regex = /\[MEMORY_ACTION\][\s\S]*?\[\/MEMORY_ACTION\]/g;
         let lastIdx = 0;
         let match;
 
@@ -1771,7 +1733,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             </div>`;
                         });
 
-                        renderContentWithNotepadTools(contentDiv, textContent || "");
+                        contentDiv.innerHTML = parsedContent;
 
                         if (Array.isArray(msg.content)) {
                             msg.content.forEach((part, partIdx) => {
@@ -2917,12 +2879,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function renderMemoryManagerUI() {
         const contentTa = document.getElementById('memory-content-text');
-        const toolGuidanceTa = document.getElementById('memory-tool-guidance-text');
-        const chatInstructionsTa = document.getElementById('memory-chat-instructions-text');
         const logsDiv = document.getElementById('memory-logs-list');
         if (contentTa) contentTa.value = currentSelfMemory;
-        if (toolGuidanceTa) toolGuidanceTa.value = currentNotepadToolGuidance;
-        if (chatInstructionsTa) chatInstructionsTa.value = currentNotepadChatInstructions;
         if (logsDiv) {
             logsDiv.innerHTML = '';
             if (memoryLogs.length === 0) {
@@ -2957,34 +2915,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
     safeBind('save-memory-btn', 'click', async () => {
         const val = document.getElementById('memory-content-text').value;
-        const toolGuidance = document.getElementById('memory-tool-guidance-text')?.value || "";
-        const chatInstructions = document.getElementById('memory-chat-instructions-text')?.value || "";
         const btn = document.getElementById('save-memory-btn');
         const ogText = btn.textContent;
         btn.textContent = "Saving..."; btn.disabled = true;
 
         try {
-            await fetch('/update_visual_memory', {
+            await fetch('/update_visual_memory', { // We reuse the update route but specify self_memory
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ memory: val, type: 'self' })
-            });
-            await fetch('/update_visual_memory', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ memory: toolGuidance, type: 'notepad_guidance' })
-            });
-            await fetch('/update_visual_memory', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ memory: chatInstructions, type: 'notepad_chat_instructions' })
+                body: JSON.stringify({ memory: val, type: 'self' }) // Add type to distinguish
             });
             currentSelfMemory = val;
-            currentNotepadToolGuidance = toolGuidance;
-            currentNotepadChatInstructions = chatInstructions;
-            alert("Notepad settings updated.");
+            alert("Internal Memory updated manually.");
             await loadHistory();
-        } catch(e) { alert("Failed to save notepad settings."); }
+        } catch(e) { alert("Failed to save memory."); }
         
         btn.textContent = ogText; btn.disabled = false;
     });
@@ -4529,7 +4473,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (contentDiv.innerHTML === '<i>Thinking...</i>') {
                         contentDiv.innerHTML = '';
                     }
-                    renderContentWithNotepadTools(contentDiv, thread[lastMsgIdx].content || "");
+                    contentDiv.innerHTML = typeof marked !== 'undefined' ? marked.parse(thread[lastMsgIdx].content) : thread[lastMsgIdx].content;
                 }
             }
             if (update.reasoning) {

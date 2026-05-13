@@ -1338,35 +1338,25 @@ eyes widened in surprise"></textarea>
                 <span id="close-memory-x" class="close-x">×</span>
             </div>
             <p style="color:var(--text-dim); font-size:0.9em; margin-top:0;">This is the persistent scratchpad the AI
-                uses to remember durable context. It can update this itself during a chat turn, or you can manually
-                edit the notepad and its tool instructions below.</p>
+                uses to remember long-term facts, motivations, and feedback. It can update this itself during a chat
+                turn, or you can manually edit it below.</p>
 
-            <div style="flex:1; display:flex; flex-direction:column; gap:10px; min-height:0; overflow-y:auto; padding-right:4px;">
-                <label style="color:var(--accent); font-weight:bold;">Current Notepad Content:</label>
+            <div style="flex:1; display:flex; flex-direction:column; gap:10px; min-height:0;">
+                <label style="color:var(--accent); font-weight:bold;">Current Content:</label>
                 <textarea id="memory-content-text"
-                    style="min-height:220px; resize:vertical; padding:15px; background:#1a1a1a; border:1px solid #333; color:#ccc; border-radius:8px; font-family:inherit; line-height:1.5;"
+                    style="flex:2; resize:none; padding:15px; background:#1a1a1a; border:1px solid #333; color:#ccc; border-radius:8px; font-family:inherit; line-height:1.5;"
                     placeholder="Memory is currently empty..."></textarea>
-
-                <label style="color:var(--accent); font-weight:bold; margin-top:10px;">Tool Format / Usage Guidance:</label>
-                <textarea id="memory-tool-guidance-text"
-                    style="min-height:150px; resize:vertical; padding:15px; background:#1a1a1a; border:1px solid #333; color:#ccc; border-radius:8px; font-family:inherit; line-height:1.5;"
-                    placeholder="Optional custom system guidance for how the model should use the notepad tool. Leave blank to use the built-in default."></textarea>
-
-                <label style="color:var(--accent); font-weight:bold; margin-top:10px;">Chat-Specific Notepad Instructions:</label>
-                <textarea id="memory-chat-instructions-text"
-                    style="min-height:110px; resize:vertical; padding:15px; background:#1a1a1a; border:1px solid #333; color:#ccc; border-radius:8px; font-family:inherit; line-height:1.5;"
-                    placeholder="Optional instructions for this chat, such as: note every new character introduced."></textarea>
 
                 <label style="color:var(--purple); font-weight:bold; margin-top:10px;">Change Logs (Audit
                     Trail):</label>
                 <div id="memory-logs-list"
-                    style="min-height:180px; background:#111; border:1px solid #333; border-radius:8px; overflow-y:auto; padding:10px; font-size:0.85em;">
+                    style="flex:1; background:#111; border:1px solid #333; border-radius:8px; overflow-y:auto; padding:10px; font-size:0.85em;">
                     <!-- Logs populated via JS -->
                 </div>
             </div>
 
             <button id="save-memory-btn" class="action"
-                style="background:var(--accent); margin-top:15px; height:50px;">Save Notepad Settings</button>
+                style="background:var(--accent); margin-top:15px; height:50px;">Save Manual Edits</button>
         </div>
     </div>
 

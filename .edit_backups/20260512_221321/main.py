@@ -752,23 +752,11 @@ def get_active_chat_path():
         })
     return os.path.join(FILES["conversations_dir"], fn)
 
-def scrub_notepad_tool_calls_for_api(content, role=None):
-    if role != "assistant" or not isinstance(content, str):
-        return content
-
-    return re.sub(
-        r'(<notepad_tool_call>.*?</notepad_tool_call>|\[MEMORY_ACTION\].*?\[/MEMORY_ACTION\])',
-        '[MODEL NOTEPAD TOOL CALL OMITTED FROM HISTORY. Current notepad state and recent edit digest are provided later in context.]',
-        content,
-        flags=re.DOTALL | re.IGNORECASE
-    )
-
 def clean_for_api(messages):
     cleaned = []
     for m in messages:
         c = m.get('content', '')
         if isinstance(c, str) and c.startswith('__IMG_JSON__'): continue
-        c = scrub_notepad_tool_calls_for_api(c, m.get("role"))
         cleaned.append({"role": m.get("role"), "content": c})
     return cleaned
 
@@ -1083,6 +1071,18 @@ def build_context(chat_data, user_query=None, current_model=None):
         context.append({"role": "system", "content": f"--- PERMANENT CHARACTER VISUALS & LORE ---\n{vis_mem}"})
 
     v_set = read_json(FILES["venice_settings"], {})
+    if v_set.get("auto_memory_enabled"):
+        self_mem = chat_data.get("self_memory", "")
+        if self_mem:
+            context.append({
+                "role": "system", 
+                "content": f"--- AI INTERNAL NOTEPAD (Your Persistent Self-Memory) ---\n{self_mem}"
+            })
+        
+        # Inject surgical tool instructions into the system prompt
+        tool_instr = "\n\n[AI SELF-MEMORY TOOL]\nYou have a persistent 'Internal Notepad' at a fixed position near the start of your context. Note that while its position is static, its contents are dynamic and cumulative; the version you see always reflects the most up-to-date state resulting from all cumulative tool calls and manual edits, regardless of the chat chronology. Use it to track long-term facts, motivations, or user feedback that might otherwise be lost during summarization. To update it, output exactly this format at the VERY END of your response:\n\n[MEMORY_ACTION]\n[ADD]\nText to append to the end of the notepad.\n[/ADD]\n[REPLACE]\nExact text to find and remove.\n[WITH]\nNew text to replace it with.\n[/REPLACE]\n[/MEMORY_ACTION]"
+        if context[0]["role"] == "system":
+            context[0]["content"] += tool_instr
 
     # --- STABLE HISTORY BLOCK (Summaries & Raw History) ---
     v_set = read_json(FILES["venice_settings"], {})
@@ -1154,11 +1154,9 @@ def build_context(chat_data, user_query=None, current_model=None):
                                     new_content.append(part)
                             context.append({"role": msgs[msg_idx]["role"], "content": new_content})
                         else:
-                            msg_role = msgs[msg_idx]["role"]
-                            context.append({"role": msg_role, "content": scrub_notepad_tool_calls_for_api(get_text_content(msgs[msg_idx]), msg_role)})
+                            context.append({"role": msgs[msg_idx]["role"], "content": get_text_content(msgs[msg_idx])})
                     else:
-                        msg_role = msgs[msg_idx]["role"]
-                        context.append({"role": msg_role, "content": scrub_notepad_tool_calls_for_api(c, msg_role)})
+                        context.append({"role": msgs[msg_idx]["role"], "content": c})
                 msg_idx += 1
     else:
         v_set = read_json(FILES["venice_settings"], {})
@@ -1185,7 +1183,7 @@ def build_context(chat_data, user_query=None, current_model=None):
                             new_content.append(part)
                     context.append({"role": m["role"], "content": new_content})
                 else:
-                    context.append({"role": m["role"], "content": scrub_notepad_tool_calls_for_api(get_text_content(m), m["role"])})
+                    context.append({"role": m["role"], "content": get_text_content(m)})
             else:
                 context.append({"role": m["role"], "content": c})
 
@@ -1200,72 +1198,6 @@ def build_context(chat_data, user_query=None, current_model=None):
                 "role": "system", 
                 "content": f"{read_text(FILES['rag_note_prompt'])}\n{lore_text}"
             })
-
-    # --- VOLATILE CONTEXT BLOCK (MODEL NOTEPAD) ---
-    # Injected very late so the model sees the current notepad state close to
-    # the latest user message, even when older chat history has been summarized.
-    if v_set.get("auto_memory_enabled"):
-        self_mem = chat_data.get("self_memory", "").strip()
-        tool_guidance = chat_data.get("notepad_tool_guidance", "").strip()
-        chat_specific = chat_data.get("notepad_chat_instructions", "").strip()
-
-        if not tool_guidance:
-            tool_guidance = (
-                "You have access to a persistent Model Notepad. Use it for durable facts, "
-                "character/lore tracking, user preferences, continuity notes, or other details "
-                "that should survive summarization and context trimming.\n\n"
-                "When you need to edit the notepad, write a visible tool call in your normal assistant message "
-                "using exactly this XML-wrapped JSON format:\n\n"
-                "<notepad_tool_call>\n"
-                "{\n"
-                "  \"operation\": \"append\",\n"
-                "  \"content\": \"New text to add only at the very end of the notepad.\"\n"
-                "}\n"
-                "</notepad_tool_call>\n\n"
-                "Supported operations:\n"
-                "- append: add new text only at the end of the notepad. Never use append to modify, correct, remove, or rewrite existing notepad content.\n"
-                "- replace: replace exact existing notepad text. Use fields \"find\" and \"replace\".\n"
-                "- overwrite: replace the entire notepad with new content. Use field \"content\".\n\n"
-                "Do not include a reason field. Keep edits concise and intentional."
-            )
-
-        recent_log_lines = []
-        for log in chat_data.get("memory_logs", [])[:8]:
-            if log.get("operation"):
-                recent_log_lines.append(
-                    f"- {log.get('operation', 'edit')}: +{log.get('words_added', 0)} words, "
-                    f"-{log.get('words_removed', 0)} words. "
-                    f"Start: \"{log.get('preview_start', '')}\" End: \"{log.get('preview_end', '')}\""
-                )
-            elif log.get("change"):
-                recent_log_lines.append(f"- {log.get('change')}")
-
-        notepad_parts = [
-            "[MODEL NOTEPAD - CURRENT CONTENT]",
-            self_mem if self_mem else "(The notepad is currently empty.)",
-            "",
-            "[MODEL NOTEPAD TOOL GUIDANCE]",
-            tool_guidance
-        ]
-
-        if chat_specific:
-            notepad_parts.extend([
-                "",
-                "[CHAT-SPECIFIC NOTEPAD INSTRUCTIONS]",
-                chat_specific
-            ])
-
-        if recent_log_lines:
-            notepad_parts.extend([
-                "",
-                "[RECENT NOTEPAD EDIT ACTIVITY]",
-                "\n".join(recent_log_lines)
-            ])
-
-        context.append({
-            "role": "system",
-            "content": "\n".join(notepad_parts)
-        })
 
     return context
 
@@ -1836,8 +1768,6 @@ def get_history():
         "visual_memory": data["visual_memory"], 
         "self_memory": data.get("self_memory", ""),
         "memory_logs": data.get("memory_logs", []),
-        "notepad_tool_guidance": data.get("notepad_tool_guidance", ""),
-        "notepad_chat_instructions": data.get("notepad_chat_instructions", ""),
         "character_slug": data.get("character_slug"),
         "has_backup": has_backup,
         "audit_context": data.get("audit_context", {"batches": [], "includeRaw": True}),
@@ -2928,9 +2858,6 @@ def chat():
                                             # check for start tags
                                             sum_idx = chunk_buffer.find('[SUM]')
                                             mem_idx = chunk_buffer.find('[MEMORY_ACTION]')
-                                            # Keep notepad tool calls visible in the regular assistant message.
-                                            # They are parsed and applied after streaming from the final visible text.
-                                            mem_idx = -1
                                             
                                             first_tag = None
                                             first_idx = -1
@@ -3019,153 +2946,50 @@ def chat():
             
             save_chat_data(path, chat_data)
 
-            notepad_actions = []
-
-            # Preferred current format:
-            # <notepad_tool_call>{"operation":"append|replace|overwrite", ...}</notepad_tool_call>
-            xml_blocks = re.findall(
-                r'<notepad_tool_call>\s*(\{.*?\})\s*</notepad_tool_call>',
-                full,
-                re.DOTALL | re.IGNORECASE
-            )
-            for block in xml_blocks:
-                try:
-                    parsed = json.loads(block.strip())
-                    if isinstance(parsed, dict):
-                        notepad_actions.append(parsed)
-                except Exception as e:
-                    print(f"[NOTEPAD TOOL ERROR] Could not parse JSON tool call: {e}")
-
-            # Legacy compatibility for older saved prompts/messages.
-            legacy_blocks = re.findall(r'\[MEMORY_ACTION\](.*?)\[/MEMORY_ACTION\]', full, re.DOTALL)
+            # Post-stream surgical memory update logic
             if memory_buffer:
-                legacy_blocks.append(memory_buffer)
-
-            for raw_actions in legacy_blocks:
+                raw_actions = memory_buffer
                 if '[/MEMORY_ACTION]' in raw_actions:
                     raw_actions = raw_actions.split('[/MEMORY_ACTION]')[0]
-
-                replace_pattern = re.compile(r'\[REPLACE\]\s*(.*?)\s*\[WITH\]\s*(.*?)\s*\[/REPLACE\]', re.DOTALL)
-                for match in replace_pattern.finditer(raw_actions):
-                    notepad_actions.append({
-                        "operation": "replace",
-                        "find": match.group(1).strip(),
-                        "replace": match.group(2).strip()
-                    })
-
-                append_pattern = re.compile(r'\[(?:ADD|APPEND)\]\s*(.*?)\s*\[/(?:ADD|APPEND)\]', re.DOTALL)
-                for match in append_pattern.finditer(raw_actions):
-                    notepad_actions.append({
-                        "operation": "append",
-                        "content": match.group(1).strip()
-                    })
-
-            # Post-stream surgical notepad update logic
-            if notepad_actions:
+                
                 # Reload chat data right before update to ensure we aren't using a stale copy
                 fresh_data = load_chat_data(path)
                 updated_mem = fresh_data.get("self_memory", "")
                 changes_made = []
-                structured_change_logs = []
 
-                def memory_word_count(text):
-                    return len(re.findall(r'\S+', text or ''))
+                # 1. Handle [REPLACE]...[WITH]...[/REPLACE]
+                replace_pattern = re.compile(r'\[REPLACE\]\s*(.*?)\s*\[WITH\]\s*(.*?)\s*\[/REPLACE\]', re.DOTALL)
+                for match in replace_pattern.finditer(raw_actions):
+                    old_text = match.group(1).strip()
+                    new_text = match.group(2).strip()
+                    if old_text and old_text in updated_mem:
+                        updated_mem = updated_mem.replace(old_text, new_text)
+                        snip = f"{new_text[:15]}...{new_text[-15:]}" if len(new_text) > 30 else new_text
+                        changes_made.append(f"REPLACED text with: '{snip}'")
+                    elif old_text:
+                        print(f"[MEMORY TOOL ERROR] Could not find exact match to replace: {old_text[:50]}...")
 
-                def memory_edge_preview(text, max_words=10):
-                    words = re.findall(r'\S+', text or '')
-                    if not words:
-                        return "", ""
-                    return " ".join(words[:max_words]), " ".join(words[-max_words:])
-
-                def add_structured_log(operation, words_added, words_removed, preview_text, change_text):
-                    preview_start, preview_end = memory_edge_preview(preview_text)
-                    structured_change_logs.append({
-                        "timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M"),
-                        "model": f"AI Model ({model_to_use})",
-                        "operation": operation,
-                        "words_added": words_added,
-                        "words_removed": words_removed,
-                        "preview_start": preview_start,
-                        "preview_end": preview_end,
-                        "change": change_text
-                    })
-
-                for action in notepad_actions:
-                    operation = str(action.get("operation", "")).strip().lower()
-
-                    if operation == "append":
-                        addition = str(action.get("content", "")).strip()
-                        if addition:
-                            if updated_mem:
-                                updated_mem += "\n" + addition
-                            else:
-                                updated_mem = addition
-                            words_added = memory_word_count(addition)
-                            changes_made.append(f"APPENDED {words_added} words.")
-                            add_structured_log(
-                                "append",
-                                words_added,
-                                0,
-                                addition,
-                                f"APPENDED {words_added} words."
-                            )
-
-                    elif operation == "replace":
-                        old_text = str(action.get("find", "")).strip()
-                        new_text = str(action.get("replace", "")).strip()
-                        if old_text and old_text in updated_mem:
-                            updated_mem = updated_mem.replace(old_text, new_text)
-                            words_removed = memory_word_count(old_text)
-                            words_added = memory_word_count(new_text)
-                            changes_made.append(f"REPLACED {words_removed} words with {words_added} words.")
-                            add_structured_log(
-                                "replace",
-                                words_added,
-                                words_removed,
-                                new_text,
-                                f"REPLACED {words_removed} words with {words_added} words."
-                            )
-                        elif old_text:
-                            print(f"[NOTEPAD TOOL ERROR] Could not find exact match to replace: {old_text[:50]}...")
-
-                    elif operation == "overwrite":
-                        new_content = str(action.get("content", "")).strip()
-                        old_words = memory_word_count(updated_mem)
-                        new_words = memory_word_count(new_content)
-                        updated_mem = new_content
-                        changes_made.append(f"OVERWROTE notepad with {new_words} words.")
-                        add_structured_log(
-                            "overwrite",
-                            new_words,
-                            old_words,
-                            new_content,
-                            f"OVERWROTE notepad with {new_words} words."
-                        )
-
-                    else:
-                        print(f"[NOTEPAD TOOL ERROR] Unknown operation: {operation}")
+                # 2. Handle [ADD]...[/ADD]
+                add_pattern = re.compile(r'\[ADD\]\s*(.*?)\s*\[/ADD\]', re.DOTALL)
+                for match in add_pattern.finditer(raw_actions):
+                    addition = match.group(1).strip()
+                    if addition:
+                        if updated_mem:
+                            updated_mem += "\n" + addition
+                        else:
+                            updated_mem = addition
+                        snip = f"{addition[:15]}...{addition[-15:]}" if len(addition) > 30 else addition
+                        changes_made.append(f"ADDED: '{snip}'")
 
                 if changes_made:
                     fresh_data["self_memory"] = updated_mem.strip()
-                    if "memory_logs" not in fresh_data:
-                        fresh_data["memory_logs"] = []
-
-                    if structured_change_logs:
-                        for log_entry in reversed(structured_change_logs):
-                            fresh_data["memory_logs"].insert(0, log_entry)
-                    else:
-                        fresh_data["memory_logs"].insert(0, {
-                            "timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M"),
-                            "model": f"AI Model ({model_to_use})",
-                            "operation": "edit",
-                            "words_added": 0,
-                            "words_removed": 0,
-                            "preview_start": "",
-                            "preview_end": "",
-                            "change": "; ".join(changes_made)
-                        })
-
-                    fresh_data["memory_logs"] = fresh_data["memory_logs"][:50]
+                    log_entry = {
+                        "timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M"),
+                        "model": f"AI Model ({model_to_use})",
+                        "change": "; ".join(changes_made)
+                    }
+                    if "memory_logs" not in fresh_data: fresh_data["memory_logs"] = []
+                    fresh_data["memory_logs"].insert(0, log_entry)
                     save_chat_data(path, fresh_data)
                     
                     # Update local state for subsequent summary processing in same turn if needed
@@ -3520,40 +3344,16 @@ def update_visual_memory():
     path = get_active_chat_path()
     data = load_chat_data(path)
     mem_type = request.json.get('type', 'visual')
-    content = request.json.get('memory', '')
-    if content is None:
-        content = ""
-
-    if "memory_logs" not in data:
-        data["memory_logs"] = []
+    content = request.json.get('memory')
     
-    if mem_type in ('self', 'notepad'):
-        old_content = data.get("self_memory", "")
+    if mem_type == 'self':
         data["self_memory"] = content
-
-        old_words = len(re.findall(r'\S+', old_content or ''))
-        new_words = len(re.findall(r'\S+', content or ''))
-        words_added = max(new_words - old_words, 0)
-        words_removed = max(old_words - new_words, 0)
-        words = re.findall(r'\S+', content or '')
-        preview_start = " ".join(words[:10]) if words else ""
-        preview_end = " ".join(words[-10:]) if words else ""
-
+        snip = f"{content[:15]}...{content[-15:]}" if len(content) > 30 else content
         data["memory_logs"].insert(0, {
             "timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M"),
             "model": "User (Manual Edit)",
-            "operation": "manual_edit",
-            "words_added": words_added,
-            "words_removed": words_removed,
-            "preview_start": preview_start,
-            "preview_end": preview_end,
-            "change": f"Manual notepad edit. New size: {new_words} words."
+            "change": f"Manually edited to: '{snip}'"
         })
-        data["memory_logs"] = data["memory_logs"][:50]
-    elif mem_type == 'notepad_guidance':
-        data["notepad_tool_guidance"] = content
-    elif mem_type == 'notepad_chat_instructions':
-        data["notepad_chat_instructions"] = content
     else:
         data["visual_memory"] = content
         

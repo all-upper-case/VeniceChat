@@ -1,8 +1,8 @@
 {
     "num_inference_steps": 8,
-    "width": 1536,
-    "height": 2048,
-    "res_tier": "2k",
+    "width": 864,
+    "height": 1152,
+    "res_tier": "standard",
     "aspect_ratio": "3:4",
     "guided_mode": false,
     "art_style": "None",
