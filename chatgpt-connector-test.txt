@@ -1,0 +1,3 @@
+Hello from the ChatGPT GitHub connector.
+
+This is a small test file created directly on the default branch to confirm that file creation and pushing/committing through the connector works.
