@@ -1,4 +1,4 @@
 {
-    "model": "google.gemma-4-31b-it",
+    "model": "gemma-4-uncensored",
     "temperature": 0.6
 }
