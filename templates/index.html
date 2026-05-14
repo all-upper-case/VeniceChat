@@ -24,7 +24,7 @@
             <summary>Advanced Utilities</summary>
             <div id="sidebar-utilities-content">
                 <button id="open-architect-btn" class="action full-btn"
-                    style="background:var(--purple); height:40px; font-size:0.9em; margin-bottom:10px;">⚡ Scenario Architect</button>
+                    style="background:var(--purple); height:40px; font-size:0.9em; margin-bottom:10px;">⚡ Scenario Designer</button>
                 <button id="open-api-explorer-btn" class="action full-btn"
                     style="background:#4338ca; height:40px; font-size:0.9em; margin-bottom:10px;">🌍 API Explorer</button>
                 <button id="open-ledger-btn" class="action full-btn"
@@ -661,21 +661,26 @@
     </div>
 
     <div id="architect-modal" class="modal">
-        <div class="modal-content" style="max-width:800px; height:90vh; display:flex; flex-direction:column;">
+        <div class="modal-content" style="max-width:min(1050px, 96vw); height:92vh; display:flex; flex-direction:column;">
             <div class="modal-header">
-                <h2>Scenario Architect</h2>
+                <div>
+                    <h2 style="margin-bottom:4px;">Scenario Designer</h2>
+                    <div style="color:var(--text-dim); font-size:0.9em;">Plan a roleplay, story, simulated chat, or narrative game, then turn it into a clean launch prompt.</div>
+                </div>
                 <span onclick="document.getElementById('architect-modal').style.display='none'" class="close-x">×</span>
             </div>
             <div id="architect-chat-display"
                 style="flex:1; overflow-y:auto; background:#111; padding:15px; border-radius:8px; margin-bottom:15px; border:1px solid #333;">
-                <div class="message assistant">Hello. I am the Scenario Architect. I can help you design a rich starting
-                    prompt for a new roleplay or story. What kind of genre or setting are you looking for today?</div>
+                <div class="message assistant">Hello. I’m the Scenario Designer. I can help you build a clear starting prompt for a new roleplay, story, simulated chat, or narrative game. Tell me the rough idea, or start with the genre, setting, characters, or format you want.</div>
             </div>
-            <div style="display:flex; gap:10px; height:80px;">
-                <textarea id="architect-input" placeholder="Describe your idea..."
+            <div style="display:flex; gap:10px; min-height:90px;">
+                <textarea id="architect-input" placeholder="Describe your idea, answer the designer’s question, or ask for PRESENT FINAL DRAFT when ready..."
                     style="flex:1; resize:none; font-family:inherit;"></textarea>
                 <button id="architect-send-btn" class="action"
-                    style="background:var(--purple); width:100px;">Send</button>
+                    style="background:var(--purple); width:120px;">Send</button>
+            </div>
+            <div style="color:var(--text-dim); font-size:0.8em; margin-top:8px;">
+                Tip: ask for “PRESENT FINAL DRAFT” to review the launch prompt. Say “START” when you want to create the new chat.
             </div>
         </div>
     </div>

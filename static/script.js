@@ -643,7 +643,65 @@ document.addEventListener('DOMContentLoaded', () => {
         renderTTSControls(index);
     }
 
-    // --- ARCHITECT LOGIC ---
+    // --- SCENARIO DESIGNER LOGIC ---
+    const SCENARIO_DESIGNER_GREETING = 'Hello. I’m the Scenario Designer. I can help you build a clear starting prompt for a new roleplay, story, simulated chat, or narrative game. Tell me the rough idea, or start with the genre, setting, characters, or format you want.';
+
+    function resetScenarioDesignerUI() {
+        architectHistory = [];
+        if (architectDisplay) {
+            architectDisplay.innerHTML = `<div class="message assistant">${SCENARIO_DESIGNER_GREETING}</div>`;
+        }
+    }
+
+    function extractScenarioDesignerAction(text) {
+        const toolMatch = text.match(/<scenario_designer_action>\s*([\s\S]*?)\s*<\/scenario_designer_action>/i);
+        if (toolMatch) {
+            const block = toolMatch[1].trim();
+            const visibleText = text.replace(toolMatch[0], '').trim();
+
+            const actionMatch = block.match(/<action>\s*([\s\S]*?)\s*<\/action>/i);
+            const titleMatch = block.match(/<title>\s*([\s\S]*?)\s*<\/title>/i);
+            const promptMatch = block.match(/<initialization_prompt>\s*([\s\S]*?)\s*<\/initialization_prompt>/i);
+
+            if (promptMatch) {
+                return {
+                    action: {
+                        action: actionMatch ? actionMatch[1].trim() : 'create_scenario',
+                        title: titleMatch ? titleMatch[1].trim() : '',
+                        initialization_prompt: promptMatch[1].trim(),
+                        format: 'xml'
+                    },
+                    visibleText
+                };
+            }
+
+            try {
+                const parsed = JSON.parse(block);
+                if (parsed && typeof parsed === 'object') {
+                    return { action: parsed, visibleText };
+                }
+            } catch (e) {
+                console.warn('Scenario Designer tool call could not be parsed:', e);
+            }
+        }
+
+        // Legacy compatibility with the old Scenario Architect prompt.
+        if (text.includes('[[SCENARIO_START]]')) {
+            const parts = text.split('[[SCENARIO_START]]');
+            return {
+                action: {
+                    action: 'create_scenario',
+                    title: '',
+                    initialization_prompt: (parts[1] || '').trim(),
+                    format: 'legacy_marker'
+                },
+                visibleText: (parts[0] || '').trim()
+            };
+        }
+
+        return { action: null, visibleText: text };
+    }
+
     safeBind('open-architect-btn', 'click', () => {
         if (architectModal) architectModal.style.display = 'block';
         if (architectHistory.length === 0 && architectDisplay) {
@@ -707,31 +765,48 @@ document.addEventListener('DOMContentLoaded', () => {
                 architectDisplay.scrollTop = architectDisplay.scrollHeight;
             }
 
-            if(fullContent.includes('[[SCENARIO_START]]')) {
-                const parts = fullContent.split('[[SCENARIO_START]]');
-                const finalPrompt = parts[1].trim();
-                aDiv.innerHTML += `<br><br><b style="color:var(--accent)">Creating Scenario...</b>`;
-                await createScenario(finalPrompt);
+            const parsedScenarioAction = extractScenarioDesignerAction(fullContent);
+
+            if (
+                parsedScenarioAction.action &&
+                (parsedScenarioAction.action.action || '').toLowerCase() === 'create_scenario'
+            ) {
+                const finalPrompt = (parsedScenarioAction.action.initialization_prompt || parsedScenarioAction.action.prompt || '').trim();
+
+                if (!finalPrompt) {
+                    aDiv.innerText = parsedScenarioAction.visibleText || fullContent;
+                    aDiv.innerText += "\n\n[Scenario Designer error: launch tool call did not include an initialization prompt.]";
+                    architectHistory.push({role:'assistant', content: fullContent});
+                    return;
+                }
+
+                aDiv.innerText = parsedScenarioAction.visibleText || 'Scenario prompt complete.';
+                aDiv.insertAdjacentHTML('beforeend', `<br><br><b style="color:var(--accent)">Creating scenario...</b>`);
+                await createScenario(finalPrompt, parsedScenarioAction.action);
             } else {
-                architectHistory.push({role:'assistant', content: fullContent});
+                aDiv.innerText = parsedScenarioAction.visibleText;
+                architectHistory.push({role:'assistant', content: parsedScenarioAction.visibleText});
             }
 
         } catch(e) { aDiv.innerText += " [Error]"; }
     });
 
-    async function createScenario(promptText) {
+    async function createScenario(promptText, scenarioMeta = {}) {
         try {
             const res = await fetch('/create_scenario_chat', {
                 method: 'POST', headers: {'Content-Type':'application/json'},
-                body: JSON.stringify({prompt: promptText})
+                body: JSON.stringify({
+                    prompt: promptText,
+                    title: scenarioMeta.title || '',
+                    scenario_meta: scenarioMeta
+                })
             });
             const data = await res.json();
             if(data.success) {
                 if (architectModal) architectModal.style.display = 'none';
                 const sidebar = document.getElementById('sidebar');
                 if (sidebar) sidebar.classList.add('hidden');
-                architectHistory = [];
-                if (architectDisplay) architectDisplay.innerHTML = '<div class="message assistant">Hello. I am the Scenario Architect. I can help you design a rich starting prompt for a new roleplay or story. What kind of genre or setting are you looking for today?</div>';
+                resetScenarioDesignerUI();
                 await loadHistory();
             } else {
                 alert("Error creating scenario: " + data.error);

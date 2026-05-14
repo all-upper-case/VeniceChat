@@ -1436,8 +1436,14 @@ def architect_chat():
 
 @app.route('/create_scenario_chat', methods=['POST'])
 def create_scenario_chat():
-    prompt = request.json.get('prompt')
+    req = request.json or {}
+    prompt = req.get('prompt')
     if not prompt: return jsonify({"error": "No prompt provided"}), 400
+
+    title = (req.get('title') or '').strip()
+    scenario_meta = req.get('scenario_meta') or {}
+    if not isinstance(scenario_meta, dict):
+        scenario_meta = {}
 
     ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
     fn = f"Scenario_{ts}.json"
@@ -1445,8 +1451,10 @@ def create_scenario_chat():
 
     messages = [
         {"role": "system", "content": read_text(FILES["main_prompt"])},
-        {"role": "user", "content": prompt}
+        {"role": "user", "content": prompt, "timestamp": datetime.datetime.now().isoformat()}
     ]
+
+    opening_error = None
 
     try:
         v_set = read_json(FILES["venice_settings"], {})
@@ -1461,14 +1469,30 @@ def create_scenario_chat():
         }
         resp = requests.post(VENICE_URL, headers=headers, json=payload).json()
         opening_content = resp['choices'][0]['message']['content']
-        messages.append({"role": "assistant", "content": opening_content})
+        messages.append({
+            "role": "assistant",
+            "content": opening_content,
+            "model": model_id,
+            "timestamp": datetime.datetime.now().isoformat()
+        })
     except Exception as e:
-        messages.append({"role": "assistant", "content": "(Error generating opening scene. You may need to regenerate.)"})
+        opening_error = str(e)
+        messages.append({
+            "role": "assistant",
+            "content": "(Error generating opening scene. You may need to regenerate.)",
+            "timestamp": datetime.datetime.now().isoformat()
+        })
 
     save_chat_data(path, {
         "messages": messages,
         "summaries": [],
-        "visual_memory": ""
+        "visual_memory": "",
+        "chat_type": "scenario",
+        "scenario_source": "scenario_designer",
+        "scenario_prompt": prompt,
+        "scenario_designer_title": title,
+        "scenario_designer_meta": scenario_meta,
+        "scenario_designer_opening_error": opening_error
     })
 
     write_json(FILES["active_meta"], {"filename": fn})
